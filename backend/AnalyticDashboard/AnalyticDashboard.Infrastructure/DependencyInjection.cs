@@ -1,6 +1,8 @@
+using AnalyticDashboard.Application.Import;
 using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Infrastructure.Data;
 using AnalyticDashboard.Infrastructure.Repositories;
+using AnalyticDashboard.Infrastructure.Services.Import;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,8 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IDatasetRepository, DatasetRepository>();
+        
+        services.AddScoped<ICsvImportService, CsvImportService>();
 
         return services;
     }

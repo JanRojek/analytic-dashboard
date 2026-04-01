@@ -15,6 +15,20 @@ public sealed class DeleteDatasetHandler
         DeleteDatasetCommand command, 
         CancellationToken cancellationToken)
     { 
+        var dataset = await _repository.GetByIdAsync(command.Id, cancellationToken);
+
+        if (dataset is null)
+        {
+            return false;
+        }
+
+        var datasetPath = dataset.StoredPath;
+
+        if (File.Exists(datasetPath))
+        {
+            File.Delete(datasetPath);
+        }
+        
         return await _repository.DeleteAsync(command.Id, cancellationToken);
     }
 }
