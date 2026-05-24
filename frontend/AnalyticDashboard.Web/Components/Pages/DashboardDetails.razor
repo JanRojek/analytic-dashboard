@@ -1,0 +1,90 @@
+@page "/dashboards/{Id:guid}"
+@inject HttpClient Http
+@inject AuthTokenService AuthTokenService
+@inject NavigationManager Navigation
+
+<div class="page-container dashboard-page">
+
+    @if (dashboard is null)
+    {
+        <p>Loading dashboard...</p>
+    }
+    else
+    {
+        <div class="dashboard-details-header">
+            <div>
+                <h1 class="section-title">@dashboard.Name</h1>
+                <p class="section-description">
+                    Dataset: @dashboard.DatasetName • Created @dashboard.CreatedAtUtc.ToString("yyyy-MM-dd")
+                </p>
+            </div>
+
+            <button class="upload-btn" disabled>
+                + Add widget
+            </button>
+        </div>
+
+        <div class="profile-card">
+            <h2 class="profile-card-title">Widgets</h2>
+
+            <div class="empty-widgets">
+                <p>No widgets yet.</p>
+                <p class="upload-text">Add your first widget to start building this dashboard.</p>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private DashboardDetailsDto? dashboard;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await LoadDashboard();
+        StateHasChanged();
+    }
+
+    private async Task LoadDashboard()
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"http://localhost:5151/dashboards/{Id}");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            dashboard = await response.Content.ReadFromJsonAsync<DashboardDetailsDto>();
+        }
+        else
+        {
+            Navigation.NavigateTo("/dashboards");
+        }
+    }
+
+    private sealed class DashboardDetailsDto
+    {
+        public Guid Id { get; set; }
+        public Guid DatasetId { get; set; }
+        public string DatasetName { get; set; } = "";
+        public string Name { get; set; } = "";
+        public DateTime CreatedAtUtc { get; set; }
+    }
+}

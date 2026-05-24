@@ -6,6 +6,9 @@ namespace AnalyticDashboard.Infrastructure.Data;
 public class AppDbContext : DbContext
 {
     public DbSet<Dataset> Datasets => Set<Dataset>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Dashboard> Dashboards => Set<Dashboard>();
+    public DbSet<Widget> Widgets => Set<Widget>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)

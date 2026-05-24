@@ -1,0 +1,156 @@
+@page "/datasets"
+@inject HttpClient Http
+@inject AuthTokenService AuthTokenService
+@inject NavigationManager Navigation
+
+<div class="page-container">
+
+    <div class="section-header">
+        <h1 class="section-title">Your Datasets</h1>
+        <p class="section-description">
+            Browse imported datasets and inspect their structure
+        </p>
+    </div>
+
+    <div class="profile-card">
+        <h2 class="profile-card-title">Your datasets</h2>
+
+        @if (datasets == null)
+        {
+            <p>Loading datasets...</p>
+        }
+        else if (datasets.Count == 0)
+        {
+            <p>No datasets yet. Go to Import and upload your first CSV.</p>
+        }
+        else
+        {
+            @foreach (var d in datasets)
+            {
+                <div class="dataset-card" @onclick="() => OpenDataset(d.Id)">
+                    <div class="dataset-card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="28"
+                             height="28"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="2"
+                             stroke-linecap="round"
+                             stroke-linejoin="round">
+                            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+                            <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+                            <path d="M8 18v-1" />
+                            <path d="M12 18v-6" />
+                            <path d="M16 18v-3" />
+                        </svg>
+                    </div>
+
+                    <div class="dataset-card-body">
+                        <h3 class="dataset-card-title">@d.Name</h3>
+                        <p class="dataset-card-file">@d.OriginalFileName</p>
+                        <p class="dataset-card-meta">
+                            Created @d.CreatedAtUtc.ToString("yyyy-MM-dd")
+                        </p>
+                    </div>
+
+                    <div class="dataset-card-actions">
+                        <div class="dataset-card-stats">
+                            <div class="dataset-badge">@d.RowCount rows</div>
+                            <div class="dataset-badge">@d.ColumnCount columns</div>
+                        </div>
+
+                        <button class="dashboard-delete-btn"
+                                @onclick:stopPropagation="true"
+                                @onclick="() => DeleteDataset(d.Id)">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private List<DatasetDto>? datasets;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await LoadDatasets();
+        StateHasChanged();
+    }
+
+    private async Task LoadDatasets()
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "http://localhost:5151/datasets");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            datasets = await response.Content.ReadFromJsonAsync<List<DatasetDto>>();
+        }
+        else
+        {
+            Navigation.NavigateTo("/auth");
+        }
+    }
+
+    private async Task DeleteDataset(Guid id)
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"http://localhost:5151/datasets/{id}");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadDatasets();
+            StateHasChanged();
+        }
+    }
+
+    private void OpenDataset(Guid id)
+    {
+        Navigation.NavigateTo($"/datasets/{id}");
+    }
+
+    private sealed class DatasetDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string OriginalFileName { get; set; } = string.Empty;
+        public DateTime CreatedAtUtc { get; set; }
+        public int RowCount { get; set; }
+        public int ColumnCount { get; set; }
+    }
+}

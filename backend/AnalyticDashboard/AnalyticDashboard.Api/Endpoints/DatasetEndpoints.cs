@@ -3,6 +3,7 @@ using AnalyticDashboard.Application.Datasets.GetDatasetById;
 using AnalyticDashboard.Application.Datasets.GetDatasets;
 using AnalyticDashboard.Application.Datasets.ImportCsvDataset;
 using AnalyticDashboard.Application.Import;
+using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
@@ -50,7 +51,8 @@ public static class DatasetEndpoints
         })
         .WithName("ImportCsvDataset")
         .WithTags("Datasets")
-        .DisableAntiforgery();
+        .DisableAntiforgery()
+        .RequireAuthorization();
 
         app.MapGet("/datasets", async (
             GetDatasetsHandler handler,
@@ -62,9 +64,10 @@ public static class DatasetEndpoints
             return Results.Ok(result);
         })
         .WithName("GetDatasets")
-        .WithTags("Datasets");
+        .WithTags("Datasets")
+        .RequireAuthorization();
 
-        app.MapGet("/datasets/{id}", async (
+        app.MapGet("/datasets/{id:guid}", async (
             Guid id,
             GetDatasetByIdHandler handler,
             CancellationToken cancellationToken) =>
@@ -81,9 +84,10 @@ public static class DatasetEndpoints
             return Results.Ok(result);
         })
         .WithName("GetDatasetById")
-        .WithTags("Datasets");
+        .WithTags("Datasets")
+        .RequireAuthorization();
 
-        app.MapDelete("/datasets/{id}", async (
+        app.MapDelete("/datasets/{id:guid}", async (
             Guid id,
             DeleteDatasetHandler handler,
             CancellationToken cancellationToken) =>
@@ -95,7 +99,28 @@ public static class DatasetEndpoints
             return success ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteDataset")
-        .WithTags("Datasets");
+        .WithTags("Datasets")
+        .RequireAuthorization();
+        
+        app.MapGet("/datasets/{id:guid}/profile", async (
+                Guid id,
+                GetDatasetProfileHandler handler,
+                CancellationToken cancellationToken) =>
+            {
+                var query = new GetDatasetProfileQuery(id);
+                
+                var result = await handler.Handle(query, cancellationToken);
+
+                if (result is null)
+                {
+                    return Results.NotFound(new { message = $"Dataset with ID {id} doesn't exist." });
+                }
+                
+                return Results.Ok(result);
+            })
+            .WithName("GetDatasetProfile")
+            .WithTags("Datasets")
+            .RequireAuthorization();
 
         return app;
     }

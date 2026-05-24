@@ -1,0 +1,85 @@
+@page "/import"
+@inject HttpClient Http
+@inject AuthTokenService AuthTokenService
+@inject NavigationManager Navigation
+
+<div class="page-container">
+
+    <div class="section-header">
+        <h1 class="section-title">Import CSV</h1>
+        <p class="section-description">
+            Upload a CSV file to analyze its structure and create dashboards
+        </p>
+    </div>
+
+    <div class="upload-panel">
+        <img src="upload-icon.png" class="upload-icon" alt="Upload file">
+
+        <h2 class="upload-title">Upload your file</h2>
+        <p class="upload-text">Select a CSV file from your computer</p>
+
+        <label class="upload-btn">
+            Select file
+            <InputFile OnChange="HandleFile" class="file-input" accept=".csv" />
+        </label>
+
+        @if (message is not null)
+        {
+            <p class="upload-text mt-3">@message</p>
+        }
+    </div>
+
+</div>
+
+@code {
+    private string? message;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+        }
+    }
+
+    private async Task HandleFile(InputFileChangeEventArgs e)
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var file = e.File;
+
+        var content = new MultipartFormDataContent();
+        await using var stream = file.OpenReadStream(10_000_000);
+        content.Add(new StreamContent(stream), "file", file.Name);
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "http://localhost:5151/datasets/import/csv");
+
+        request.Content = content;
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            message = "Upload successful";
+        }
+        else
+        {
+            message = "Upload failed";
+        }
+    }
+}

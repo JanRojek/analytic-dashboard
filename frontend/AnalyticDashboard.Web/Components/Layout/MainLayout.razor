@@ -1,0 +1,82 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<div class="app-layout">
+    <aside class="sidebar @(isSidebarCollapsed ? "sidebar--collapsed" : "")">
+        <div class="sidebar-header">
+            <button class="sidebar-toggle-btn" @onclick="ToggleSidebar">☰</button>
+            <h1 class="sidebar-title">Analytic Dashboard</h1>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-title">General</div>
+
+            <a href="/import" class="sidebar-item @(IsActive("/import") ? "active" : "")">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                    <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                    <path d="M12 18v-6"/>
+                    <path d="m9 15 3 3 3-3"/>
+                </svg>
+                <span>Import</span>
+            </a>
+
+            <a href="/datasets" class="sidebar-item @(IsActive("/datasets") ? "active" : "")">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                    <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                    <path d="M8 18v-1"/>
+                    <path d="M12 18v-6"/>
+                    <path d="M16 18v-3"/>
+                </svg>
+                <span>Datasets</span>
+            </a>
+            
+            <a href="/dashboards" class="sidebar-item @(IsActive("/dashboards") ? "active" : "")">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <rect width="7" height="9" x="3" y="3" rx="1"/>
+                    <rect width="7" height="5" x="14" y="3" rx="1"/>
+                    <rect width="7" height="9" x="14" y="12" rx="1"/>
+                    <rect width="7" height="5" x="3" y="16" rx="1"/>
+                </svg>
+                <span>Dashboards</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <h2 class="topbar-title">Analytic Dashboard</h2>
+
+            <div class="topbar-right">
+                <span class="topbar-username">Jan Kowalski</span>
+                <div class="topbar-avatar"></div>
+                <button class="topbar-logout">Logout</button>
+            </div>
+        </header>
+
+        <main class="content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private bool isSidebarCollapsed = true;
+
+    private void ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+    }
+
+    private bool IsActive(string path)
+    {
+        return Nav.Uri.EndsWith(path, StringComparison.OrdinalIgnoreCase);
+    }
+}

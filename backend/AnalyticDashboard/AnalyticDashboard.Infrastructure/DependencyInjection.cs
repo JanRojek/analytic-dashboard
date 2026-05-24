@@ -6,6 +6,8 @@ using AnalyticDashboard.Infrastructure.Services.Import;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using AnalyticDashboard.Application.Profiling;
+using AnalyticDashboard.Infrastructure.Services.Profiling;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -24,6 +26,14 @@ public static class DependencyInjection
         services.AddScoped<IDatasetRepository, DatasetRepository>();
         
         services.AddScoped<ICsvImportService, CsvImportService>();
+        
+        services.AddScoped<IDatasetProfileReader, CsvDatasetProfileReader>();
+        
+        services.AddScoped<IUserRepository, UserRepository>();
+        
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
+        
+        services.AddScoped<IWidgetRepository, WidgetRepository>();
 
         return services;
     }

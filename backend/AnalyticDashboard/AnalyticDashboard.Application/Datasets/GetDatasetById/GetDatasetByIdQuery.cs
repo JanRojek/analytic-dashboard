@@ -1,5 +1,5 @@
 namespace AnalyticDashboard.Application.Datasets.GetDatasetById;
 
-public record GetDatasetByIdQuery(
+public sealed record GetDatasetByIdQuery(
     Guid Id
 );

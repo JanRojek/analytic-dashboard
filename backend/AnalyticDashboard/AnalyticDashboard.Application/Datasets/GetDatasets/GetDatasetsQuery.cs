@@ -1,3 +1,3 @@
 namespace AnalyticDashboard.Application.Datasets.GetDatasets;
 
-public record GetDatasetsQuery();
+public sealed record GetDatasetsQuery();

@@ -1,0 +1,93 @@
+@page "/"
+@page "/auth"
+@layout EmptyLayout
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AuthTokenService AuthTokenService
+
+<main class="auth-page">
+    <div class="auth-card">
+
+        <div class="auth-switch">
+            <button class="auth-switch-btn @(!isRegisterMode ? "active" : "")"
+                    @onclick="() => SetMode(false)">
+                Login
+            </button>
+
+            <button class="auth-switch-btn @(isRegisterMode ? "active" : "")"
+                    @onclick="() => SetMode(true)">
+                Register
+            </button>
+        </div>
+
+        <h2 class="upload-title">@Title</h2>
+        <p class="upload-text">@Subtitle</p>
+
+        <input class="form-control mb-3" @bind="username" placeholder="Username" />
+        <input class="form-control mb-3" @bind="password" placeholder="Password" type="password" />
+
+        <button class="upload-btn" @onclick="HandleSubmit">
+            @ButtonText
+        </button>
+
+        @if (message is not null)
+        {
+            <p class="upload-text mt-3">@message</p>
+        }
+    </div>
+</main>
+
+@code {
+    private bool isRegisterMode = false;
+    private string username = "";
+    private string password = "";
+    private string? message;
+
+    private string Title => isRegisterMode ? "Create account" : "Login";
+    private string Subtitle => isRegisterMode
+        ? "Create an account to import and manage datasets"
+        : "Log in to access your datasets";
+
+    private string ButtonText => isRegisterMode ? "Register" : "Login";
+
+    private void SetMode(bool registerMode)
+    {
+        isRegisterMode = registerMode;
+        message = null;
+    }
+
+    private sealed class AuthResponse
+    {
+        public string Token { get; set; } = string.Empty;
+        public DateTime ExpiresAt { get; set; }
+    }
+
+    private async Task HandleSubmit()
+    {
+        var request = new { username, password };
+
+        var endpoint = isRegisterMode
+            ? "http://localhost:5151/auth/register"
+            : "http://localhost:5151/auth/login";
+
+        var response = await Http.PostAsJsonAsync(endpoint, request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+
+            if (authResponse is null)
+            {
+                message = "Invalid server response.";
+                return;
+            }
+
+            await AuthTokenService.SaveTokenAsync(authResponse.Token, authResponse.ExpiresAt);
+            Navigation.NavigateTo("/import");
+        }
+        else
+        {
+            message = await response.Content.ReadAsStringAsync();
+        }
+    }
+}

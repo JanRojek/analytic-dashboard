@@ -1,0 +1,239 @@
+@page "/dashboards"
+@inject HttpClient Http
+@inject AuthTokenService AuthTokenService
+@inject NavigationManager Navigation
+
+<div class="page-container">
+
+    <div class="section-header">
+        <h1 class="section-title">Dashboards</h1>
+        <p class="section-description">
+            Create and manage dashboards based on imported datasets
+        </p>
+    </div>
+
+    <div class="profile-card">
+        <h2 class="profile-card-title">Create dashboard</h2>
+
+        <div class="dashboard-form">
+            <input class="form-control"
+                   placeholder="Dashboard name"
+                   @bind="newDashboardName" />
+
+            <select class="form-control dashboard-select" @bind="selectedDatasetId">
+                <option value="">Select dataset</option>
+                @if (datasets is not null)
+                {
+                    @foreach (var dataset in datasets)
+                    {
+                        <option value="@dataset.Id">@dataset.Name</option>
+                    }
+                }
+            </select>
+
+            <div class="dashboard-form-actions">
+                <button class="upload-btn" @onclick="CreateDashboard">
+                    Create
+                </button>
+            </div>
+        </div>
+
+        @if (message is not null)
+        {
+            <p class="upload-text mt-3">@message</p>
+        }
+    </div>
+
+    <div class="profile-card">
+        <h2 class="profile-card-title">Your dashboards</h2>
+
+        @if (dashboards is null)
+        {
+            <p>Loading dashboards...</p>
+        }
+        else if (dashboards.Count == 0)
+        {
+            <p>No dashboards yet. Create your first dashboard above.</p>
+        }
+        else
+        {
+            @foreach (var dashboard in dashboards)
+            {
+                <div class="dataset-card" @onclick="() => OpenDashboard(dashboard.Id)">
+                    <div class="dataset-card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="28"
+                             height="28"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="2"
+                             stroke-linecap="round"
+                             stroke-linejoin="round">
+                            <rect width="7" height="9" x="3" y="3" rx="1"/>
+                            <rect width="7" height="5" x="14" y="3" rx="1"/>
+                            <rect width="7" height="9" x="14" y="12" rx="1"/>
+                            <rect width="7" height="5" x="3" y="16" rx="1"/>
+                        </svg>
+                    </div>
+
+                    <div class="dataset-card-body">
+                        <h3 class="dataset-card-title">@dashboard.Name</h3>
+                        <p class="dataset-card-file">Dataset: @dashboard.DatasetName</p>
+                        <p class="dataset-card-meta">
+                            Created @dashboard.CreatedAtUtc.ToString("yyyy-MM-dd")
+                        </p>
+                    </div>
+
+                    <button class="dashboard-delete-btn"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => DeleteDashboard(dashboard.Id)">
+                        Delete
+                    </button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private List<DashboardDto>? dashboards;
+    private List<DatasetDto>? datasets;
+
+    private string newDashboardName = "";
+    private string selectedDatasetId = "";
+    private string? message;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task LoadData()
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        dashboards = await GetFromApi<List<DashboardDto>>("http://localhost:5151/dashboards", token);
+        datasets = await GetFromApi<List<DatasetDto>>("http://localhost:5151/datasets", token);
+    }
+
+    private async Task<T?> GetFromApi<T>(string url, string token)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/auth");
+            return default;
+        }
+
+        return await response.Content.ReadFromJsonAsync<T>();
+    }
+
+    private async Task CreateDashboard()
+    {
+        message = null;
+
+        if (string.IsNullOrWhiteSpace(newDashboardName))
+        {
+            message = "Dashboard name is required.";
+            return;
+        }
+
+        if (!Guid.TryParse(selectedDatasetId, out var datasetId))
+        {
+            message = "Select dataset.";
+            return;
+        }
+
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost:5151/dashboards");
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        request.Content = JsonContent.Create(new
+        {
+            datasetId,
+            name = newDashboardName
+        });
+
+        var response = await Http.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            message = "Could not create dashboard.";
+            return;
+        }
+
+        newDashboardName = "";
+        selectedDatasetId = "";
+        message = "Dashboard created.";
+
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task DeleteDashboard(Guid id)
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"http://localhost:5151/dashboards/{id}");
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private void OpenDashboard(Guid id)
+    {
+        Navigation.NavigateTo($"/dashboards/{id}");
+    }
+
+    private sealed class DashboardDto
+    {
+        public Guid Id { get; set; }
+        public Guid DatasetId { get; set; }
+        public string DatasetName { get; set; } = "";
+        public string Name { get; set; } = "";
+        public DateTime CreatedAtUtc { get; set; }
+    }
+
+    private sealed class DatasetDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+}

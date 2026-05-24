@@ -1,0 +1,148 @@
+@page "/datasets/{Id:guid}"
+@inject HttpClient Http
+@inject AuthTokenService AuthTokenService
+@inject NavigationManager Navigation
+
+<main class="content">
+    <div class="page-container">
+
+        @if (profile is null)
+        {
+            <p>Loading...</p>
+        }
+        else
+        {
+            <!-- HEADER -->
+            <div class="section-header">
+                <h1 class="section-title">@profile.Name</h1>
+                <p class="section-description">
+                    @profile.OriginalFileName • @profile.RowCount rows • @profile.ColumnCount columns
+                </p>
+            </div>
+
+            <!-- COLUMNS -->
+            <div class="profile-card">
+                <h2 class="profile-card-title">Columns</h2>
+
+                <div class="table-scroll">
+                    <table class="profile-table">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Nulls</th>
+                            <th>Min</th>
+                            <th>Max</th>
+                            <th>Avg</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var col in profile.Columns)
+                        {
+                            <tr>
+                                <td>@col.Name</td>
+                                <td><span class="type-badge">@col.Type</span></td>
+                                <td>@col.NullCount</td>
+                                <td>@DisplayValue(col.Min)</td>
+                                <td>@DisplayValue(col.Max)</td>
+                                <td>@(col.Avg?.ToString("0.##") ?? "—")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PREVIEW -->
+            <div class="profile-card">
+                <h2 class="profile-card-title">Preview</h2>
+
+                <div class="table-scroll">
+                    <table class="profile-table">
+                        <thead>
+                        <tr>
+                            @foreach (var col in profile.Columns)
+                            {
+                                <th>@col.Name</th>
+                            }
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in profile.PreviewRows)
+                        {
+                            <tr>
+                                @foreach (var col in profile.Columns)
+                                {
+                                    <td>@(row.TryGetValue(col.Name, out var value) ? DisplayValue(value) : "—")</td>
+                                }
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+    </div>
+</main>
+
+@code {
+    [Parameter] public Guid id { get; set; }
+
+    private GetDatasetProfileResponse? profile;
+    
+    private static string DisplayValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "—" : value;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"http://localhost:5151/datasets/{id}/profile");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            profile = await response.Content.ReadFromJsonAsync<GetDatasetProfileResponse>();
+            StateHasChanged();
+        }
+    }
+
+    private sealed class GetDatasetProfileResponse
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string OriginalFileName { get; set; } = "";
+        public int RowCount { get; set; }
+        public int ColumnCount { get; set; }
+        public List<ColumnProfile> Columns { get; set; } = new();
+        public List<Dictionary<string, string?>> PreviewRows { get; set; } = new();
+    }
+
+    private sealed class ColumnProfile
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public int NullCount { get; set; }
+        public string? Min { get; set; }
+        public string? Max { get; set; }
+        public double? Avg { get; set; }
+    }
+}
