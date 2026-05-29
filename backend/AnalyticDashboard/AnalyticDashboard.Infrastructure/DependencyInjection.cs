@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using AnalyticDashboard.Application.Profiling;
 using AnalyticDashboard.Infrastructure.Services.Profiling;
+using AnalyticDashboard.Infrastructure.Services.Csv;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -34,6 +35,10 @@ public static class DependencyInjection
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         
         services.AddScoped<IWidgetRepository, WidgetRepository>();
+        
+        services.AddScoped<CsvFormatDetector>();
+        
+        services.AddScoped<CsvDatasetReader>();
 
         return services;
     }

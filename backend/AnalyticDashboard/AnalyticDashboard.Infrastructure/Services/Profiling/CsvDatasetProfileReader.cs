@@ -1,13 +1,19 @@
 using System.Globalization;
 using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 using AnalyticDashboard.Application.Profiling;
-using CsvHelper;
-using CsvHelper.Configuration;
+using AnalyticDashboard.Infrastructure.Services.Csv;
 
 namespace AnalyticDashboard.Infrastructure.Services.Profiling;
 
 public sealed class CsvDatasetProfileReader : IDatasetProfileReader
 {
+    private readonly CsvDatasetReader _csvDatasetReader;
+
+    public CsvDatasetProfileReader(CsvDatasetReader csvDatasetReader)
+    {
+        _csvDatasetReader = csvDatasetReader;
+    }
+    
     public async Task<GetDatasetProfileResponse> ReadProfileAsync(
         Guid datasetId,
         string name,
@@ -17,23 +23,11 @@ public sealed class CsvDatasetProfileReader : IDatasetProfileReader
         int columnCount,
         CancellationToken cancellationToken)
     {
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-        {
-            HasHeaderRecord = true
-        };
+        var csvData = await _csvDatasetReader.ReadAsync(
+            storedPath,
+            cancellationToken);
 
-        using var reader = new StreamReader(storedPath);
-        using var csv = new CsvReader(reader, config);
-
-        if (!await csv.ReadAsync())
-        {
-            throw new InvalidOperationException("CSV file has no header.");
-        }
-
-        csv.ReadHeader();
-
-        var header = csv.HeaderRecord
-            ?? throw new InvalidOperationException("CSV file has no header record.");
+        var header = csvData.Headers;
 
         var stats = header
             .Select(column => new ColumnStats(column))
@@ -41,13 +35,13 @@ public sealed class CsvDatasetProfileReader : IDatasetProfileReader
 
         var preview = new List<IReadOnlyDictionary<string, string?>>();
 
-        while (await csv.ReadAsync())
+        foreach (var csvRow in csvData.Rows)
         {
             var row = new Dictionary<string, string?>();
 
             foreach (var column in header)
             {
-                var value = csv.GetField(column);
+                csvRow.TryGetValue(column, out var value);
 
                 stats[column].AddValue(value);
 
