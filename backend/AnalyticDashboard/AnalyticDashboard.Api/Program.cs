@@ -16,10 +16,19 @@ using System.Text;
 using AnalyticDashboard.Application.Dashboards.DeleteDashboard;
 using AnalyticDashboard.Application.Dashboards.GetDashboardById;
 using AnalyticDashboard.Application.Dashboards.GetDashboards;
+using AnalyticDashboard.Application.Widgets.CreateWidget;
+using AnalyticDashboard.Application.Widgets.DeleteWidget;
+using AnalyticDashboard.Application.Widgets.GetWidgets;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -92,6 +101,9 @@ builder.Services.AddScoped<CreateDashboardHandler>();
 builder.Services.AddScoped<GetDashboardsHandler>();
 builder.Services.AddScoped<GetDashboardByIdHandler>();
 builder.Services.AddScoped<DeleteDashboardHandler>();
+builder.Services.AddScoped<CreateWidgetHandler>();
+builder.Services.AddScoped<GetWidgetsHandler>();
+builder.Services.AddScoped<DeleteWidgetHandler>();
 
 builder.Services.AddScoped<JwtTokenService>();
 

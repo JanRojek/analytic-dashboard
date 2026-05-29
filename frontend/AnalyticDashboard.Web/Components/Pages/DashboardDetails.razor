@@ -5,7 +5,7 @@
 
 <div class="page-container dashboard-page">
 
-    @if (dashboard is null)
+    @if (dashboard is null || widgets is null)
     {
         <p>Loading dashboard...</p>
     }
@@ -18,19 +18,92 @@
                     Dataset: @dashboard.DatasetName • Created @dashboard.CreatedAtUtc.ToString("yyyy-MM-dd")
                 </p>
             </div>
+        </div>
 
-            <button class="upload-btn" disabled>
-                + Add widget
-            </button>
+        <div class="profile-card">
+            <h2 class="profile-card-title">Add widget</h2>
+
+            <div class="widget-form">
+                <input class="form-control"
+                       placeholder="Widget title"
+                       @bind="newWidgetTitle" />
+
+                <select class="form-control dashboard-select" @bind="newWidgetType">
+                    <option value="Kpi">KPI</option>
+                    <option value="BarChart">Bar chart</option>
+                    <option value="LineChart">Line chart</option>
+                    <option value="PieChart">Pie chart</option>
+                </select>
+
+                <input class="form-control"
+                       placeholder="X column"
+                       @bind="newWidgetXColumn" />
+
+                <input class="form-control"
+                       placeholder="Y column"
+                       @bind="newWidgetYColumn" />
+
+                <select class="form-control dashboard-select" @bind="newWidgetAggregation">
+                    <option value="count">Count</option>
+                    <option value="sum">Sum</option>
+                    <option value="avg">Average</option>
+                    <option value="min">Min</option>
+                    <option value="max">Max</option>
+                </select>
+
+                <div class="dashboard-form-actions">
+                    <button class="upload-btn" @onclick="CreateWidget">
+                        Create
+                    </button>
+                </div>
+            </div>
+
+            @if (message is not null)
+            {
+                <p class="upload-text mt-3">@message</p>
+            }
         </div>
 
         <div class="profile-card">
             <h2 class="profile-card-title">Widgets</h2>
 
-            <div class="empty-widgets">
-                <p>No widgets yet.</p>
-                <p class="upload-text">Add your first widget to start building this dashboard.</p>
-            </div>
+            @if (widgets.Count == 0)
+            {
+                <div class="empty-widgets">
+                    <p>No widgets yet.</p>
+                    <p class="upload-text">Add your first widget to start building this dashboard.</p>
+                </div>
+            }
+            else
+            {
+                <div class="widgets-grid">
+                    @foreach (var widget in widgets)
+                    {
+                        <div class="widget-card">
+                            <div class="widget-card-header">
+                                <div>
+                                    <h3 class="widget-title">@widget.Title</h3>
+                                    <p class="widget-meta">@widget.Type • @widget.Aggregation</p>
+                                </div>
+
+                                <button class="dashboard-delete-btn"
+                                        @onclick="() => DeleteWidget(widget.Id)">
+                                    Delete
+                                </button>
+                            </div>
+
+                            <div class="widget-config">
+                                <p><strong>X:</strong> @DisplayValue(widget.XColumn)</p>
+                                <p><strong>Y:</strong> @DisplayValue(widget.YColumn)</p>
+                            </div>
+
+                            <div class="widget-placeholder">
+                                Widget preview will be displayed here.
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     }
 
@@ -40,17 +113,114 @@
     [Parameter] public Guid Id { get; set; }
 
     private DashboardDetailsDto? dashboard;
+    private List<WidgetDto>? widgets;
+
+    private string newWidgetTitle = "";
+    private string newWidgetType = "Kpi";
+    private string? newWidgetXColumn;
+    private string? newWidgetYColumn;
+    private string newWidgetAggregation = "count";
+    private string? message;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
             return;
 
-        await LoadDashboard();
+        await LoadData();
         StateHasChanged();
     }
 
-    private async Task LoadDashboard()
+    private async Task LoadData()
+    {
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        dashboard = await GetFromApi<DashboardDetailsDto>(
+            $"http://localhost:5151/dashboards/{Id}",
+            token);
+
+        widgets = await GetFromApi<List<WidgetDto>>(
+            $"http://localhost:5151/dashboards/{Id}/widgets",
+            token);
+    }
+
+    private async Task<T?> GetFromApi<T>(string url, string token)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/dashboards");
+            return default;
+        }
+
+        return await response.Content.ReadFromJsonAsync<T>();
+    }
+
+    private async Task CreateWidget()
+    {
+        message = null;
+
+        if (string.IsNullOrWhiteSpace(newWidgetTitle))
+        {
+            message = "Widget title is required.";
+            return;
+        }
+
+        var token = await AuthTokenService.GetTokenAsync();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Navigation.NavigateTo("/auth");
+            return;
+        }
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"http://localhost:5151/dashboards/{Id}/widgets");
+
+        request.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        request.Content = JsonContent.Create(new
+        {
+            type = newWidgetType,
+            title = newWidgetTitle,
+            xColumn = NormalizeOptional(newWidgetXColumn),
+            yColumn = NormalizeOptional(newWidgetYColumn),
+            aggregation = newWidgetAggregation
+        });
+
+        var response = await Http.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            message = "Could not create widget.";
+            return;
+        }
+
+        newWidgetTitle = "";
+        newWidgetXColumn = null;
+        newWidgetYColumn = null;
+        newWidgetAggregation = "count";
+        newWidgetType = "Kpi";
+        message = "Widget created.";
+
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task DeleteWidget(Guid id)
     {
         var token = await AuthTokenService.GetTokenAsync();
 
@@ -61,8 +231,8 @@
         }
 
         var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"http://localhost:5151/dashboards/{Id}");
+            HttpMethod.Delete,
+            $"http://localhost:5151/widgets/{id}");
 
         request.Headers.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -71,12 +241,19 @@
 
         if (response.IsSuccessStatusCode)
         {
-            dashboard = await response.Content.ReadFromJsonAsync<DashboardDetailsDto>();
+            await LoadData();
+            StateHasChanged();
         }
-        else
-        {
-            Navigation.NavigateTo("/dashboards");
-        }
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static string DisplayValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "—" : value;
     }
 
     private sealed class DashboardDetailsDto
@@ -85,6 +262,18 @@
         public Guid DatasetId { get; set; }
         public string DatasetName { get; set; } = "";
         public string Name { get; set; } = "";
+        public DateTime CreatedAtUtc { get; set; }
+    }
+
+    private sealed class WidgetDto
+    {
+        public Guid Id { get; set; }
+        public Guid DashboardId { get; set; }
+        public string Type { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string? XColumn { get; set; }
+        public string? YColumn { get; set; }
+        public string Aggregation { get; set; } = "";
         public DateTime CreatedAtUtc { get; set; }
     }
 }

@@ -20,6 +20,12 @@ public sealed class WidgetRepository : IWidgetRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<Widget?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Widgets
+            .FirstOrDefaultAsync(w => w.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Widget>> GetByDashboardIdAsync(
         Guid dashboardId,
         CancellationToken cancellationToken)
