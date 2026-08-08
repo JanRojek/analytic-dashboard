@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="AnalyticDashboard.Api/AnalyticDashboard.Api.csproj" />
-  <Project Path="AnalyticDashboard.Application/AnalyticDashboard.Application.csproj" />
-  <Project Path="AnalyticDashboard.Domain/AnalyticDashboard.Domain.csproj" />
-  <Project Path="AnalyticDashboard.Infrastructure/AnalyticDashboard.Infrastructure.csproj" />
-</Solution>

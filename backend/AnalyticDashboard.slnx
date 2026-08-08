@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AnalyticDashboard.Api/AnalyticDashboard.Api.csproj" />
+    <Project Path="src/AnalyticDashboard.Application/AnalyticDashboard.Application.csproj" />
+    <Project Path="src/AnalyticDashboard.Domain/AnalyticDashboard.Domain.csproj" />
+    <Project Path="src/AnalyticDashboard.Infrastructure/AnalyticDashboard.Infrastructure.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/AnalyticDashboard.IntegrationTests/AnalyticDashboard.IntegrationTests.csproj" />
+    <Project Path="tests/AnalyticDashboard.UnitTests/AnalyticDashboard.UnitTests.csproj" />
+  </Folder>
+</Solution>
