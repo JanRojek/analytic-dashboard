@@ -9,7 +9,7 @@ using AnalyticDashboard.Application.Datasets.DeleteDataset;
 using AnalyticDashboard.Application.Datasets.ImportCsvDataset;
 using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 using AnalyticDashboard.Application.Dashboards.CreateDashboard;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -42,19 +42,9 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Paste your JWT token here"
     });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
     });
 });
 
