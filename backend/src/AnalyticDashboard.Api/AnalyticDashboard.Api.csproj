@@ -33,4 +33,8 @@
       <Folder Include="storage\datasets\" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="AnalyticDashboard.IntegrationTests" />
+    </ItemGroup>
+
 </Project>
