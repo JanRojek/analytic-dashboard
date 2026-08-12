@@ -1,21 +1,21 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
+﻿namespace AnalyticDashboard.IntegrationTests;
 
-namespace AnalyticDashboard.IntegrationTests;
-
-public class ApiSmokeTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class ApiSmokeTests : IClassFixture<ApiFixture>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly ApiFixture _fixture;
 
-    public ApiSmokeTests(WebApplicationFactory<Program> factory)
+    public ApiSmokeTests(ApiFixture fixture)
     {
-        _factory = factory;
+        _fixture = fixture;
     }
 
     [Fact]
-    public void Factory_ShouldCreateClient()
+    public async Task DatabaseHealthCheck_ShouldReturnSuccess()
     {
-        using var client = _factory.CreateClient();
+        using var response = await _fixture.Client.GetAsync(
+            "/health/db",
+            TestContext.Current.CancellationToken);
 
-        Assert.NotNull(client);
+        response.EnsureSuccessStatusCode();
     }
 }
