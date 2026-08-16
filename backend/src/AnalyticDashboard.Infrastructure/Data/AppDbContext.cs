@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Dashboard> Dashboards => Set<Dashboard>();
     public DbSet<Widget> Widgets => Set<Widget>();
+    public DbSet<Project> Projects => Set<Project>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
@@ -18,5 +19,7 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        modelBuilder.HasPostgresExtension("citext");
     }
 }

@@ -20,6 +20,7 @@ using AnalyticDashboard.Application.Widgets.CreateWidget;
 using AnalyticDashboard.Application.Widgets.DeleteWidget;
 using AnalyticDashboard.Application.Widgets.GetWidgets;
 using System.Text.Json.Serialization;
+using AnalyticDashboard.Application.Projects.CreateProject;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +95,7 @@ builder.Services.AddScoped<DeleteDashboardHandler>();
 builder.Services.AddScoped<CreateWidgetHandler>();
 builder.Services.AddScoped<GetWidgetsHandler>();
 builder.Services.AddScoped<DeleteWidgetHandler>();
+builder.Services.AddScoped<CreateProjectHandler>();
 
 builder.Services.AddScoped<JwtTokenService>();
 
@@ -107,6 +109,7 @@ app.MapHealthChecks("/health/db");
 app.MapDatasetEndpoints();
 app.MapAuthEndpoints();
 app.MapDashboardEndpoints();
+app.MapProjectEndpoints();
 
 if (app.Environment.IsDevelopment())
 {

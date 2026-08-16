@@ -1,4 +1,8 @@
-﻿namespace AnalyticDashboard.IntegrationTests;
+﻿using AnalyticDashboard.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace AnalyticDashboard.IntegrationTests;
 
 public sealed class ApiFixture : IAsyncLifetime
 {
@@ -14,6 +18,15 @@ public sealed class ApiFixture : IAsyncLifetime
 
         _factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
         Client = _factory.CreateClient();
+
+        using var scope = _factory.Services.CreateScope();
+
+        var dbContext = scope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+        await dbContext.Database.MigrateAsync(
+            TestContext.Current.CancellationToken
+        );
     }
 
     public async ValueTask DisposeAsync()

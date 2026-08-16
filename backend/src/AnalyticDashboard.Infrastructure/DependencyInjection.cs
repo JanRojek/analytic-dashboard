@@ -18,26 +18,28 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Default") 
+        var connectionString = configuration.GetConnectionString("Default")
                                ?? throw new InvalidOperationException("Missing connection string 'Default'.");
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IDatasetRepository, DatasetRepository>();
-        
+
         services.AddScoped<ICsvImportService, CsvImportService>();
-        
+
         services.AddScoped<IDatasetProfileReader, CsvDatasetProfileReader>();
-        
+
         services.AddScoped<IUserRepository, UserRepository>();
-        
+
         services.AddScoped<IDashboardRepository, DashboardRepository>();
-        
+
         services.AddScoped<IWidgetRepository, WidgetRepository>();
-        
+
+        services.AddScoped<IProjectRepository, ProjectRepository>();
+
         services.AddScoped<CsvFormatDetector>();
-        
+
         services.AddScoped<CsvDatasetReader>();
 
         return services;
