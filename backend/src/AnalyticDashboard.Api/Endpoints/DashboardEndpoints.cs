@@ -14,18 +14,18 @@ public static class DashboardEndpoints
     public static void MapDashboardEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/dashboards", async (
-                CreateDashboardCommand command,
-                CreateDashboardHandler handler,
-                CancellationToken cancellationToken) =>
+            CreateDashboardCommand command,
+            CreateDashboardHandler handler,
+            CancellationToken cancellationToken) =>
         {
-                var result = await handler.Handle(command, cancellationToken);
+            var result = await handler.Handle(command, cancellationToken);
 
-                return Results.Created($"/dashboards/{result.Id}", result);
+            return Results.Created($"/dashboards/{result.Id}", result);
         })
         .WithName("CreateDashboard")
         .WithTags("Dashboards")
         .RequireAuthorization();
-        
+
         app.MapGet("/dashboards", async (
             GetDashboardsHandler handler,
             CancellationToken cancellationToken) =>
@@ -38,16 +38,16 @@ public static class DashboardEndpoints
         .WithName("GetDashboards")
         .WithTags("Dashboards")
         .RequireAuthorization();
-        
+
         app.MapGet("/dashboards/{id:guid}", async (
             Guid id,
             GetDashboardByIdHandler handler,
             CancellationToken cancellationToken) =>
         {
             var query = new GetDashboardByIdQuery(id);
-            
+
             var result = await handler.Handle(query, cancellationToken);
-            
+
             if (result is null)
             {
                 return Results.NotFound(new { message = $"Dashboard with ID {id} doesn't exist." });
@@ -58,14 +58,14 @@ public static class DashboardEndpoints
         .WithName("GetDashboardById")
         .WithTags("Dashboards")
         .RequireAuthorization();
-        
+
         app.MapDelete("/dashboards/{id:guid}", async (
             Guid id,
             DeleteDashboardHandler handler,
             CancellationToken cancellationToken) =>
         {
             var command = new DeleteDashboardCommand(id);
-            
+
             var success = await handler.Handle(command, cancellationToken);
 
             return success ? Results.NoContent() : Results.NotFound();
@@ -73,7 +73,7 @@ public static class DashboardEndpoints
         .WithName("DeleteDashboard")
         .WithTags("Dashboards")
         .RequireAuthorization();
-        
+
         app.MapPost("/dashboards/{dashboardId:guid}/widgets", async (
             Guid dashboardId,
             CreateWidgetRequest request,
@@ -99,7 +99,7 @@ public static class DashboardEndpoints
         .WithName("CreateWidget")
         .WithTags("Widgets")
         .RequireAuthorization();
-        
+
         app.MapGet("/dashboards/{dashboardId:guid}/widgets", async (
             Guid dashboardId,
             GetWidgetsHandler handler,
@@ -114,7 +114,7 @@ public static class DashboardEndpoints
         .WithName("GetWidgets")
         .WithTags("Widgets")
         .RequireAuthorization();
-        
+
         app.MapDelete("/widgets/{id:guid}", async (
             Guid id,
             DeleteWidgetHandler handler,
