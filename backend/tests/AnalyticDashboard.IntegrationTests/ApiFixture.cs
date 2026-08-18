@@ -9,7 +9,18 @@ public sealed class ApiFixture : IAsyncLifetime
     private PostgresFixture? _postgres;
     private CustomWebApplicationFactory? _factory;
 
-    public HttpClient Client { get; private set; } = null!;
+    private HttpClient? _client;
+
+    public HttpClient Client =>
+        _client ?? throw new InvalidOperationException(
+            "API fixture has not been initialized."
+        );
+
+    public IServiceProvider Services =>
+        _factory?.Services
+        ?? throw new InvalidOperationException(
+            "API fixture has not been initialized."
+        );
 
     public async ValueTask InitializeAsync()
     {
@@ -17,7 +28,7 @@ public sealed class ApiFixture : IAsyncLifetime
         await _postgres.InitializeAsync();
 
         _factory = new CustomWebApplicationFactory(_postgres.ConnectionString);
-        Client = _factory.CreateClient();
+        _client = _factory.CreateClient();
 
         using var scope = _factory.Services.CreateScope();
 
@@ -31,12 +42,16 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        Client.Dispose();
+        _client?.Dispose();
 
         if (_factory is not null)
+        {
             await _factory.DisposeAsync();
+        }
 
         if (_postgres is not null)
+        {
             await _postgres.DisposeAsync();
+        }
     }
 }

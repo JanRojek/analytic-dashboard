@@ -18,7 +18,7 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(project => project.Name)
             .HasColumnType("citext")
             .IsRequired()
-            .HasMaxLength(100);
+            .HasMaxLength(Project.MaxNameLength);
 
         builder.HasIndex(project => new
             {

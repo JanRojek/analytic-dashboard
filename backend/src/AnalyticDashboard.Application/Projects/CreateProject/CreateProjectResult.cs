@@ -11,4 +11,8 @@ public abstract record CreateProjectResult
     public sealed record NameAlreadyExists(
         string RequestedName
     ) : CreateProjectResult;
+
+    public sealed record InvalidName(
+        string Message
+    ) : CreateProjectResult;
 }

@@ -10,6 +10,8 @@ public sealed class Project
 
     public DateTime CreatedAt { get; private set; }
 
+    public const int MaxNameLength = 100;
+
     public Project(
         Guid ownerId,
         string name)
@@ -34,14 +36,15 @@ public sealed class Project
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new ArgumentException("Project name cannot be empty.");
+            throw new InvalidProjectNameException("Project name cannot be empty.");
         }
 
         name = name.Trim();
 
-        if (name.Length > 100)
+        if (name.Length > MaxNameLength)
         {
-            throw new ArgumentException("Project name cannot be longer than 100 characters.");
+            throw new InvalidProjectNameException(
+                $"Project name cannot be longer than {MaxNameLength} characters.");
         }
 
         return name;

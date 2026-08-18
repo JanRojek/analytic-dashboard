@@ -20,7 +20,9 @@ public sealed class ProjectTests
     [Fact]
     public void Constructor_ShouldThrow_WhenNameIsEmpty()
     {
-        Assert.Throws<ArgumentException>(() => new Project(UserId, ""));
+        Assert.Throws<InvalidProjectNameException>(
+            () => new Project(UserId, "")
+        );
     }
 
     [Fact]
@@ -28,7 +30,9 @@ public sealed class ProjectTests
     {
         var projectName = new string('a', 101);
 
-        Assert.Throws<ArgumentException>(() => new Project(UserId, projectName));
+        Assert.Throws<InvalidProjectNameException>(
+            () => new Project(UserId, projectName)
+        );
     }
 
     [Fact]

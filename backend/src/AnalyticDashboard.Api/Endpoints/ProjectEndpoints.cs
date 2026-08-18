@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using AnalyticDashboard.Api.Contracts.Projects;
 using AnalyticDashboard.Application.Projects.CreateProject;
+using System.Diagnostics;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
@@ -17,7 +18,8 @@ public static class ProjectEndpoints
         {
             var ownerIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (!Guid.TryParse(ownerIdClaim, out var ownerId))
+            if (!Guid.TryParse(ownerIdClaim, out var ownerId)
+                || ownerId == Guid.Empty)
             {
                 return Results.Unauthorized();
             }
@@ -41,12 +43,21 @@ public static class ProjectEndpoints
                     ),
 
                 CreateProjectResult.NameAlreadyExists conflict =>
-                    Results.Conflict(new
-                    {
-                        message = $"Project '{conflict.RequestedName}' already exists."
-                    }),
+                    Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Project name already exists.",
+                        detail: $"Project '{conflict.RequestedName}' already exists."
+                    ),
 
-                _ => Results.StatusCode(StatusCodes.Status500InternalServerError)
+                CreateProjectResult.InvalidName invalidName =>
+                    Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["Name"] = [invalidName.Message]
+                        }
+                    ),
+
+                _ => throw new UnreachableException()
             };
         })
         .WithName("CreateProject")

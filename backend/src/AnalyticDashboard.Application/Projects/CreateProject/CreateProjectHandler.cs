@@ -1,4 +1,5 @@
-﻿using AnalyticDashboard.Domain.Entities;
+﻿using System.Diagnostics;
+using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Domain.Repositories;
 
 namespace AnalyticDashboard.Application.Projects.CreateProject;
@@ -16,31 +17,42 @@ public sealed class CreateProjectHandler
         CreateProjectCommand command,
         CancellationToken cancellationToken)
     {
-        var project = new Project(
-            command.OwnerId,
-            command.Name
-        );
+        Project project;
 
-        var exists = await _projectRepository.ExistsByOwnerAndNameAsync(
-            project.OwnerId,
-            project.Name,
-            cancellationToken
-        );
-
-        if (exists)
+        try
         {
-            return new CreateProjectResult.NameAlreadyExists(project.Name);
+            project = new Project(
+                command.OwnerId,
+                command.Name
+            );
+        }
+        catch (InvalidProjectNameException exception)
+        {
+            return new CreateProjectResult.InvalidName(
+                exception.Message
+            );
         }
 
-        await _projectRepository.AddAsync(
+        var outcome = await _projectRepository.AddAsync(
             project,
             cancellationToken
         );
 
-        return new CreateProjectResult.Success(
-            project.Id,
-            project.Name,
-            project.CreatedAt
-        );
+        return outcome switch
+        {
+            ProjectAddOutcome.Added =>
+                new CreateProjectResult.Success(
+                    project.Id,
+                    project.Name,
+                    project.CreatedAt
+                ),
+
+            ProjectAddOutcome.NameAlreadyExists =>
+                new CreateProjectResult.NameAlreadyExists(
+                    project.Name
+                ),
+
+            _ => throw new UnreachableException()
+        };
     }
 }
