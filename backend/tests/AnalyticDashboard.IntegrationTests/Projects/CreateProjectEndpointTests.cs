@@ -13,6 +13,8 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 {
     private readonly ApiFixture _fixture;
 
+    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+
     public CreateProjectEndpointTests(ApiFixture fixture)
     {
         _fixture = fixture;
@@ -53,7 +55,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var response = await _fixture.Client.SendAsync(
             request,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -63,7 +65,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         var result = await response.Content
             .ReadFromJsonAsync<CreateProjectResult.Success>(
-                TestContext.Current.CancellationToken
+                CancellationToken
             );
 
         Assert.NotNull(result);
@@ -95,7 +97,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         var project = await dbContext.Projects.SingleAsync(
             project => project.Id == result.Id,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -119,7 +121,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var response = await _fixture.Client.SendAsync(
             request,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -143,7 +145,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var response = await _fixture.Client.SendAsync(
             request,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -162,7 +164,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var firstResponse = await _fixture.Client.SendAsync(
             firstRequest,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -177,7 +179,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var secondResponse = await _fixture.Client.SendAsync(
             secondRequest,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -195,7 +197,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var response = await _fixture.Client.SendAsync(
             request,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -214,7 +216,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var firstResponse = await _fixture.Client.SendAsync(
             firstRequest,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -229,7 +231,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var secondResponse = await _fixture.Client.SendAsync(
             secondRequest,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(
@@ -253,12 +255,12 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         var firstTask = _fixture.Client.SendAsync(
             firstRequest,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         var secondTask = _fixture.Client.SendAsync(
             secondRequest,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         var responses = await Task.WhenAll(
@@ -294,7 +296,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var response = await _fixture.Client.SendAsync(
             request,
-            TestContext.Current.CancellationToken
+            CancellationToken
         );
 
         Assert.Equal(

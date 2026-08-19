@@ -41,4 +41,18 @@ public sealed class ProjectRepository : IProjectRepository
             return ProjectAddOutcome.NameAlreadyExists;
         }
     }
+
+    public async Task<Project?> GetByIdAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Projects
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                project => project.Id == projectId
+                           && project.OwnerId == ownerId,
+                cancellationToken
+            );
+    }
 }

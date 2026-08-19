@@ -2,6 +2,7 @@
 using AnalyticDashboard.Api.Contracts.Projects;
 using AnalyticDashboard.Application.Projects.CreateProject;
 using System.Diagnostics;
+using AnalyticDashboard.Application.Projects.GetProjectById;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
@@ -61,6 +62,51 @@ public static class ProjectEndpoints
             };
         })
         .WithName("CreateProject")
+        .WithTags("Projects")
+        .RequireAuthorization();
+
+        app.MapGet("/projects/{id:guid}", async (
+            Guid id,
+            GetProjectByIdHandler handler,
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken) =>
+        {
+            var ownerIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(ownerIdClaim, out var ownerId)
+                || ownerId == Guid.Empty)
+            {
+                return Results.Unauthorized();
+            }
+
+            var query = new GetProjectByIdQuery(
+                id,
+                ownerId
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
+            return result switch
+            {
+                GetProjectByIdResult.Found found =>
+                    Results.Ok(
+                        new GetProjectByIdResponse(
+                            found.Id,
+                            found.Name,
+                            found.CreatedAt
+                        )
+                    ),
+
+                GetProjectByIdResult.NotFound =>
+                    Results.NotFound(),
+
+                _ => throw new UnreachableException()
+            };
+        })
+        .WithName("GetProjectById")
         .WithTags("Projects")
         .RequireAuthorization();
 

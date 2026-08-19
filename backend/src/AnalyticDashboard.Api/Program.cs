@@ -21,6 +21,7 @@ using AnalyticDashboard.Application.Widgets.DeleteWidget;
 using AnalyticDashboard.Application.Widgets.GetWidgets;
 using System.Text.Json.Serialization;
 using AnalyticDashboard.Application.Projects.CreateProject;
+using AnalyticDashboard.Application.Projects.GetProjectById;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +97,7 @@ builder.Services.AddScoped<CreateWidgetHandler>();
 builder.Services.AddScoped<GetWidgetsHandler>();
 builder.Services.AddScoped<DeleteWidgetHandler>();
 builder.Services.AddScoped<CreateProjectHandler>();
+builder.Services.AddScoped<GetProjectByIdHandler>();
 
 builder.Services.AddScoped<JwtTokenService>();
 
