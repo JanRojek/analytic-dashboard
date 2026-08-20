@@ -53,8 +53,10 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task GetProjectById_ShouldReturnOk_WhenProjectBelongsToAuthenticatedUser()
     {
+        var userId = Guid.NewGuid();
+
         var project = new Project(
-            TestAuthHandler.User1Id,
+            userId,
             "Get by id project"
         );
 
@@ -62,7 +64,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
 
         using var request = CreateRequest(
             project.Id,
-            TestAuthHandler.User1Id
+            userId
         );
 
         using var response = await _fixture.Client.SendAsync(
@@ -129,7 +131,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
     {
         using var request = CreateRequest(
             Guid.NewGuid(),
-            TestAuthHandler.User1Id
+            Guid.NewGuid()
         );
 
         using var response = await _fixture.Client.SendAsync(

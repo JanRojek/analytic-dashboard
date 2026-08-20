@@ -12,4 +12,8 @@ public interface IProjectRepository
         Guid projectId,
         Guid ownerId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Project>> GetByOwnerAsync(
+        Guid ownerId,
+        CancellationToken cancellationToken);
 }

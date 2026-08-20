@@ -55,4 +55,16 @@ public sealed class ProjectRepository : IProjectRepository
                 cancellationToken
             );
     }
+
+    public async Task<IReadOnlyList<Project>> GetByOwnerAsync(
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Projects
+            .Where(project => project.OwnerId == ownerId)
+            .AsNoTracking()
+            .OrderByDescending(project => project.CreatedAt)
+            .ThenBy(project => project.Id)
+            .ToListAsync(cancellationToken);
+    }
 }

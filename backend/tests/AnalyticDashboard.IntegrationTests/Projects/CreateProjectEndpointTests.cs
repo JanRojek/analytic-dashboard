@@ -48,9 +48,11 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task CreateProject_ShouldReturnCreated()
     {
+        var userId = Guid.NewGuid();
+
         using var request = CreateRequest(
             "   Happy path project   ",
-            TestAuthHandler.User1Id
+            userId
         );
 
         using var response = await _fixture.Client.SendAsync(
@@ -101,7 +103,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            TestAuthHandler.User1Id,
+            userId,
             project.OwnerId
         );
 
@@ -116,7 +118,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
     {
         using var request = CreateRequest(
             "   ",
-            TestAuthHandler.User1Id
+            Guid.NewGuid()
         );
 
         using var response = await _fixture.Client.SendAsync(
@@ -140,7 +142,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var request = CreateRequest(
             name,
-            TestAuthHandler.User1Id
+            Guid.NewGuid()
         );
 
         using var response = await _fixture.Client.SendAsync(
@@ -157,9 +159,11 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task CreateProject_ShouldReturnConflict_WhenNameAlreadyExistsIgnoringCase()
     {
+        var userId = Guid.NewGuid();
+
         using var firstRequest = CreateRequest(
             "   Case insensitive project   ",
-            TestAuthHandler.User1Id
+            userId
         );
 
         using var firstResponse = await _fixture.Client.SendAsync(
@@ -174,7 +178,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 
         using var secondRequest = CreateRequest(
             "case insensitive project",
-            TestAuthHandler.User1Id
+            userId
         );
 
         using var secondResponse = await _fixture.Client.SendAsync(
@@ -243,14 +247,16 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task CreateProject_ShouldReturnOneCreatedAndOneConflict_WhenRequestsAreConcurrent()
     {
+        var userId = Guid.NewGuid();
+
         using var firstRequest = CreateRequest(
             "Concurrent project",
-            TestAuthHandler.User1Id
+            userId
         );
 
         using var secondRequest = CreateRequest(
             "Concurrent project",
-            TestAuthHandler.User1Id
+            userId
         );
 
         var firstTask = _fixture.Client.SendAsync(

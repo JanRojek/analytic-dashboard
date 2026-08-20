@@ -25,6 +25,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AnalyticDashboard.Api\AnalyticDashboard.Api.csproj" />
+    <ProjectReference Include="..\..\src\AnalyticDashboard.Domain\AnalyticDashboard.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AnalyticDashboard.Infrastructure\AnalyticDashboard.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
