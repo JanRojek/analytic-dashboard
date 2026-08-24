@@ -10,7 +10,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public PostgresFixture()
     {
-        _container = new PostgreSqlBuilder("postgres:16").Build();
+        _container = new PostgreSqlBuilder("postgres:16.15").Build();
     }
 
     public async ValueTask InitializeAsync()

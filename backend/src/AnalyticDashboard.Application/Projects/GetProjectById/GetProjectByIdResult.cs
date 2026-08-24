@@ -5,7 +5,7 @@ public abstract record GetProjectByIdResult
     public sealed record Found(
         Guid Id,
         string Name,
-        DateTime CreatedAt
+        DateTime CreatedAtUtc
     ) : GetProjectByIdResult;
 
     public sealed record NotFound : GetProjectByIdResult;

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AnalyticDashboard.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260816192827_AddProjects")]
-    partial class AddProjects
+    [Migration("20260824193444_AddProjectPaginationIndex")]
+    partial class AddProjectPaginationIndex
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -109,7 +109,12 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_projects_OwnerId_Name");
+
+                    b.HasIndex("OwnerId", "CreatedAtUtc", "Id")
+                        .IsDescending(false, true, false)
+                        .HasDatabaseName("IX_projects_OwnerId_CreatedAtUtc_Id");
 
                     b.ToTable("projects", (string)null);
                 });

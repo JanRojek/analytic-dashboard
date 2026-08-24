@@ -5,11 +5,11 @@ public abstract record CreateProjectResult
     public sealed record Success(
         Guid Id,
         string Name,
-        DateTime CreatedAt
+        DateTime CreatedAtUtc
     ) : CreateProjectResult;
 
     public sealed record NameAlreadyExists(
-        string RequestedName
+        string ConflictingName
     ) : CreateProjectResult;
 
     public sealed record InvalidName(

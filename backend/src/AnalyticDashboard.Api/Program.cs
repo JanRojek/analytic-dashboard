@@ -21,12 +21,16 @@ using AnalyticDashboard.Application.Widgets.DeleteWidget;
 using AnalyticDashboard.Application.Widgets.GetWidgets;
 using System.Text.Json.Serialization;
 using AnalyticDashboard.Application.Projects.CreateProject;
+using AnalyticDashboard.Application.Projects.DeleteProject;
 using AnalyticDashboard.Application.Projects.GetProjectById;
 using AnalyticDashboard.Application.Projects.GetProjects;
+using AnalyticDashboard.Application.Projects.RenameProject;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddProblemDetails();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -100,10 +104,16 @@ builder.Services.AddScoped<DeleteWidgetHandler>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<GetProjectByIdHandler>();
 builder.Services.AddScoped<GetProjectsHandler>();
+builder.Services.AddScoped<RenameProjectHandler>();
+builder.Services.AddScoped<DeleteProjectHandler>();
 
 builder.Services.AddScoped<JwtTokenService>();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
+
+app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -120,7 +130,5 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
-app.UseHttpsRedirection();
 
 app.Run();

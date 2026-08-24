@@ -21,10 +21,7 @@ public sealed class ProjectRepository : IProjectRepository
     {
         try
         {
-            await _dbContext.Projects.AddAsync(
-                project,
-                cancellationToken
-            );
+            _dbContext.Projects.Add(project);
 
             await _dbContext.SaveChangesAsync(
                 cancellationToken
@@ -34,10 +31,12 @@ public sealed class ProjectRepository : IProjectRepository
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException
         {
-           SqlState: PostgresErrorCodes.UniqueViolation,
-           ConstraintName: "IX_projects_OwnerId_Name"
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: ProjectDatabaseNames.OwnerNameUniqueIndex
         })
         {
+            _dbContext.Entry(project).State = EntityState.Detached;
+
             return ProjectAddOutcome.NameAlreadyExists;
         }
     }
@@ -56,15 +55,78 @@ public sealed class ProjectRepository : IProjectRepository
             );
     }
 
-    public async Task<IReadOnlyList<Project>> GetByOwnerAsync(
+    public async Task<ProjectRenameOutcome> RenameAsync(
+        Guid projectId,
+        Guid ownerId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var affectedRows = await _dbContext.Projects
+                .Where(project =>
+                    project.Id == projectId
+                    && project.OwnerId == ownerId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        project => project.Name,
+                        name
+                    ),
+                    cancellationToken
+                );
+
+            return affectedRows == 1
+                ? ProjectRenameOutcome.Renamed
+                : ProjectRenameOutcome.NotFound;
+        }
+        catch (PostgresException ex) when (ex is
+        {
+           SqlState: PostgresErrorCodes.UniqueViolation,
+           ConstraintName: ProjectDatabaseNames.OwnerNameUniqueIndex
+        })
+        {
+            return ProjectRenameOutcome.NameAlreadyExists;
+        }
+    }
+
+    public async Task<ProjectDeleteOutcome> DeleteByIdAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var affectedRows = await _dbContext.Projects
+            .Where(project =>
+                project.Id == projectId
+                && project.OwnerId == ownerId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return affectedRows == 1
+            ? ProjectDeleteOutcome.Deleted
+            : ProjectDeleteOutcome.NotFound;
+    }
+
+    public async Task<int> CountByOwnerAsync(
         Guid ownerId,
         CancellationToken cancellationToken)
     {
         return await _dbContext.Projects
             .Where(project => project.OwnerId == ownerId)
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Project>> GetPageByOwnerAsync(
+        Guid ownerId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Projects
+            .Where(project => project.OwnerId == ownerId)
             .AsNoTracking()
-            .OrderByDescending(project => project.CreatedAt)
+            .OrderByDescending(project => project.CreatedAtUtc)
             .ThenBy(project => project.Id)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync(cancellationToken);
     }
 }

@@ -18,7 +18,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
         _fixture = fixture;
     }
 
-    private static HttpRequestMessage CreateRequest(
+    private static HttpRequestMessage CreateGetByIdRequest(
         Guid projectId,
         Guid? userId = null)
     {
@@ -62,7 +62,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
 
         await AddProjectAsync(project);
 
-        using var request = CreateRequest(
+        using var request = CreateGetByIdRequest(
             project.Id,
             userId
         );
@@ -94,9 +94,10 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
             result.Name
         );
 
-        Assert.NotEqual(
-            default,
-            result.CreatedAt
+        Assert.Equal(
+            project.CreatedAtUtc,
+            result.CreatedAtUtc,
+            TimeSpan.FromMilliseconds(1)
         );
     }
 
@@ -110,7 +111,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
 
         await AddProjectAsync(project);
 
-        using var request = CreateRequest(
+        using var request = CreateGetByIdRequest(
             project.Id,
             TestAuthHandler.User1Id
         );
@@ -129,7 +130,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task GetProjectById_ShouldReturnNotFound_WhenProjectDoesNotExist()
     {
-        using var request = CreateRequest(
+        using var request = CreateGetByIdRequest(
             Guid.NewGuid(),
             Guid.NewGuid()
         );
@@ -148,7 +149,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task GetProjectById_ShouldReturnUnauthorized_WhenUserIsNotAuthenticated()
     {
-        using var request = CreateRequest(
+        using var request = CreateGetByIdRequest(
             Guid.NewGuid()
         );
 
@@ -166,7 +167,7 @@ public sealed class GetProjectByIdEndpointTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task GetProjectById_ShouldReturnUnauthorized_WhenUserIdIsEmpty()
     {
-        using var request = CreateRequest(
+        using var request = CreateGetByIdRequest(
             Guid.NewGuid(),
             Guid.Empty
         );

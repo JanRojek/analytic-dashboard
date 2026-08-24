@@ -3,5 +3,5 @@
 public sealed record GetProjectsItem(
     Guid Id,
     string Name,
-    DateTime CreatedAt
+    DateTime CreatedAtUtc
 );

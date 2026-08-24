@@ -44,7 +44,7 @@ public sealed class CreateProjectHandler
                 new CreateProjectResult.Success(
                     project.Id,
                     project.Name,
-                    project.CreatedAt
+                    project.CreatedAtUtc
                 ),
 
             ProjectAddOutcome.NameAlreadyExists =>

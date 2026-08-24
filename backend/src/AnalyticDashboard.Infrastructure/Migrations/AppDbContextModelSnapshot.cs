@@ -92,7 +92,7 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
@@ -106,7 +106,12 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_projects_OwnerId_Name");
+
+                    b.HasIndex("OwnerId", "CreatedAtUtc", "Id")
+                        .IsDescending(false, true, false)
+                        .HasDatabaseName("IX_projects_OwnerId_CreatedAtUtc_Id");
 
                     b.ToTable("projects", (string)null);
                 });

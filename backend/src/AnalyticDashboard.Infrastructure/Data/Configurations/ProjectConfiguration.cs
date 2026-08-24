@@ -20,11 +20,31 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .IsRequired()
             .HasMaxLength(Project.MaxNameLength);
 
-        builder.HasIndex(project => new
+        builder
+            .HasIndex(project => new
             {
                 project.OwnerId,
                 project.Name
             })
-            .IsUnique();
+            .IsUnique()
+            .HasDatabaseName(
+                ProjectDatabaseNames.OwnerNameUniqueIndex
+            );
+
+        builder
+            .HasIndex(project => new
+            {
+                project.OwnerId,
+                project.CreatedAtUtc,
+                project.Id
+            })
+            .IsDescending(
+                false,
+                true,
+                false
+            )
+            .HasDatabaseName(
+                ProjectDatabaseNames.OwnerCreatedAtUtcIdIndex
+            );
     }
 }

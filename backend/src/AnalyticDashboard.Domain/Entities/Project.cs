@@ -8,7 +8,7 @@ public sealed class Project
 
     public string Name { get; private set; }
 
-    public DateTime CreatedAt { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
 
     public const int MaxNameLength = 100;
 
@@ -24,7 +24,7 @@ public sealed class Project
         Id = Guid.NewGuid();
         OwnerId = ownerId;
         Name = NormalizeName(name);
-        CreatedAt = DateTime.UtcNow;
+        CreatedAtUtc = DateTime.UtcNow;
     }
 
     public void Rename(string name)

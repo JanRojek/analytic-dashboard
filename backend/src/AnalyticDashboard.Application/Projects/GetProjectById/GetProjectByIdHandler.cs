@@ -29,7 +29,7 @@ public sealed class GetProjectByIdHandler
         return new GetProjectByIdResult.Found(
             project.Id,
             project.Name,
-            project.CreatedAt
+            project.CreatedAtUtc
         );
     }
 }
