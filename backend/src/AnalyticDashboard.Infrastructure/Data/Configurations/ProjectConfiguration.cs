@@ -8,7 +8,31 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
 {
     public void Configure(EntityTypeBuilder<Project> builder)
     {
-        builder.ToTable("projects");
+        builder.ToTable(
+            "projects",
+            table =>
+            {
+                table.HasCheckConstraint(
+                    ProjectDatabaseNames.OwnerIdNotEmptyCheck,
+                    "\"OwnerId\" <> '00000000-0000-0000-0000-000000000000'::uuid"
+                );
+
+                table.HasCheckConstraint(
+                    ProjectDatabaseNames.NameNotBlankCheck,
+                    "btrim(\"Name\"::text) <> ''"
+                );
+
+                table.HasCheckConstraint(
+                    ProjectDatabaseNames.NameMaxLengthCheck,
+                    $"char_length(\"Name\"::text) <= {Project.MaxNameLength}"
+                );
+
+                table.HasCheckConstraint(
+                    ProjectDatabaseNames.NameTrimmedCheck,
+                    "\"Name\"::text = btrim(\"Name\"::text)"
+                );
+            }
+        );
 
         builder.HasKey(project => project.Id);
 
