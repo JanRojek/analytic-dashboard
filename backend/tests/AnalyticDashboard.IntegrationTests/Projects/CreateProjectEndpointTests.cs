@@ -489,4 +489,80 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
             response.StatusCode
         );
     }
+
+    [Fact]
+    public async Task CreateProject_ShouldReturnConflict_WhenNameDiffersOnlyByUnicodeCase()
+    {
+        var userId = Guid.NewGuid();
+
+        var existingProject = new Project(
+            userId,
+            "Żółć"
+        );
+
+        await AddProjectAsync(existingProject);
+
+        using var request = CreatePostRequest(
+            "ŻÓŁĆ",
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            response.StatusCode
+        );
+
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType
+        );
+
+        var problem = await response.Content
+            .ReadFromJsonAsync<ProblemDetails>(
+                CancellationToken
+            );
+
+        Assert.NotNull(problem);
+
+        Assert.Equal(
+            StatusCodes.Status409Conflict,
+            problem.Status
+        );
+
+        Assert.Equal(
+            "Project name already exists.",
+            problem.Title
+        );
+
+        Assert.Equal(
+            "Project 'ŻÓŁĆ' already exists.",
+            problem.Detail
+        );
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+
+        var dbContext = scope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+        var projects = await dbContext.Projects
+            .Where(project => project.OwnerId == userId)
+            .ToListAsync(CancellationToken);
+
+        var project = Assert.Single(projects);
+
+        Assert.Equal(
+            existingProject.Id,
+            project.Id
+        );
+
+        Assert.Equal(
+            "Żółć",
+            project.Name
+        );
+    }
 }
