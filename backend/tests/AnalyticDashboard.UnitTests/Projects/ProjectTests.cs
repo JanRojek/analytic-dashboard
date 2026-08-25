@@ -136,4 +136,43 @@ public sealed class ProjectTests
 
         Assert.Equal(projectName, project.Name);
     }
+
+    [Fact]
+    public void Constructor_ShouldAllowName_WhenNameHasExactlyMaxUnicodeCharacters()
+    {
+        var name = string.Concat(
+            Enumerable.Repeat(
+                "🍆",
+                Project.MaxNameLength
+            )
+        );
+
+        var project = new Project(
+            Guid.NewGuid(),
+            name
+        );
+
+        Assert.Equal(
+            name,
+            project.Name
+        );
+    }
+
+    [Fact]
+    public void Constructor_ShouldThrow_WhenNameExceedsMaxUnicodeCharacters()
+    {
+        var name = string.Concat(
+            Enumerable.Repeat(
+                "🍆",
+                Project.MaxNameLength + 1
+            )
+        );
+
+        Assert.Throws<InvalidProjectNameException>(
+            () => new Project(
+                Guid.NewGuid(),
+                name
+            )
+        );
+    }
 }

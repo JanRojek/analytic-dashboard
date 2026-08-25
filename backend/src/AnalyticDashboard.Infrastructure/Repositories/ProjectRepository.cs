@@ -1,5 +1,5 @@
 ﻿using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;

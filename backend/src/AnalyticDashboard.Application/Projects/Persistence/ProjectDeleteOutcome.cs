@@ -1,4 +1,4 @@
-﻿namespace AnalyticDashboard.Domain.Repositories;
+namespace AnalyticDashboard.Application.Projects.Persistence;
 
 public enum ProjectDeleteOutcome
 {

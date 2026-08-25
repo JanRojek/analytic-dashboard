@@ -41,7 +41,7 @@ public sealed class Project
 
         name = name.Trim();
 
-        if (name.Length > MaxNameLength)
+        if (name.EnumerateRunes().Count() > MaxNameLength)
         {
             throw new InvalidProjectNameException(
                 $"Project name cannot be longer than {MaxNameLength} characters.");

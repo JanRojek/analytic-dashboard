@@ -1,5 +1,5 @@
 ﻿using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Projects.Persistence;
 using System.Diagnostics;
 
 namespace AnalyticDashboard.Application.Projects.RenameProject;

@@ -1,4 +1,4 @@
-﻿using AnalyticDashboard.Domain.Repositories;
+﻿using AnalyticDashboard.Application.Projects.Persistence;
 using System.Diagnostics;
 
 namespace AnalyticDashboard.Application.Projects.DeleteProject;

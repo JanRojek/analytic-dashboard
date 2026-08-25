@@ -125,6 +125,52 @@ public sealed class ProjectDatabaseConstraintsTests : IClassFixture<ApiFixture>
         );
     }
 
+    [Theory]
+    [InlineData("\t\t")]
+    [InlineData("\n")]
+    [InlineData("\u00A0")]
+    [InlineData("\tProject\n")]
+    [InlineData("\u00A0Project\u00A0")]
+    public async Task ProjectDatabase_ShouldRejectName_WhenWhitespaceIsNotNormalized(
+        string name)
+    {
+        await using var scope = _fixture.Services.CreateAsyncScope();
+
+        var dbContext = scope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+        await using var transaction =
+            await dbContext.Database.BeginTransactionAsync(
+                CancellationToken
+            );
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(
+            async () =>
+                await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                     INSERT INTO projects (
+                         "Id",
+                         "OwnerId",
+                         "Name",
+                         "CreatedAtUtc"
+                     )
+                     VALUES (
+                         {Guid.NewGuid()},
+                         {Guid.NewGuid()},
+                         {name},
+                         {DateTime.UtcNow}
+                     )
+                     """,
+                    CancellationToken
+                )
+        );
+
+        Assert.Equal(
+            PostgresErrorCodes.CheckViolation,
+            exception.SqlState
+        );
+    }
+
     public enum ProjectConstraintScenario
     {
         EmptyOwnerId,

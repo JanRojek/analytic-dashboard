@@ -1,6 +1,6 @@
-﻿using AnalyticDashboard.Domain.Entities;
+using AnalyticDashboard.Domain.Entities;
 
-namespace AnalyticDashboard.Domain.Repositories;
+namespace AnalyticDashboard.Application.Projects.Persistence;
 
 public interface IProjectRepository
 {

@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Projects.Persistence;
 
 namespace AnalyticDashboard.Application.Projects.CreateProject;
 
