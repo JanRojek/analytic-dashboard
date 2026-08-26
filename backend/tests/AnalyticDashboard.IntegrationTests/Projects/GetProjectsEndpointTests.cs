@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using AnalyticDashboard.Api.Contracts.Projects;
-using AnalyticDashboard.Application.Projects.GetProjects;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.AspNetCore.Http;
@@ -150,12 +149,12 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         Assert.NotNull(result);
 
         Assert.Equal(
-            GetProjectsQuery.DefaultPage,
+            1,
             result.Page
         );
 
         Assert.Equal(
-            GetProjectsQuery.DefaultPageSize,
+            25,
             result.PageSize
         );
 
@@ -219,12 +218,12 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         Assert.Empty(result.Items);
 
         Assert.Equal(
-            GetProjectsQuery.DefaultPage,
+            1,
             result.Page
         );
 
         Assert.Equal(
-            GetProjectsQuery.DefaultPageSize,
+            25,
             result.PageSize
         );
 
@@ -265,86 +264,41 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
             projectC
         );
 
-        await using (var scope = _fixture.Services.CreateAsyncScope())
-        {
-            var dbContext = scope.ServiceProvider
-                .GetRequiredService<AppDbContext>();
+        var oldestCreatedAtUtc = new DateTime(
+            2026,
+            8,
+            20,
+            10,
+            0,
+            0,
+            DateTimeKind.Utc
+        );
 
-            var oldestCreatedAtUtc = new DateTime(
-                2026,
-                8,
-                20,
-                10,
-                0,
-                0,
-                DateTimeKind.Utc
-            );
+        var middleCreatedAtUtc = new DateTime(
+            2026,
+            8,
+            20,
+            11,
+            0,
+            0,
+            DateTimeKind.Utc
+        );
 
-            var middleCreatedAtUtc = new DateTime(
-                2026,
-                8,
-                20,
-                11,
-                0,
-                0,
-                DateTimeKind.Utc
-            );
+        var newestCreatedAtUtc = new DateTime(
+            2026,
+            8,
+            20,
+            12,
+            0,
+            0,
+            DateTimeKind.Utc
+        );
 
-            var newestCreatedAtUtc = new DateTime(
-                2026,
-                8,
-                20,
-                12,
-                0,
-                0,
-                DateTimeKind.Utc
-            );
-
-            var projectAUpdatedCount = await dbContext.Projects
-                .Where(project => project.Id == projectA.Id)
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(
-                        project => project.CreatedAtUtc,
-                        oldestCreatedAtUtc
-                    ),
-                    CancellationToken
-                );
-
-            var projectBUpdatedCount = await dbContext.Projects
-                .Where(project => project.Id == projectB.Id)
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(
-                        project => project.CreatedAtUtc,
-                        newestCreatedAtUtc
-                    ),
-                    CancellationToken
-                );
-
-            var projectCUpdatedCount = await dbContext.Projects
-                .Where(project => project.Id == projectC.Id)
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(
-                        project => project.CreatedAtUtc,
-                        middleCreatedAtUtc
-                    ),
-                    CancellationToken
-                );
-
-            Assert.Equal(
-                1,
-                projectAUpdatedCount
-            );
-
-            Assert.Equal(
-                1,
-                projectBUpdatedCount
-            );
-
-            Assert.Equal(
-                1,
-                projectCUpdatedCount
-            );
-        }
+        await SetCreatedAtUtcAsync(
+            (projectA, oldestCreatedAtUtc),
+            (projectB, newestCreatedAtUtc),
+            (projectC, middleCreatedAtUtc)
+        );
 
         using var request = CreateGetRequest(
             userId
@@ -409,7 +363,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
             var dbContext = scope.ServiceProvider
                 .GetRequiredService<AppDbContext>();
 
-            var createdAt = new DateTime(
+            var createdAtUtc = new DateTime(
                 2026,
                 8,
                 20,
@@ -426,7 +380,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
                 .ExecuteUpdateAsync(
                     setters => setters.SetProperty(
                         project => project.CreatedAtUtc,
-                        createdAt
+                        createdAtUtc
                     ),
                     CancellationToken
                 );
@@ -691,7 +645,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         Assert.NotNull(result);
 
         Assert.Equal(
-            GetProjectsQuery.DefaultPage,
+            1,
             result.Page
         );
 
@@ -857,7 +811,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
 
         using var request = CreateGetRequest(
             userId,
-            page: GetProjectsQuery.DefaultPage,
+            page: 1,
             pageSize: 50
         );
 
@@ -879,7 +833,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         Assert.NotNull(result);
 
         Assert.Equal(
-            GetProjectsQuery.DefaultPage,
+            1,
             result.Page
         );
 
@@ -960,7 +914,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         Assert.Single(errors);
 
         Assert.Equal(
-            $"Page size must be between 1 and {GetProjectsQuery.MaxPageSize}.",
+            "Page size must be between 1 and 100.",
             errors[0]
         );
     }

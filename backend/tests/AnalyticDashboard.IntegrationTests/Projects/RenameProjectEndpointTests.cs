@@ -14,7 +14,24 @@ public sealed class RenameProjectEndpointTests : IClassFixture<ApiFixture>
 {
     private readonly ApiFixture _fixture;
 
-    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+    private static CancellationToken CancellationToken =>
+        TestContext.Current.CancellationToken;
+
+    public static TheoryData<string, string> InvalidNames =>
+        new()
+        {
+            {
+                "   ",
+                "Project name cannot be empty."
+            },
+            {
+                new string(
+                    'a',
+                    Project.MaxNameLength + 1
+                ),
+                $"Project name cannot be longer than {Project.MaxNameLength} characters."
+            }
+        };
 
     public RenameProjectEndpointTests(ApiFixture fixture)
     {
@@ -124,6 +141,12 @@ public sealed class RenameProjectEndpointTests : IClassFixture<ApiFixture>
             result.Name
         );
 
+        Assert.Equal(
+            project.CreatedAtUtc,
+            result.CreatedAtUtc,
+            TimeSpan.FromMilliseconds(1)
+        );
+
         await using var scope = _fixture.Services.CreateAsyncScope();
 
         var dbContext = scope.ServiceProvider
@@ -182,97 +205,22 @@ public sealed class RenameProjectEndpointTests : IClassFixture<ApiFixture>
         );
     }
 
-    [Fact]
-    public async Task RenameProject_ShouldReturnBadRequest_WhenNameIsWhitespace()
+    [Theory]
+    [MemberData(nameof(InvalidNames))]
+    public async Task RenameProject_ShouldReturnBadRequest_WhenNameIsInvalid(
+        string name,
+        string expectedError)
     {
         var userId = Guid.NewGuid();
 
-        var project = new Project(
-            userId,
-            "My project 1"
-        );
-
-        await AddProjectsAsync(project);
-
-        using var request = CreatePatchRequest(
-            project.Id,
-            "   ",
-            userId
-        );
-
-        using var response = await _fixture.Client.SendAsync(
-            request,
-            CancellationToken
-        );
-
-        Assert.Equal(
-            HttpStatusCode.BadRequest,
-            response.StatusCode
-        );
-
-        Assert.Equal(
-            "application/problem+json",
-            response.Content.Headers.ContentType?.MediaType
-        );
-
-        var problem = await response.Content
-            .ReadFromJsonAsync<HttpValidationProblemDetails>(
-                CancellationToken
-            );
-
-        Assert.NotNull(problem);
-
-        Assert.Equal(
-            StatusCodes.Status400BadRequest,
-            problem.Status
-        );
-
-        Assert.True(
-            problem.Errors.TryGetValue(
-                "Name",
-                out var errors
-            )
-        );
-
-        Assert.Single(errors);
-
-        Assert.Equal(
-            "Project name cannot be empty.",
-            errors[0]
-        );
-
-        await using var scope = _fixture.Services.CreateAsyncScope();
-
-        var dbContext = scope.ServiceProvider
-            .GetRequiredService<AppDbContext>();
-
-        var projectInDb = await dbContext.Projects.SingleAsync(
-            entity => entity.Id == project.Id,
-            CancellationToken
-        );
-
-        Assert.Equal(
-            "My project 1",
-            projectInDb.Name
-        );
-    }
-
-    [Fact]
-    public async Task RenameProject_ShouldReturnBadRequest_WhenNameIsTooLong()
-    {
-        var userId = Guid.NewGuid();
+        const string originalName = "My project";
 
         var project = new Project(
             userId,
-            "My project 2"
+            originalName
         );
 
         await AddProjectsAsync(project);
-
-        var name = new string(
-            'a',
-            Project.MaxNameLength + 1
-        );
 
         using var request = CreatePatchRequest(
             project.Id,
@@ -317,7 +265,7 @@ public sealed class RenameProjectEndpointTests : IClassFixture<ApiFixture>
         Assert.Single(errors);
 
         Assert.Equal(
-            $"Project name cannot be longer than {Project.MaxNameLength} characters.",
+            expectedError,
             errors[0]
         );
 
@@ -332,7 +280,7 @@ public sealed class RenameProjectEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            "My project 2",
+            originalName,
             projectInDb.Name
         );
     }
@@ -786,6 +734,76 @@ public sealed class RenameProjectEndpointTests : IClassFixture<ApiFixture>
                 "Concurrent rename first",
                 "Concurrent rename second"
             }
+        );
+    }
+
+    [Fact]
+    public async Task RenameProject_ShouldReturnBadRequest_WhenNameIsNull()
+    {
+        var userId = Guid.NewGuid();
+
+        var project = new Project(
+            userId,
+            "Original name"
+        );
+
+        await AddProjectsAsync(project);
+
+        using var request = CreatePatchRequest(
+            project.Id,
+            null!,
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode
+        );
+
+        Assert.Equal(
+            "application/problem+json",
+            response.Content.Headers.ContentType?.MediaType
+        );
+
+        var problem = await response.Content
+            .ReadFromJsonAsync<HttpValidationProblemDetails>(
+                CancellationToken
+            );
+
+        Assert.NotNull(problem);
+
+        Assert.True(
+            problem.Errors.TryGetValue(
+                "Name",
+                out var errors
+            )
+        );
+
+        Assert.Single(errors);
+
+        Assert.Equal(
+            "Project name cannot be empty.",
+            errors[0]
+        );
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+
+        var dbContext = scope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+        var projectInDb = await dbContext.Projects.SingleAsync(
+            entity => entity.Id == project.Id,
+            CancellationToken
+        );
+
+        Assert.Equal(
+            "Original name",
+            projectInDb.Name
         );
     }
 }

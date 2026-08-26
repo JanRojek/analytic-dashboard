@@ -14,7 +14,8 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
 {
     private readonly ApiFixture _fixture;
 
-    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+    private static CancellationToken CancellationToken =>
+        TestContext.Current.CancellationToken;
 
     public CreateProjectEndpointTests(ApiFixture fixture)
     {
@@ -260,20 +261,30 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         Assert.False(exists);
     }
 
-    [Fact]
-    public async Task CreateProject_ShouldReturnConflict_WhenNameAlreadyExistsIgnoringCase()
+    [Theory]
+    [InlineData(
+        "Case insensitive project",
+        "case insensitive project"
+    )]
+    [InlineData(
+        "Żółć",
+        "ŻÓŁĆ"
+    )]
+    public async Task CreateProject_ShouldReturnConflict_WhenNameAlreadyExistsIgnoringCase(
+        string existingName,
+        string requestedName)
     {
         var userId = Guid.NewGuid();
 
         var existingProject = new Project(
             userId,
-            "Case insensitive project"
+            existingName
         );
 
         await AddProjectAsync(existingProject);
 
         using var request = CreatePostRequest(
-            "case insensitive project",
+            requestedName,
             userId
         );
 
@@ -310,7 +321,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            "Project 'case insensitive project' already exists.",
+            $"Project '{requestedName}' already exists.",
             problem.Detail
         );
 
@@ -330,7 +341,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            "Case insensitive project",
+            existingName,
             projectInDb.Name
         );
     }
@@ -491,19 +502,12 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task CreateProject_ShouldReturnConflict_WhenNameDiffersOnlyByUnicodeCase()
+    public async Task CreateProject_ShouldReturnBadRequest_WhenNameIsNull()
     {
         var userId = Guid.NewGuid();
 
-        var existingProject = new Project(
-            userId,
-            "Żółć"
-        );
-
-        await AddProjectAsync(existingProject);
-
         using var request = CreatePostRequest(
-            "ŻÓŁĆ",
+            null!,
             userId
         );
 
@@ -513,7 +517,7 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            HttpStatusCode.Conflict,
+            HttpStatusCode.BadRequest,
             response.StatusCode
         );
 
@@ -523,25 +527,24 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         );
 
         var problem = await response.Content
-            .ReadFromJsonAsync<ProblemDetails>(
+            .ReadFromJsonAsync<HttpValidationProblemDetails>(
                 CancellationToken
             );
 
         Assert.NotNull(problem);
 
-        Assert.Equal(
-            StatusCodes.Status409Conflict,
-            problem.Status
+        Assert.True(
+            problem.Errors.TryGetValue(
+                "Name",
+                out var errors
+            )
         );
 
-        Assert.Equal(
-            "Project name already exists.",
-            problem.Title
-        );
+        Assert.Single(errors);
 
         Assert.Equal(
-            "Project 'ŻÓŁĆ' already exists.",
-            problem.Detail
+            "Project name cannot be empty.",
+            errors[0]
         );
 
         await using var scope = _fixture.Services.CreateAsyncScope();
@@ -549,20 +552,11 @@ public sealed class CreateProjectEndpointTests : IClassFixture<ApiFixture>
         var dbContext = scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
 
-        var projects = await dbContext.Projects
-            .Where(project => project.OwnerId == userId)
-            .ToListAsync(CancellationToken);
-
-        var project = Assert.Single(projects);
-
-        Assert.Equal(
-            existingProject.Id,
-            project.Id
+        var exists = await dbContext.Projects.AnyAsync(
+            project => project.OwnerId == userId,
+            CancellationToken
         );
 
-        Assert.Equal(
-            "Żółć",
-            project.Name
-        );
+        Assert.False(exists);
     }
 }

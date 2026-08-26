@@ -94,24 +94,23 @@ public sealed class ProjectDatabaseConstraintsTests : IClassFixture<ApiFixture>
         var createdAtUtc = DateTime.UtcNow;
 
         var exception = await Assert.ThrowsAsync<PostgresException>(
-            async () =>
-                await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    INSERT INTO projects (
-                        "Id",
-                        "OwnerId",
-                        "Name",
-                        "CreatedAtUtc"
-                    )
-                    VALUES (
-                        {projectId},
-                        {ownerId},
-                        {name},
-                        {createdAtUtc}
-                    )
-                    """,
-                    CancellationToken
+            () => dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO projects (
+                    "Id",
+                    "OwnerId",
+                    "Name",
+                    "CreatedAtUtc"
                 )
+                VALUES (
+                    {projectId},
+                    {ownerId},
+                    {name},
+                    {createdAtUtc}
+                )
+                """,
+                CancellationToken
+            )
         );
 
         Assert.Equal(
@@ -145,24 +144,23 @@ public sealed class ProjectDatabaseConstraintsTests : IClassFixture<ApiFixture>
             );
 
         var exception = await Assert.ThrowsAsync<PostgresException>(
-            async () =>
-                await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                     INSERT INTO projects (
-                         "Id",
-                         "OwnerId",
-                         "Name",
-                         "CreatedAtUtc"
-                     )
-                     VALUES (
-                         {Guid.NewGuid()},
-                         {Guid.NewGuid()},
-                         {name},
-                         {DateTime.UtcNow}
-                     )
-                     """,
-                    CancellationToken
+            () => dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO projects (
+                    "Id",
+                    "OwnerId",
+                    "Name",
+                    "CreatedAtUtc"
                 )
+                VALUES (
+                    {Guid.NewGuid()},
+                    {Guid.NewGuid()},
+                    {name},
+                    {DateTime.UtcNow}
+                )
+                """,
+                CancellationToken
+            )
         );
 
         Assert.Equal(

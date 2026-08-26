@@ -21,19 +21,25 @@ public sealed class ProjectTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_ShouldThrow_WhenNameIsNullOrWhitespace(string? name)
+    public void Constructor_ShouldThrow_WhenNameIsNullOrWhitespace(
+        string? name)
     {
         Assert.Throws<InvalidProjectNameException>(
             () => new Project(UserId, name!)
         );
     }
 
-    [Fact]
-    public void Constructor_ShouldThrow_WhenNameIsTooLong()
+    [Theory]
+    [InlineData("a")]
+    [InlineData("🍆")]
+    public void Constructor_ShouldThrow_WhenNameExceedsMaxLength(
+        string character)
     {
-        var projectName = new string(
-            'a',
-            Project.MaxNameLength + 1
+        var projectName = string.Concat(
+            Enumerable.Repeat(
+                character,
+                Project.MaxNameLength + 1
+            )
         );
 
         Assert.Throws<InvalidProjectNameException>(
@@ -41,17 +47,28 @@ public sealed class ProjectTests
         );
     }
 
-    [Fact]
-    public void Constructor_ShouldAllowName_WhenNameHasMaxLength()
+    [Theory]
+    [InlineData("a")]
+    [InlineData("🍆")]
+    public void Constructor_ShouldAllowName_WhenNameHasExactlyMaxLength(
+        string character)
     {
-        var projectName = new string(
-            'a',
-            Project.MaxNameLength
+        var projectName = string.Concat(
+            Enumerable.Repeat(
+                character,
+                Project.MaxNameLength
+            )
         );
 
-        var project = new Project(UserId, projectName);
+        var project = new Project(
+            UserId,
+            projectName
+        );
 
-        Assert.Equal(projectName, project.Name);
+        Assert.Equal(
+            projectName,
+            project.Name
+        );
     }
 
     [Fact]
@@ -67,26 +84,68 @@ public sealed class ProjectTests
     {
         var ownerId = Guid.NewGuid();
 
-        var project = new Project(ownerId, "My Project");
+        var project = new Project(
+            ownerId,
+            "My Project"
+        );
 
-        Assert.Equal(ownerId, project.OwnerId);
+        Assert.Equal(
+            ownerId,
+            project.OwnerId
+        );
     }
 
     [Fact]
-    public void Constructor_ShouldGenerateNonEmptyId()
+    public void Constructor_ShouldGenerateUniqueNonEmptyId()
     {
-        var project = new Project(UserId, "My Project");
+        var firstProject = new Project(
+            UserId,
+            "First Project"
+        );
 
-        Assert.NotEqual(Guid.Empty, project.Id);
+        var secondProject = new Project(
+            UserId,
+            "Second Project"
+        );
+
+        Assert.NotEqual(
+            Guid.Empty,
+            firstProject.Id
+        );
+
+        Assert.NotEqual(
+            Guid.Empty,
+            secondProject.Id
+        );
+
+        Assert.NotEqual(
+            firstProject.Id,
+            secondProject.Id
+        );
     }
 
     [Fact]
     public void Constructor_ShouldSetCreatedAtUtc()
     {
-        var project = new Project(UserId, "My Project");
+        var before = DateTime.UtcNow;
 
-        Assert.NotEqual(default, project.CreatedAtUtc);
-        Assert.Equal(DateTimeKind.Utc, project.CreatedAtUtc.Kind);
+        var project = new Project(
+            UserId,
+            "My Project"
+        );
+
+        var after = DateTime.UtcNow;
+
+        Assert.InRange(
+            project.CreatedAtUtc,
+            before,
+            after
+        );
+
+        Assert.Equal(
+            DateTimeKind.Utc,
+            project.CreatedAtUtc.Kind
+        );
     }
 
     [Fact]
@@ -94,85 +153,70 @@ public sealed class ProjectTests
     {
         const string projectName = "Old Name";
 
-        var project = new Project(UserId, projectName);
+        var project = new Project(
+            UserId,
+            projectName
+        );
 
         project.Rename("  New Name  ");
 
-        Assert.Equal("New Name", project.Name);
+        Assert.Equal(
+            "New Name",
+            project.Name
+        );
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Rename_ShouldThrowAndKeepPreviousName_WhenNameIsNullOrWhitespace(string? name)
+    public void Rename_ShouldThrowAndKeepPreviousName_WhenNameIsNullOrWhitespace(
+        string? name)
     {
         const string projectName = "Old Name";
 
-        var project = new Project(UserId, projectName);
+        var project = new Project(
+            UserId,
+            projectName
+        );
 
         Assert.Throws<InvalidProjectNameException>(
             () => project.Rename(name!)
         );
 
-        Assert.Equal(projectName, project.Name);
+        Assert.Equal(
+            projectName,
+            project.Name
+        );
     }
 
-    [Fact]
-    public void Rename_ShouldThrowAndKeepPreviousName_WhenNameIsTooLong()
+    [Theory]
+    [InlineData("a")]
+    [InlineData("🍆")]
+    public void Rename_ShouldThrowAndKeepPreviousName_WhenNameExceedsMaxLength(
+        string character)
     {
         const string projectName = "Old Name";
 
-        var project = new Project(UserId, projectName);
+        var project = new Project(
+            UserId,
+            projectName
+        );
 
-        var newName = new string(
-            'a',
-            Project.MaxNameLength + 1
+        var newName = string.Concat(
+            Enumerable.Repeat(
+                character,
+                Project.MaxNameLength + 1
+            )
         );
 
         Assert.Throws<InvalidProjectNameException>(
             () => project.Rename(newName)
         );
 
-        Assert.Equal(projectName, project.Name);
-    }
-
-    [Fact]
-    public void Constructor_ShouldAllowName_WhenNameHasExactlyMaxUnicodeCharacters()
-    {
-        var name = string.Concat(
-            Enumerable.Repeat(
-                "🍆",
-                Project.MaxNameLength
-            )
-        );
-
-        var project = new Project(
-            Guid.NewGuid(),
-            name
-        );
-
         Assert.Equal(
-            name,
+            projectName,
             project.Name
-        );
-    }
-
-    [Fact]
-    public void Constructor_ShouldThrow_WhenNameExceedsMaxUnicodeCharacters()
-    {
-        var name = string.Concat(
-            Enumerable.Repeat(
-                "🍆",
-                Project.MaxNameLength + 1
-            )
-        );
-
-        Assert.Throws<InvalidProjectNameException>(
-            () => new Project(
-                Guid.NewGuid(),
-                name
-            )
         );
     }
 }
