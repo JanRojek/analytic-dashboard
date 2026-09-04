@@ -1,3 +1,5 @@
+using AnalyticDashboard.Application.Auth.Accounts;
+using AnalyticDashboard.Application.Auth.Email;
 using AnalyticDashboard.Application.Import;
 using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Domain.Repositories;
@@ -8,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using AnalyticDashboard.Application.Profiling;
+using AnalyticDashboard.Infrastructure.Auth.Email;
+using AnalyticDashboard.Infrastructure.Identity;
 using AnalyticDashboard.Infrastructure.Services.Profiling;
 using AnalyticDashboard.Infrastructure.Services.Csv;
 
@@ -31,13 +35,21 @@ public static class DependencyInjection
 
         services.AddScoped<IDatasetProfileReader, CsvDatasetProfileReader>();
 
-        services.AddScoped<IUserRepository, UserRepository>();
-
         services.AddScoped<IDashboardRepository, DashboardRepository>();
 
         services.AddScoped<IWidgetRepository, WidgetRepository>();
 
         services.AddScoped<IProjectRepository, ProjectRepository>();
+
+        services.AddScoped<IUserAccountService, UserAccountService>();
+
+        services.AddScoped<IUserAccountTokenService, UserAccountTokenService>();
+
+        services.AddSingleton<IEmailConfirmationLinkBuilder, EmailConfirmationLinkBuilder>();
+
+        services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
+
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
 
         services.AddScoped<CsvFormatDetector>();
 

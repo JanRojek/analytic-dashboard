@@ -17,7 +17,10 @@ public static class ProjectEndpoints
     {
         var projects = app.MapGroup("/projects")
             .WithTags("Projects")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .ProducesProblem(
+                StatusCodes.Status500InternalServerError
+            );
 
         projects.MapPost("", async (
             CreateProjectRequest request,
@@ -80,9 +83,6 @@ public static class ProjectEndpoints
         )
         .ProducesProblem(
             StatusCodes.Status409Conflict
-        )
-        .ProducesProblem(
-            StatusCodes.Status500InternalServerError
         );
 
         projects.MapGet("/{id:guid}", async (
@@ -130,9 +130,6 @@ public static class ProjectEndpoints
         )
         .Produces(
             StatusCodes.Status404NotFound
-        )
-        .ProducesProblem(
-            StatusCodes.Status500InternalServerError
         );
 
         projects.MapGet("", async (
@@ -193,9 +190,6 @@ public static class ProjectEndpoints
         .ProducesValidationProblem()
         .Produces(
             StatusCodes.Status401Unauthorized
-        )
-        .ProducesProblem(
-            StatusCodes.Status500InternalServerError
         );
 
         projects.MapPatch("/{id:guid}", async (
@@ -264,9 +258,6 @@ public static class ProjectEndpoints
         )
         .ProducesProblem(
             StatusCodes.Status409Conflict
-        )
-        .ProducesProblem(
-            StatusCodes.Status500InternalServerError
         );
 
         projects.MapDelete("/{id:guid}", async (
@@ -310,9 +301,6 @@ public static class ProjectEndpoints
         )
         .Produces(
             StatusCodes.Status404NotFound
-        )
-        .ProducesProblem(
-            StatusCodes.Status500InternalServerError
         );
 
         return app;

@@ -1,6 +1,7 @@
-namespace AnalyticDashboard.Application.Auth.Register;
+﻿namespace AnalyticDashboard.Application.Auth.Register;
 
 public sealed record RegisterUserCommand(
-    string Username, 
+    string Email,
+    string DisplayName,
     string Password
 );

@@ -1,36 +1,29 @@
-using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
+﻿using AnalyticDashboard.Application.Auth.Accounts;
 
 namespace AnalyticDashboard.Application.Auth.Login;
 
-public class LoginUserHandler
+public sealed class LoginUserHandler
 {
-    private readonly IUserRepository _userRepository;
-    
-    public  LoginUserHandler(IUserRepository userRepository)
+    private readonly IUserAccountService _userAccountService;
+
+    public LoginUserHandler(IUserAccountService userAccountService)
     {
-        _userRepository = userRepository;
+        _userAccountService = userAccountService;
     }
 
-    public async Task<User?> Handle(LoginUserCommand command, CancellationToken cancellationToken)
+    public async Task<UserPasswordSignInResult> HandleAsync(
+        LoginUserCommand command)
     {
-        var user = await _userRepository.GetByUsernameAsync(command.Username.Trim(), cancellationToken);
-
-        if (user == null)
+        if (string.IsNullOrWhiteSpace(command.Email)
+            || string.IsNullOrWhiteSpace(command.Password))
         {
-            return null;
+            return new UserPasswordSignInResult.InvalidCredentials();
         }
-        
-        var isPasswordValid = BCrypt.Net.BCrypt.Verify(
+
+        return await _userAccountService.SignInWithPasswordAsync(
+            command.Email,
             command.Password,
-            user.PasswordHash
+            command.RememberMe
         );
-
-        if (!isPasswordValid)
-        {
-            return null;
-        }
-
-        return user;
     }
 }
