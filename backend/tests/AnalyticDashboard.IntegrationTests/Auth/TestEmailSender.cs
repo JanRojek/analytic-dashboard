@@ -24,7 +24,8 @@ public sealed class TestEmailSender : IEmailSender
     public Task SendAsync(
         string recipientEmail,
         string subject,
-        string htmlBody)
+        string htmlBody,
+        CancellationToken cancellationToken)
     {
         var exception = Interlocked.Exchange(
             ref _nextException,

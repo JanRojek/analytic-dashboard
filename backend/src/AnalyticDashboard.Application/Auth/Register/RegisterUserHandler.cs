@@ -79,7 +79,8 @@ public sealed class RegisterUserHandler
         {
             await _emailConfirmationSender.SendAsync(
                 success.Id,
-                command.Email
+                command.Email,
+                cancellationToken
             );
         }
         catch (EmailDeliveryException) {}

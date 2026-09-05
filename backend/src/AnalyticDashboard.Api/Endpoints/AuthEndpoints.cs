@@ -160,8 +160,7 @@ public static class AuthEndpoints
 
         auth.MapGet("/registration-status", async (
             IRegistrationSessionService registrationSession,
-            GetRegistrationStatusHandler handler,
-            CancellationToken cancellationToken) =>
+            GetRegistrationStatusHandler handler) =>
         {
             if (!registrationSession.TryGetUserId(out var userId))
             {
@@ -177,8 +176,7 @@ public static class AuthEndpoints
             );
 
             var result = await handler.HandleAsync(
-                query,
-                cancellationToken
+                query
             );
 
             if (result is not GetRegistrationStatusResult.UserNotFound)
@@ -403,14 +401,16 @@ public static class AuthEndpoints
 
         auth.MapPost("/forgot-password", async (
             ForgotPasswordRequest request,
-            ForgotPasswordHandler handler) =>
+            ForgotPasswordHandler handler,
+            CancellationToken cancellationToken) =>
         {
             var command = new ForgotPasswordCommand(
                 request.Email
             );
 
             await handler.HandleAsync(
-                command
+                command,
+                cancellationToken
             );
 
             return TypedResults.NoContent();
@@ -423,7 +423,8 @@ public static class AuthEndpoints
 
         auth.MapPost("/reset-password", async (
             ResetPasswordRequest request,
-            ResetPasswordHandler handler) =>
+            ResetPasswordHandler handler,
+            CancellationToken cancellationToken) =>
         {
             var command = new ResetPasswordCommand(
                 request.UserId,
@@ -432,7 +433,8 @@ public static class AuthEndpoints
             );
 
             var result = await handler.HandleAsync(
-                command
+                command,
+                cancellationToken
             );
 
             return result switch

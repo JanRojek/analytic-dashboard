@@ -20,7 +20,8 @@ public sealed class PasswordResetEmailSender
 
     public async Task SendAsync(
         Guid userId,
-        string email)
+        string email,
+        CancellationToken cancellationToken)
     {
         var token = await _tokenService.GeneratePasswordResetTokenAsync(
             userId
@@ -35,7 +36,8 @@ public sealed class PasswordResetEmailSender
             email,
             "Reset your password",
             $"<p>Click the link below to reset your password:</p>" +
-            $"<p><a href=\"{resetLink}\">Reset password</a></p>"
+            $"<p><a href=\"{resetLink}\">Reset password</a></p>",
+            cancellationToken
         );
     }
 }

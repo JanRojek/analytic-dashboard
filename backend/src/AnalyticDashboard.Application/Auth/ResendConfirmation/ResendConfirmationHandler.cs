@@ -35,7 +35,8 @@ public sealed class ResendConfirmationHandler
             {
                 await _emailConfirmationSender.SendAsync(
                     unconfirmed.Id,
-                    unconfirmed.Email
+                    unconfirmed.Email,
+                    cancellationToken
                 );
             }
             catch (EmailDeliveryException) {}

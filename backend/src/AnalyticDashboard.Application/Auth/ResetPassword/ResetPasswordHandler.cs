@@ -13,12 +13,14 @@ public sealed class ResetPasswordHandler
     }
 
     public async Task<UserPasswordResetResult> HandleAsync(
-        ResetPasswordCommand command)
+        ResetPasswordCommand command,
+        CancellationToken cancellationToken)
     {
         return await _tokenService.ResetPasswordAsync(
             command.UserId,
             command.Token,
-            command.NewPassword
+            command.NewPassword,
+            cancellationToken
         );
     }
 }

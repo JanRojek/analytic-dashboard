@@ -17,7 +17,8 @@ public sealed class ForgotPasswordHandler
     }
 
     public async Task HandleAsync(
-        ForgotPasswordCommand command)
+        ForgotPasswordCommand command,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Email))
         {
@@ -38,7 +39,8 @@ public sealed class ForgotPasswordHandler
         {
             await _passwordResetEmailSender.SendAsync(
                 found.Id,
-                found.Email
+                found.Email,
+                cancellationToken
             );
         }
         catch (EmailDeliveryException) {}

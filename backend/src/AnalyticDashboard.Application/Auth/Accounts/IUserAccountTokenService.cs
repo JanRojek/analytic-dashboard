@@ -19,6 +19,7 @@ public interface IUserAccountTokenService
     Task<UserPasswordResetResult> ResetPasswordAsync(
         Guid userId,
         string token,
-        string newPassword
+        string newPassword,
+        CancellationToken cancellationToken
     );
 }

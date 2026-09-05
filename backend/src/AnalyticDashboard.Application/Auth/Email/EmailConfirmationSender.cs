@@ -20,7 +20,8 @@ public sealed class EmailConfirmationSender
 
     public async Task SendAsync(
         Guid userId,
-        string email)
+        string email,
+        CancellationToken cancellationToken)
     {
         var token = await _tokenService.GenerateEmailConfirmationTokenAsync(
             userId
@@ -35,7 +36,8 @@ public sealed class EmailConfirmationSender
             email,
             "Confirm your email",
             $"<p>Click the link below to confirm your email:</p>" +
-            $"<p><a href=\"{confirmationLink}\">Confirm email</a></p>"
+            $"<p><a href=\"{confirmationLink}\">Confirm email</a></p>",
+            cancellationToken
         );
     }
 }

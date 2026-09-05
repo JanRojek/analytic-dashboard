@@ -123,7 +123,8 @@ public sealed class UserAccountTokenService : IUserAccountTokenService
     public async Task<UserPasswordResetResult> ResetPasswordAsync(
         Guid userId,
         string token,
-        string newPassword)
+        string newPassword,
+        CancellationToken cancellationToken)
     {
         var user = await _userManager.FindByIdAsync(
             userId.ToString()
@@ -146,9 +147,42 @@ public sealed class UserAccountTokenService : IUserAccountTokenService
         }
 
         if (result.Errors.Any(error =>
-                error.Code is "InvalidToken" or "ConcurrencyFailure"))
+                error.Code == "InvalidToken"))
         {
             return new UserPasswordResetResult.InvalidToken();
+        }
+
+        if (result.Errors.Any(error =>
+                error.Code == "ConcurrencyFailure"))
+        {
+            var freshUser = await _userManager.Users
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    candidate => candidate.Id == userId,
+                    cancellationToken
+                );
+
+            if (freshUser == null)
+            {
+                return new UserPasswordResetResult.UserNotFound();
+            }
+
+            var tokenIsStillValid =
+                await _userManager.VerifyUserTokenAsync(
+                    freshUser,
+                    _userManager.Options.Tokens.PasswordResetTokenProvider,
+                    UserManager<ApplicationUser>.ResetPasswordTokenPurpose,
+                    token
+                );
+
+            if (!tokenIsStillValid)
+            {
+                return new UserPasswordResetResult.InvalidToken();
+            }
+
+            throw new InvalidOperationException(
+                "Password reset failed because of an unexpected concurrency conflict."
+            );
         }
 
         if (result.Errors.All(error =>

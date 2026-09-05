@@ -19,7 +19,8 @@ public sealed class SmtpEmailSender : IEmailSender
     public async Task SendAsync(
         string recipientEmail,
         string subject,
-        string htmlBody)
+        string htmlBody,
+        CancellationToken cancellationToken)
     {
         var message = new MimeMessage();
 
@@ -52,7 +53,8 @@ public sealed class SmtpEmailSender : IEmailSender
             await client.ConnectAsync(
                 _options.Host,
                 _options.Port,
-                socketOptions
+                socketOptions,
+                cancellationToken
             );
 
             if (!string.IsNullOrWhiteSpace(_options.Username)
@@ -60,22 +62,32 @@ public sealed class SmtpEmailSender : IEmailSender
             {
                 await client.AuthenticateAsync(
                     _options.Username,
-                    _options.Password
+                    _options.Password,
+                    cancellationToken
                 );
             }
 
             await client.SendAsync(
-                message
+                message,
+                cancellationToken
             );
 
             await client.DisconnectAsync(
-                true
+                true,
+                cancellationToken
             );
         }
         catch (SocketException exception)
         {
             throw new EmailDeliveryException(
                 "Failed to connect to the SMTP server.",
+                exception
+            );
+        }
+        catch (SslHandshakeException exception)
+        {
+            throw new EmailDeliveryException(
+                "A TLS handshake error occurred while connecting to the SMTP server.",
                 exception
             );
         }

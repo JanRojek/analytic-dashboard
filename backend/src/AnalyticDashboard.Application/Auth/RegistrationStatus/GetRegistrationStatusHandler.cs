@@ -13,8 +13,7 @@ public sealed class GetRegistrationStatusHandler
     }
 
     public async Task<GetRegistrationStatusResult> HandleAsync(
-        GetRegistrationStatusQuery query,
-        CancellationToken cancellationToken)
+        GetRegistrationStatusQuery query)
     {
         var outcome =
             await _accountService.GetEmailConfirmationStatusAsync(
