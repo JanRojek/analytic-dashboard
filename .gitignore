@@ -21,7 +21,7 @@ Thumbs.db
 
 .env
 
-storage/
+/backend/src/AnalyticDashboard.Api/storage/
 
 appsettings.Development.json
 
