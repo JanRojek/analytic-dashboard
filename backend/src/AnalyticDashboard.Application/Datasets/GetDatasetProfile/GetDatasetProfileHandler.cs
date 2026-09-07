@@ -1,6 +1,7 @@
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Profiling;
 using AnalyticDashboard.Domain.Entities;
+using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 
@@ -9,15 +10,18 @@ public sealed class GetDatasetProfileHandler
     private readonly IDatasetRepository _datasetRepository;
     private readonly IDatasetVersionRepository _versionRepository;
     private readonly IDatasetProfileReader _profileReader;
+    private readonly IFileStorage _fileStorage;
 
     public GetDatasetProfileHandler(
         IDatasetRepository datasetRepository,
         IDatasetVersionRepository versionRepository,
-        IDatasetProfileReader profileReader)
+        IDatasetProfileReader profileReader,
+        IFileStorage fileStorage)
     {
         _datasetRepository = datasetRepository;
         _versionRepository = versionRepository;
         _profileReader = profileReader;
+        _fileStorage = fileStorage;
     }
 
     public async Task<GetDatasetProfileResult> HandleAsync(
@@ -51,11 +55,15 @@ public sealed class GetDatasetProfileHandler
             return new GetDatasetProfileResult.NotFound();
         }
 
-        if (!File.Exists(version.StorageKey))
+        var fileExists = await _fileStorage.ExistsAsync(
+            version.StorageKey,
+            cancellationToken
+        );
+
+        if (!fileExists)
         {
             throw new FileNotFoundException(
-                "Dataset file not found.",
-                version.StorageKey
+                "Dataset file not found."
             );
         }
 

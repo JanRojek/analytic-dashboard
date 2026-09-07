@@ -1,4 +1,5 @@
 using AnalyticDashboard.Application.Datasets.Persistence;
+using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.Application.Datasets.DeleteDataset;
 
@@ -6,13 +7,16 @@ public sealed class DeleteDatasetHandler
 {
     private readonly IDatasetRepository _datasetRepository;
     private readonly IDatasetVersionRepository _versionRepository;
+    private readonly IFileStorage _fileStorage;
 
     public DeleteDatasetHandler(
         IDatasetRepository datasetRepository,
-        IDatasetVersionRepository versionRepository)
+        IDatasetVersionRepository versionRepository,
+        IFileStorage fileStorage)
     {
         _datasetRepository = datasetRepository;
         _versionRepository = versionRepository;
+        _fileStorage = fileStorage;
     }
 
     public async Task<DeleteDatasetResult> HandleAsync(
@@ -40,10 +44,10 @@ public sealed class DeleteDatasetHandler
 
         foreach (var version in versions)
         {
-            if (File.Exists(version.StorageKey))
-            {
-                File.Delete(version.StorageKey);
-            }
+            await _fileStorage.DeleteAsync(
+                version.StorageKey,
+                cancellationToken
+            );
         }
 
         var deleted =

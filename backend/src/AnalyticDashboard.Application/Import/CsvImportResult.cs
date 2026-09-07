@@ -1,9 +1,8 @@
 namespace AnalyticDashboard.Application.Import;
 
 public sealed record CsvImportResult(
-    Guid Id,
     string OriginalFileName,
-    string StoredPath,
+    string StorageKey,
     int RowCount,
     int ColumnCount
 );

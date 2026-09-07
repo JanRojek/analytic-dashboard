@@ -1,4 +1,5 @@
 using System.Globalization;
+using AnalyticDashboard.Application.Storage;
 using CsvHelper;
 using CsvHelper.Configuration;
 
@@ -6,47 +7,75 @@ namespace AnalyticDashboard.Infrastructure.Services.Csv;
 
 public sealed class CsvDatasetReader
 {
+    private readonly IFileStorage _fileStorage;
     private readonly CsvFormatDetector _formatDetector;
 
-    public CsvDatasetReader(CsvFormatDetector formatDetector)
+    public CsvDatasetReader(
+        IFileStorage fileStorage,
+        CsvFormatDetector formatDetector)
     {
+        _fileStorage = fileStorage;
         _formatDetector = formatDetector;
     }
 
     public async Task<CsvReadResult> ReadAsync(
-        string storedFilePath,
+        string storageKey,
         CancellationToken cancellationToken)
     {
-        var delimiter = ResolveDelimiter(storedFilePath);
+        var delimiter = await ResolveDelimiterAsync(
+            storageKey,
+            cancellationToken
+        );
 
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+        await using var stream =
+            await _fileStorage.OpenReadAsync(
+                storageKey,
+                cancellationToken
+            );
+
+        using var reader = new StreamReader(
+            stream
+        );
+
+        var config = new CsvConfiguration(
+            CultureInfo.InvariantCulture
+        )
         {
             Delimiter = delimiter,
             HasHeaderRecord = true
         };
 
-        using var reader = new StreamReader(storedFilePath);
-        using var csv = new CsvReader(reader, config);
+        using var csv = new CsvReader(
+            reader,
+            config
+        );
 
         if (!await csv.ReadAsync())
         {
-            throw new InvalidOperationException("CSV file has no header.");
+            throw new InvalidOperationException(
+                "CSV file has no header."
+            );
         }
 
         csv.ReadHeader();
 
         var header = csv.HeaderRecord
-            ?? throw new InvalidOperationException("CSV file has no header record.");
+            ?? throw new InvalidOperationException(
+                "CSV file has no header record."
+            );
 
-        var rows = new List<IReadOnlyDictionary<string, string?>>();
+        var rows =
+            new List<IReadOnlyDictionary<string, string?>>();
 
         while (await csv.ReadAsync())
         {
-            var row = new Dictionary<string, string?>();
+            var row =
+                new Dictionary<string, string?>();
 
             foreach (var column in header)
             {
-                row[column] = csv.GetField(column);
+                row[column] =
+                    csv.GetField(column);
             }
 
             rows.Add(row);
@@ -58,16 +87,42 @@ public sealed class CsvDatasetReader
         );
     }
 
-    private string ResolveDelimiter(string storedFilePath)
+    private async Task<string> ResolveDelimiterAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
     {
-        var detectionResult = _formatDetector.Detect(storedFilePath);
+        await using var stream =
+            await _fileStorage.OpenReadAsync(
+                storageKey,
+                cancellationToken
+            );
+
+        using var reader = new StreamReader(
+            stream
+        );
+
+        var detectionResult =
+            _formatDetector.Detect(
+                reader
+            );
 
         return detectionResult.Status switch
         {
-            CsvDetectionStatus.DelimiterDetected => detectionResult.Delimiter!,
-            CsvDetectionStatus.SingleColumn => "\u001F",
-            CsvDetectionStatus.Ambiguous => throw new InvalidOperationException("CSV delimiter is ambiguous."),
-            _ => throw new InvalidOperationException("Unsupported CSV detection status.")
+            CsvDetectionStatus.DelimiterDetected =>
+                detectionResult.Delimiter!,
+
+            CsvDetectionStatus.SingleColumn =>
+                "\u001F",
+
+            CsvDetectionStatus.Ambiguous =>
+                throw new InvalidOperationException(
+                    "CSV delimiter is ambiguous."
+                ),
+
+            _ =>
+                throw new InvalidOperationException(
+                    "Unsupported CSV detection status."
+                )
         };
     }
 }

@@ -1,6 +1,7 @@
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.Application.Widgets.GetWidgetData;
 
@@ -11,19 +12,22 @@ public sealed class GetWidgetDataHandler
     private readonly IDatasetRepository _datasetRepository;
     private readonly IDatasetVersionRepository _versionRepository;
     private readonly IWidgetDataReader _widgetDataReader;
+    private readonly IFileStorage _fileStorage;
 
     public GetWidgetDataHandler(
         IWidgetRepository widgetRepository,
         IDashboardRepository dashboardRepository,
         IDatasetRepository datasetRepository,
         IDatasetVersionRepository versionRepository,
-        IWidgetDataReader dataReader)
+        IWidgetDataReader dataReader,
+        IFileStorage fileStorage)
     {
         _widgetRepository = widgetRepository;
         _dashboardRepository = dashboardRepository;
         _datasetRepository = datasetRepository;
         _versionRepository = versionRepository;
         _widgetDataReader = dataReader;
+        _fileStorage = fileStorage;
     }
 
     public async Task<GetWidgetDataResponse?> Handle(
@@ -75,7 +79,12 @@ public sealed class GetWidgetDataHandler
             return null;
         }
 
-        if (!File.Exists(version.StorageKey))
+        var fileExists = await _fileStorage.ExistsAsync(
+            version.StorageKey,
+            cancellationToken
+        );
+
+        if (!fileExists)
         {
             return null;
         }

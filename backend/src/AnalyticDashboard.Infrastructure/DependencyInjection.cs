@@ -15,6 +15,8 @@ using AnalyticDashboard.Infrastructure.Services.Profiling;
 using AnalyticDashboard.Infrastructure.Services.Csv;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Storage;
+using AnalyticDashboard.Infrastructure.Storage;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -35,6 +37,8 @@ public static class DependencyInjection
         services.AddScoped<IDatasetVersionRepository, DatasetVersionRepository>();
 
         services.AddScoped<ICsvImportService, CsvImportService>();
+
+        services.AddScoped<IFileStorage, LocalFileStorage>();
 
         services.AddScoped<IDatasetProfileReader, CsvDatasetProfileReader>();
 

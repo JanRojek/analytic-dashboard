@@ -6,6 +6,7 @@ public interface IWidgetDataReader
 {
     Task<GetWidgetDataResponse> ReadDataAsync(
         Widget widget,
-        string datasetPath,
-        CancellationToken cancellationToken);
+        string storageKey,
+        CancellationToken cancellationToken
+    );
 }

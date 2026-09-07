@@ -7,6 +7,7 @@ using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.IntegrationTests.Datasets;
 
@@ -88,7 +89,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
 
         await AddProjectAsync(project);
 
-        string? storedPath = null;
+        string? storageKey = null;
 
         try
         {
@@ -151,7 +152,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
                     CancellationToken
                 );
 
-            storedPath = version.StorageKey;
+            storageKey = version.StorageKey;
 
             Assert.Equal(
                 dataset.Id,
@@ -183,16 +184,32 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
                 version.ColumnCount
             );
 
+            var fileStorage = scope.ServiceProvider
+                .GetRequiredService<IFileStorage>();
+
+            var fileExists = await fileStorage.ExistsAsync(
+                version.StorageKey,
+                CancellationToken
+            );
+
             Assert.True(
-                File.Exists(version.StorageKey)
+                fileExists
             );
         }
         finally
         {
-            if (storedPath is not null
-                && File.Exists(storedPath))
+            if (storageKey is not null)
             {
-                File.Delete(storedPath);
+                await using var scope =
+                    _fixture.Services.CreateAsyncScope();
+
+                var fileStorage = scope.ServiceProvider
+                    .GetRequiredService<IFileStorage>();
+
+                await fileStorage.DeleteAsync(
+                    storageKey,
+                    CancellationToken
+                );
             }
         }
     }

@@ -18,14 +18,15 @@ public sealed class CsvDatasetProfileReader : IDatasetProfileReader
         Guid datasetId,
         string name,
         string originalFileName,
-        string storedPath,
+        string storageKey,
         int rowCount,
         int columnCount,
         CancellationToken cancellationToken)
     {
         var csvData = await _csvDatasetReader.ReadAsync(
-            storedPath,
-            cancellationToken);
+            storageKey,
+            cancellationToken
+        );
 
         var header = csvData.Headers;
 

@@ -1,81 +1,96 @@
 using AnalyticDashboard.Application.Import;
+using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Infrastructure.Services.Csv;
+using Microsoft.Extensions.Logging;
 
 namespace AnalyticDashboard.Infrastructure.Services.Import;
 
 public sealed class CsvImportService : ICsvImportService
 {
+    private readonly IFileStorage _fileStorage;
     private readonly CsvDatasetReader _csvDatasetReader;
+    private readonly ILogger<CsvImportService> _logger;
 
-    public CsvImportService(CsvDatasetReader csvDatasetReader)
+    public CsvImportService(
+        IFileStorage fileStorage,
+        CsvDatasetReader csvDatasetReader,
+        ILogger<CsvImportService> logger)
     {
+        _fileStorage = fileStorage;
         _csvDatasetReader = csvDatasetReader;
+        _logger = logger;
     }
-    
+
     public async Task<CsvImportResult> ImportAsync(
         Stream fileStream,
         string fileName,
         CancellationToken cancellationToken)
     {
-        ValidateExtension(fileName);
+        ValidateExtension(
+            fileName
+        );
 
-        var datasetId = Guid.NewGuid();
-        var storedFilePath = await SaveFileAsync(fileStream, datasetId, cancellationToken);
+        var storageKey =
+            $"datasets/imports/{Guid.NewGuid():N}.csv";
 
         try
         {
-            var csvData = await _csvDatasetReader.ReadAsync(
-                storedFilePath,
-                cancellationToken);
+            await _fileStorage.SaveAsync(
+                storageKey,
+                fileStream,
+                cancellationToken
+            );
+
+            var csvData =
+                await _csvDatasetReader.ReadAsync(
+                    storageKey,
+                    cancellationToken
+                );
 
             return new CsvImportResult(
-                datasetId,
                 fileName,
-                storedFilePath,
+                storageKey,
                 csvData.Rows.Count,
                 csvData.Headers.Count
             );
         }
         catch
         {
-            if (File.Exists(storedFilePath))
+            try
             {
-                File.Delete(storedFilePath);
+                await _fileStorage.DeleteAsync(
+                    storageKey,
+                    CancellationToken.None
+                );
+            }
+            catch (Exception cleanupException)
+            {
+                _logger.LogWarning(
+                    cleanupException,
+                    "Failed to clean up storage object {StorageKey} after CSV import failure.",
+                    storageKey
+                );
             }
 
             throw;
         }
     }
 
-    private static void ValidateExtension(string fileName)
+    private static void ValidateExtension(
+        string fileName)
     {
-        var extension = Path.GetExtension(fileName);
+        var extension =
+            Path.GetExtension(fileName);
 
-        if (!string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(
+                extension,
+                ".csv",
+                StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("File is not a .csv file.", nameof(fileName));
+            throw new ArgumentException(
+                "File is not a .csv file.",
+                nameof(fileName)
+            );
         }
-    }
-
-    private static async Task<string> SaveFileAsync(
-        Stream fileStream,
-        Guid datasetId,
-        CancellationToken cancellationToken)
-    {
-        var storagePath = Path.Combine(Directory.GetCurrentDirectory(), "storage", "datasets");
-        Directory.CreateDirectory(storagePath);
-        
-        var storedFileName = $"{datasetId}.csv";
-        var storedFilePath = Path.Combine(storagePath, storedFileName);
-        
-        await using var outputStream = new FileStream(
-            storedFilePath,
-            FileMode.Create,
-            FileAccess.Write,
-            FileShare.None);
-
-        await fileStream.CopyToAsync(outputStream, cancellationToken);
-
-        return storedFilePath;
     }
 }

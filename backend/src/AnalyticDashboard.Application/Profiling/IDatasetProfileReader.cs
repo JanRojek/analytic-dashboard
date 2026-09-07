@@ -6,7 +6,7 @@ public interface IDatasetProfileReader
         Guid datasetId,
         string name,
         string originalFileName,
-        string storedPath,
+        string storageKey,
         int rowCount,
         int columnCount,
         CancellationToken cancellationToken

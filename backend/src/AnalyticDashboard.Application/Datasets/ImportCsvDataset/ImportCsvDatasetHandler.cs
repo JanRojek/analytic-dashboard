@@ -78,7 +78,7 @@ public sealed class ImportCsvDatasetHandler
             dataset.Id,
             versionNumber: 1,
             importResult.OriginalFileName,
-            importResult.StoredPath
+            importResult.StorageKey
         );
 
         version.MarkReady(
