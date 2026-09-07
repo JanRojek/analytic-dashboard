@@ -3,11 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using AnalyticDashboard.Api.Contracts.Datasets;
+using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.IntegrationTests.Datasets;
 
@@ -65,7 +65,8 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
     private async Task AddProjectAsync(
         Project project)
     {
-        await using var scope = _fixture.Services.CreateAsyncScope();
+        await using var scope =
+            _fixture.Services.CreateAsyncScope();
 
         var dbContext = scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
@@ -78,7 +79,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task ImportCsvDataset_ShouldCreateDatasetForOwnedProject()
+    public async Task ImportCsvDataset_ShouldCreatePendingImportForOwnedProject()
     {
         var userId = Guid.NewGuid();
 
@@ -89,7 +90,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
 
         await AddProjectAsync(project);
 
-        string? storageKey = null;
+        string? sourceStorageKey = null;
 
         try
         {
@@ -106,7 +107,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             );
 
             Assert.Equal(
-                HttpStatusCode.Created,
+                HttpStatusCode.Accepted,
                 response.StatusCode
             );
 
@@ -126,7 +127,21 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             var dataset = await dbContext.Datasets
                 .AsNoTracking()
                 .SingleAsync(
-                    entity => entity.Id == result.Id,
+                    entity => entity.Id == result.DatasetId,
+                    CancellationToken
+                );
+
+            var version = await dbContext.DatasetVersions
+                .AsNoTracking()
+                .SingleAsync(
+                    entity => entity.Id == result.DatasetVersionId,
+                    CancellationToken
+                );
+
+            var importJob = await dbContext.ImportJobs
+                .AsNoTracking()
+                .SingleAsync(
+                    entity => entity.Id == result.ImportJobId,
                     CancellationToken
                 );
 
@@ -140,19 +155,9 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
                 dataset.Name
             );
 
-            Assert.NotNull(
+            Assert.Null(
                 dataset.CurrentVersionId
             );
-
-            var version = await dbContext.DatasetVersions
-                .AsNoTracking()
-                .SingleAsync(
-                    entity =>
-                        entity.Id == dataset.CurrentVersionId.Value,
-                    CancellationToken
-                );
-
-            storageKey = version.StorageKey;
 
             Assert.Equal(
                 dataset.Id,
@@ -170,35 +175,66 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             );
 
             Assert.Equal(
-                DatasetVersionStatus.Ready,
+                DatasetVersionStatus.Pending,
                 version.Status
             );
 
-            Assert.Equal(
-                2,
+            Assert.Null(
+                version.StorageKey
+            );
+
+            Assert.Null(
                 version.RowCount
             );
 
-            Assert.Equal(
-                2,
+            Assert.Null(
                 version.ColumnCount
             );
+
+            Assert.Equal(
+                version.Id,
+                importJob.DatasetVersionId
+            );
+
+            Assert.Equal(
+                "sales.csv",
+                importJob.SourceFileName
+            );
+
+            Assert.Equal(
+                ImportJobStatus.Pending,
+                importJob.Status
+            );
+
+            Assert.Null(
+                importJob.ErrorMessage
+            );
+
+            Assert.Null(
+                importJob.StartedAtUtc
+            );
+
+            Assert.Null(
+                importJob.CompletedAtUtc
+            );
+
+            sourceStorageKey = importJob.SourceStorageKey;
 
             var fileStorage = scope.ServiceProvider
                 .GetRequiredService<IFileStorage>();
 
-            var fileExists = await fileStorage.ExistsAsync(
-                version.StorageKey,
+            var sourceExists = await fileStorage.ExistsAsync(
+                sourceStorageKey,
                 CancellationToken
             );
 
             Assert.True(
-                fileExists
+                sourceExists
             );
         }
         finally
         {
-            if (storageKey is not null)
+            if (sourceStorageKey is not null)
             {
                 await using var scope =
                     _fixture.Services.CreateAsyncScope();
@@ -207,7 +243,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
                     .GetRequiredService<IFileStorage>();
 
                 await fileStorage.DeleteAsync(
-                    storageKey,
+                    sourceStorageKey,
                     CancellationToken
                 );
             }
@@ -241,7 +277,8 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             response.StatusCode
         );
 
-        await using var scope = _fixture.Services.CreateAsyncScope();
+        await using var scope =
+            _fixture.Services.CreateAsyncScope();
 
         var dbContext = scope.ServiceProvider
             .GetRequiredService<AppDbContext>();
@@ -251,6 +288,8 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             CancellationToken
         );
 
-        Assert.False(datasetExists);
+        Assert.False(
+            datasetExists
+        );
     }
 }

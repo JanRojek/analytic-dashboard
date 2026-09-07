@@ -1,27 +1,24 @@
 using AnalyticDashboard.Application.Datasets.Persistence;
-using AnalyticDashboard.Application.Import;
 using AnalyticDashboard.Application.Projects.Persistence;
+using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Domain.Entities;
 
 namespace AnalyticDashboard.Application.Datasets.ImportCsvDataset;
 
 public sealed class ImportCsvDatasetHandler
 {
-    private readonly IDatasetRepository _datasetRepository;
-    private readonly IDatasetVersionRepository _versionRepository;
     private readonly IProjectRepository _projectRepository;
-    private readonly ICsvImportService _csvImportService;
+    private readonly IPendingDatasetImportRepository _pendingImportRepository;
+    private readonly IFileStorage _fileStorage;
 
     public ImportCsvDatasetHandler(
-        IDatasetRepository datasetRepository,
-        IDatasetVersionRepository versionRepository,
         IProjectRepository projectRepository,
-        ICsvImportService csvImportService)
+        IPendingDatasetImportRepository pendingImportRepository,
+        IFileStorage fileStorage)
     {
-        _datasetRepository = datasetRepository;
-        _versionRepository = versionRepository;
         _projectRepository = projectRepository;
-        _csvImportService = csvImportService;
+        _pendingImportRepository = pendingImportRepository;
+        _fileStorage = fileStorage;
     }
 
     public async Task<ImportCsvDatasetResult> HandleAsync(
@@ -39,76 +36,102 @@ public sealed class ImportCsvDatasetHandler
             return new ImportCsvDatasetResult.ProjectNotFound();
         }
 
-        CsvImportResult importResult;
+        var originalFileName = Path.GetFileName(
+            command.FileName
+        );
 
-        try
-        {
-            importResult = await _csvImportService.ImportAsync(
-                command.FileStream,
-                command.FileName,
-                cancellationToken
-            );
-        }
-        catch (ArgumentException exception)
+        if (string.IsNullOrWhiteSpace(originalFileName))
         {
             return new ImportCsvDatasetResult.InvalidFile(
-                exception.Message
+                "File name cannot be empty."
             );
         }
-        catch (InvalidOperationException exception)
+
+        var extension = Path.GetExtension(
+            originalFileName
+        );
+
+        if (!string.Equals(
+                extension,
+                ".csv",
+                StringComparison.OrdinalIgnoreCase))
         {
             return new ImportCsvDatasetResult.InvalidFile(
-                exception.Message
+                "File is not a .csv file."
+            );
+        }
+
+        var datasetName = Path.GetFileNameWithoutExtension(
+            originalFileName
+        );
+
+        if (string.IsNullOrWhiteSpace(datasetName))
+        {
+            return new ImportCsvDatasetResult.InvalidFile(
+                "Dataset name cannot be empty."
             );
         }
 
         var dataset = new Dataset(
             command.ProjectId,
-            Path.GetFileNameWithoutExtension(
-                importResult.OriginalFileName
-            )
-        );
-
-        await _datasetRepository.AddAsync(
-            dataset,
-            cancellationToken
+            datasetName
         );
 
         var version = new DatasetVersion(
             dataset.Id,
             versionNumber: 1,
-            importResult.OriginalFileName,
-            importResult.StorageKey
+            originalFileName
         );
 
-        version.MarkReady(
-            importResult.RowCount,
-            importResult.ColumnCount
+        var sourceStorageKey =
+            $"datasets/{dataset.Id:N}/imports/{version.Id:N}/source.csv";
+
+        var importJob = new ImportJob(
+            version.Id,
+            originalFileName,
+            sourceStorageKey
         );
 
-        await _versionRepository.AddAsync(
-            version,
-            cancellationToken
-        );
-
-        var published =
-            await _datasetRepository.PublishVersionAsync(
-                dataset.Id,
-                command.ProjectId,
-                command.OwnerId,
-                version.Id,
+        try
+        {
+            await _fileStorage.SaveAsync(
+                sourceStorageKey,
+                command.FileStream,
                 cancellationToken
             );
 
-        if (!published)
-        {
-            throw new InvalidOperationException(
-                "The imported dataset version could not be published."
+            await _pendingImportRepository.CreateAsync(
+                dataset,
+                version,
+                importJob,
+                cancellationToken
             );
         }
+        catch (Exception importException)
+        {
+            try
+            {
+                await _fileStorage.DeleteAsync(
+                    sourceStorageKey,
+                    CancellationToken.None
+                );
+            }
+            catch (Exception cleanupException)
+            {
+                throw new AggregateException(
+                    "Dataset import creation failed and source cleanup also failed.",
+                    importException,
+                    cleanupException
+                );
+            }
 
-        return new ImportCsvDatasetResult.Success(
-            dataset.Id
+            throw;
+        }
+
+        return new ImportCsvDatasetResult.Accepted(
+            dataset.Id,
+            version.Id,
+            importJob.Id
         );
     }
 }

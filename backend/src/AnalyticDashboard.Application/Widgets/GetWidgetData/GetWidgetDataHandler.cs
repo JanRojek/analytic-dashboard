@@ -74,7 +74,8 @@ public sealed class GetWidgetDataHandler
         );
 
         if (version is null
-            || version.Status != DatasetVersionStatus.Ready)
+            || version.Status != DatasetVersionStatus.Ready
+            || version.StorageKey is null)
         {
             return null;
         }

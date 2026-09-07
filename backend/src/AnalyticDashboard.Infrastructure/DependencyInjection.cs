@@ -1,6 +1,5 @@
 using AnalyticDashboard.Application.Auth.Accounts;
 using AnalyticDashboard.Application.Auth.Email;
-using AnalyticDashboard.Application.Import;
 using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Infrastructure.Data;
 using AnalyticDashboard.Infrastructure.Repositories;
@@ -12,7 +11,6 @@ using AnalyticDashboard.Application.Profiling;
 using AnalyticDashboard.Infrastructure.Auth.Email;
 using AnalyticDashboard.Infrastructure.Identity;
 using AnalyticDashboard.Infrastructure.Services.Profiling;
-using AnalyticDashboard.Infrastructure.Services.Csv;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Application.Storage;
@@ -27,7 +25,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("Default")
-                               ?? throw new InvalidOperationException("Missing connection string 'Default'.");
+            ?? throw new InvalidOperationException("Missing connection string 'Default'.");
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
@@ -36,11 +34,13 @@ public static class DependencyInjection
 
         services.AddScoped<IDatasetVersionRepository, DatasetVersionRepository>();
 
-        services.AddScoped<ICsvImportService, CsvImportService>();
+        services.AddScoped<IImportJobRepository, ImportJobRepository>();
+
+        services.AddScoped<IPendingDatasetImportRepository, PendingDatasetImportRepository>();
 
         services.AddScoped<IFileStorage, LocalFileStorage>();
 
-        services.AddScoped<IDatasetProfileReader, CsvDatasetProfileReader>();
+        services.AddScoped<IDatasetProfileReader, DuckDbDatasetProfileReader>();
 
         services.AddScoped<IDashboardRepository, DashboardRepository>();
 
@@ -56,11 +56,21 @@ public static class DependencyInjection
 
         services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
 
+        services.AddScoped<DuckDbCsvImporter>();
+
+        services.AddScoped<ImportJobProcessor>();
+
         services.AddScoped<IEmailSender, SmtpEmailSender>();
 
-        services.AddScoped<CsvFormatDetector>();
+        var workerEnabled = configuration.GetValue(
+            "ImportJobs:WorkerEnabled",
+            true
+        );
 
-        services.AddScoped<CsvDatasetReader>();
+        if (workerEnabled)
+        {
+            services.AddHostedService<ImportJobWorker>();
+        }
 
         return services;
     }

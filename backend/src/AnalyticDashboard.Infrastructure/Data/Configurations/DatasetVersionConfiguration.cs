@@ -25,7 +25,6 @@ public sealed class DatasetVersionConfiguration
             .HasMaxLength(255);
 
         builder.Property(version => version.StorageKey)
-            .IsRequired()
             .HasMaxLength(500);
 
         builder.Property(version => version.Status)

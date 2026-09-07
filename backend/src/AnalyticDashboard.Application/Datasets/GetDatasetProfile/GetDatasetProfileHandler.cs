@@ -49,6 +49,7 @@ public sealed class GetDatasetProfileHandler
 
         if (version is null
             || version.Status != DatasetVersionStatus.Ready
+            || version.StorageKey is null
             || !version.RowCount.HasValue
             || !version.ColumnCount.HasValue)
         {

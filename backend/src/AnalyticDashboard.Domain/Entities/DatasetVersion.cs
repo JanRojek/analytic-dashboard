@@ -10,7 +10,7 @@ public sealed class DatasetVersion
 
     public string OriginalFileName { get; private set; }
 
-    public string StorageKey { get; private set; }
+    public string? StorageKey { get; private set; }
 
     public DatasetVersionStatus Status { get; private set; }
 
@@ -23,8 +23,7 @@ public sealed class DatasetVersion
     public DatasetVersion(
         Guid datasetId,
         int versionNumber,
-        string originalFileName,
-        string storageKey)
+        string originalFileName)
     {
         if (datasetId == Guid.Empty)
         {
@@ -48,6 +47,19 @@ public sealed class DatasetVersion
             );
         }
 
+        Id = Guid.NewGuid();
+        DatasetId = datasetId;
+        VersionNumber = versionNumber;
+        OriginalFileName = originalFileName;
+        Status = DatasetVersionStatus.Pending;
+        CreatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkReady(
+        string storageKey,
+        int rowCount,
+        int columnCount)
+    {
         if (string.IsNullOrWhiteSpace(storageKey))
         {
             throw new ArgumentException(
@@ -55,19 +67,6 @@ public sealed class DatasetVersion
             );
         }
 
-        Id = Guid.NewGuid();
-        DatasetId = datasetId;
-        VersionNumber = versionNumber;
-        OriginalFileName = originalFileName;
-        StorageKey = storageKey;
-        Status = DatasetVersionStatus.Pending;
-        CreatedAtUtc = DateTime.UtcNow;
-    }
-
-    public void MarkReady(
-        int rowCount,
-        int columnCount)
-    {
         if (rowCount < 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -89,6 +88,7 @@ public sealed class DatasetVersion
             );
         }
 
+        StorageKey = storageKey;
         RowCount = rowCount;
         ColumnCount = columnCount;
         Status = DatasetVersionStatus.Ready;

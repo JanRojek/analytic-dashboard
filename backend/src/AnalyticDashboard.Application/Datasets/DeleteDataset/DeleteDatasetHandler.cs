@@ -44,6 +44,11 @@ public sealed class DeleteDatasetHandler
 
         foreach (var version in versions)
         {
+            if (version.StorageKey is null)
+            {
+                continue;
+            }
+
             await _fileStorage.DeleteAsync(
                 version.StorageKey,
                 cancellationToken

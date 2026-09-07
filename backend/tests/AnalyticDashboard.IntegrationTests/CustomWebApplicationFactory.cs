@@ -27,6 +27,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
 
         builder.UseSetting(
+            "ImportJobs:WorkerEnabled",
+            "false"
+        );
+
+        builder.UseSetting(
             "ConnectionStrings:Default",
             _connectionString
         );

@@ -61,11 +61,12 @@ public static class DatasetEndpoints
 
             return result switch
             {
-                ImportCsvDatasetResult.Success success =>
-                    Results.Created(
-                        $"/projects/{projectId}/datasets/{success.Id}",
-                        new ImportCsvDatasetResponse(
-                            success.Id
+                ImportCsvDatasetResult.Accepted accepted =>
+                    Results.Accepted(
+                        value: new ImportCsvDatasetResponse(
+                            accepted.DatasetId,
+                            accepted.DatasetVersionId,
+                            accepted.ImportJobId
                         )
                     ),
 
@@ -86,7 +87,7 @@ public static class DatasetEndpoints
         .WithName("ImportCsvDataset")
         .DisableAntiforgery()
         .Produces<ImportCsvDatasetResponse>(
-            StatusCodes.Status201Created
+            StatusCodes.Status202Accepted
         )
         .ProducesValidationProblem()
         .Produces(

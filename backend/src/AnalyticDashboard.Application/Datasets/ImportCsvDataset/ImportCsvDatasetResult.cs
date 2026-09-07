@@ -2,8 +2,10 @@
 
 public abstract record ImportCsvDatasetResult
 {
-    public sealed record Success(
-        Guid Id
+    public sealed record Accepted(
+        Guid DatasetId,
+        Guid DatasetVersionId,
+        Guid ImportJobId
     ) : ImportCsvDatasetResult;
 
     public sealed record ProjectNotFound

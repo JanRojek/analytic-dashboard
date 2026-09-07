@@ -92,14 +92,16 @@ public sealed class GetDatasetByIdEndpointTests : IClassFixture<ApiFixture>
             "Sales"
         );
 
+        var storageKey = $"datasets/{dataset.Id}/sales.csv";
+
         var version = new DatasetVersion(
             dataset.Id,
             1,
-            "sales.csv",
-            $"datasets/{dataset.Id}/sales.csv"
+            "sales.csv"
         );
 
         version.MarkReady(
+            storageKey,
             25,
             4
         );
