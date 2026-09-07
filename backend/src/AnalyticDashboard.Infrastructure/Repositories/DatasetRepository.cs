@@ -1,5 +1,5 @@
+using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,39 +14,120 @@ public sealed class DatasetRepository : IDatasetRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Dataset dataset, CancellationToken cancellationToken)
+    public async Task AddAsync(
+        Dataset dataset,
+        CancellationToken cancellationToken)
     {
-        await _dbContext.Datasets.AddAsync(dataset, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        _dbContext.Datasets.Add(dataset);
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken
+        );
     }
 
-    public async Task<IReadOnlyList<Dataset>> GetAllAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Dataset>> GetAllByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
     {
         return await _dbContext.Datasets
+            .Where(dataset =>
+                dataset.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dataset.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
             .AsNoTracking()
-            .OrderByDescending(d => d.CreatedAtUtc)
+            .OrderByDescending(dataset => dataset.CreatedAtUtc)
+            .ThenBy(dataset => dataset.Id)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Dataset?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Dataset?> GetByIdAndProjectOwnerAsync(
+        Guid datasetId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
     {
         return await _dbContext.Datasets
+            .Where(dataset =>
+                dataset.Id == datasetId
+                && dataset.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dataset.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
             .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<bool> DeleteByIdAndProjectOwnerAsync(
+        Guid datasetId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var affectedRows = await _dbContext.Datasets
+            .Where(dataset =>
+                dataset.Id == datasetId
+                && dataset.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dataset.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return affectedRows == 1;
+    }
+
+    public async Task<bool> PublishVersionAsync(
+        Guid datasetId,
+        Guid projectId,
+        Guid ownerId,
+        Guid versionId,
+        CancellationToken cancellationToken)
     {
         var dataset = await _dbContext.Datasets
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .Where(dataset =>
+                dataset.Id == datasetId
+                && dataset.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dataset.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (dataset == null)
+        if (dataset is null)
         {
             return false;
         }
-        
-        _dbContext.Datasets.Remove(dataset);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var versionBelongsToDataset =
+            await _dbContext.DatasetVersions.AnyAsync(
+                version =>
+                    version.Id == versionId
+                    && version.DatasetId == datasetId
+                    && version.Status == DatasetVersionStatus.Ready,
+                cancellationToken
+            );
+
+        if (!versionBelongsToDataset)
+        {
+            return false;
+        }
+
+        dataset.PublishVersion(
+            versionId
+        );
+
+        await _dbContext.SaveChangesAsync(
+            cancellationToken
+        );
+
         return true;
     }
 }

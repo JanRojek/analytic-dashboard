@@ -1,5 +1,7 @@
 namespace AnalyticDashboard.Application.Datasets.DeleteDataset;
 
 public sealed record DeleteDatasetCommand(
-    Guid Id
+    Guid DatasetId,
+    Guid ProjectId,
+    Guid OwnerId
 );

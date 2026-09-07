@@ -1,34 +1,61 @@
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Datasets.Persistence;
 
 namespace AnalyticDashboard.Application.Datasets.DeleteDataset;
 
 public sealed class DeleteDatasetHandler
 {
-    private readonly IDatasetRepository _repository;
+    private readonly IDatasetRepository _datasetRepository;
+    private readonly IDatasetVersionRepository _versionRepository;
 
-    public DeleteDatasetHandler(IDatasetRepository repository)
+    public DeleteDatasetHandler(
+        IDatasetRepository datasetRepository,
+        IDatasetVersionRepository versionRepository)
     {
-        _repository = repository;
+        _datasetRepository = datasetRepository;
+        _versionRepository = versionRepository;
     }
 
-    public async Task<bool> Handle(
-        DeleteDatasetCommand command, 
+    public async Task<DeleteDatasetResult> HandleAsync(
+        DeleteDatasetCommand command,
         CancellationToken cancellationToken)
-    { 
-        var dataset = await _repository.GetByIdAsync(command.Id, cancellationToken);
+    {
+        var dataset =
+            await _datasetRepository.GetByIdAndProjectOwnerAsync(
+                command.DatasetId,
+                command.ProjectId,
+                command.OwnerId,
+                cancellationToken
+            );
 
         if (dataset is null)
         {
-            return false;
+            return new DeleteDatasetResult.NotFound();
         }
 
-        var datasetPath = dataset.StoredPath;
+        var versions =
+            await _versionRepository.GetAllByDatasetIdAsync(
+                dataset.Id,
+                cancellationToken
+            );
 
-        if (File.Exists(datasetPath))
+        foreach (var version in versions)
         {
-            File.Delete(datasetPath);
+            if (File.Exists(version.StorageKey))
+            {
+                File.Delete(version.StorageKey);
+            }
         }
-        
-        return await _repository.DeleteAsync(command.Id, cancellationToken);
+
+        var deleted =
+            await _datasetRepository.DeleteByIdAndProjectOwnerAsync(
+                command.DatasetId,
+                command.ProjectId,
+                command.OwnerId,
+                cancellationToken
+            );
+
+        return deleted
+            ? new DeleteDatasetResult.Success()
+            : new DeleteDatasetResult.NotFound();
     }
 }

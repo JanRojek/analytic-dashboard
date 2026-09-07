@@ -3,6 +3,7 @@ using System;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AnalyticDashboard.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905192822_AddProjectOwnershipToDatasets")]
+    partial class AddProjectOwnershipToDatasets
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -53,75 +56,41 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<int>("ColumnCount")
+                        .HasColumnType("integer");
 
-                    b.Property<Guid?>("CurrentVersionId")
-                        .HasColumnType("uuid");
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CurrentVersionId");
-
-                    b.HasIndex("ProjectId", "CreatedAtUtc", "Id")
-                        .IsDescending(false, true, false);
-
-                    b.ToTable("datasets", (string)null);
-                });
-
-            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.DatasetVersion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("ColumnCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DatasetId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<int?>("RowCount")
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RowCount")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("StorageKey")
+                    b.Property<string>("StoredPath")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<int>("VersionNumber")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("DatasetId", "VersionNumber")
-                        .IsUnique();
-
-                    b.HasIndex("DatasetId", "CreatedAtUtc", "Id")
+                    b.HasIndex("ProjectId", "CreatedAtUtc", "Id")
                         .IsDescending(false, true, false);
 
-                    b.ToTable("dataset_versions", (string)null);
+                    b.ToTable("datasets", (string)null);
                 });
 
             modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Project", b =>
@@ -360,23 +329,9 @@ namespace AnalyticDashboard.Infrastructure.Migrations
 
             modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Dataset", b =>
                 {
-                    b.HasOne("AnalyticDashboard.Domain.Entities.DatasetVersion", null)
-                        .WithMany()
-                        .HasForeignKey("CurrentVersionId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("AnalyticDashboard.Domain.Entities.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.DatasetVersion", b =>
-                {
-                    b.HasOne("AnalyticDashboard.Domain.Entities.Dataset", null)
-                        .WithMany()
-                        .HasForeignKey("DatasetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

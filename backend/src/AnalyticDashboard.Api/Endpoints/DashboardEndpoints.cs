@@ -6,6 +6,9 @@ using AnalyticDashboard.Application.Dashboards.GetDashboards;
 using AnalyticDashboard.Application.Widgets.CreateWidget;
 using AnalyticDashboard.Application.Widgets.DeleteWidget;
 using AnalyticDashboard.Application.Widgets.GetWidgets;
+using System.Security.Claims;
+using AnalyticDashboard.Api.Auth;
+using AnalyticDashboard.Api.Contracts.Dashboards;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
@@ -13,14 +16,39 @@ public static class DashboardEndpoints
 {
     public static void MapDashboardEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/dashboards", async (
-            CreateDashboardCommand command,
+        app.MapPost("/projects/{projectId:guid}/dashboards", async (
+            Guid projectId,
+            CreateDashboardRequest request,
             CreateDashboardHandler handler,
+            ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
-            var result = await handler.Handle(command, cancellationToken);
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Unauthorized();
+            }
 
-            return Results.Created($"/dashboards/{result.Id}", result);
+            var command = new CreateDashboardCommand(
+                projectId,
+                ownerId,
+                request.DatasetId,
+                request.Name
+            );
+
+            var result = await handler.Handle(
+                command,
+                cancellationToken
+            );
+
+            if (result is null)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Created(
+                $"/dashboards/{result.Id}",
+                result
+            );
         })
         .WithName("CreateDashboard")
         .WithTags("Dashboards")

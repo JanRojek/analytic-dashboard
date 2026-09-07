@@ -1,44 +1,76 @@
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Profiling;
+using AnalyticDashboard.Domain.Entities;
 
 namespace AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 
 public sealed class GetDatasetProfileHandler
 {
-    private readonly IDatasetRepository _repository;
+    private readonly IDatasetRepository _datasetRepository;
+    private readonly IDatasetVersionRepository _versionRepository;
     private readonly IDatasetProfileReader _profileReader;
-    
+
     public GetDatasetProfileHandler(
-        IDatasetRepository repository,
+        IDatasetRepository datasetRepository,
+        IDatasetVersionRepository versionRepository,
         IDatasetProfileReader profileReader)
     {
-        _repository = repository;
+        _datasetRepository = datasetRepository;
+        _versionRepository = versionRepository;
         _profileReader = profileReader;
     }
 
-    public async Task<GetDatasetProfileResponse?> Handle(
+    public async Task<GetDatasetProfileResult> HandleAsync(
         GetDatasetProfileQuery query,
         CancellationToken cancellationToken)
     {
-        var dataset = await _repository.GetByIdAsync(query.DatasetId, cancellationToken);
+        var dataset =
+            await _datasetRepository.GetByIdAndProjectOwnerAsync(
+                query.DatasetId,
+                query.ProjectId,
+                query.OwnerId,
+                cancellationToken
+            );
 
-        if (dataset is null)
+        if (dataset is not { CurrentVersionId: { } versionId })
         {
-            return null;
+            return new GetDatasetProfileResult.NotFound();
         }
 
-        if (!File.Exists(dataset.StoredPath))
+        var version = await _versionRepository.GetByIdAsync(
+            versionId,
+            dataset.Id,
+            cancellationToken
+        );
+
+        if (version is null
+            || version.Status != DatasetVersionStatus.Ready
+            || !version.RowCount.HasValue
+            || !version.ColumnCount.HasValue)
         {
-            throw new FileNotFoundException("Dataset file not found.", dataset.StoredPath);
+            return new GetDatasetProfileResult.NotFound();
         }
 
-        return await _profileReader.ReadProfileAsync(
+        if (!File.Exists(version.StorageKey))
+        {
+            throw new FileNotFoundException(
+                "Dataset file not found.",
+                version.StorageKey
+            );
+        }
+
+        var profile = await _profileReader.ReadProfileAsync(
             dataset.Id,
             dataset.Name,
-            dataset.OriginalFileName,
-            dataset.StoredPath,
-            dataset.RowCount,
-            dataset.ColumnCount,
-            cancellationToken);
+            version.OriginalFileName,
+            version.StorageKey,
+            version.RowCount.Value,
+            version.ColumnCount.Value,
+            cancellationToken
+        );
+
+        return new GetDatasetProfileResult.Found(
+            profile
+        );
     }
 }

@@ -2,7 +2,6 @@ using AnalyticDashboard.Application.Auth.Accounts;
 using AnalyticDashboard.Application.Auth.Email;
 using AnalyticDashboard.Application.Import;
 using AnalyticDashboard.Application.Projects.Persistence;
-using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Infrastructure.Data;
 using AnalyticDashboard.Infrastructure.Repositories;
 using AnalyticDashboard.Infrastructure.Services.Import;
@@ -14,6 +13,8 @@ using AnalyticDashboard.Infrastructure.Auth.Email;
 using AnalyticDashboard.Infrastructure.Identity;
 using AnalyticDashboard.Infrastructure.Services.Profiling;
 using AnalyticDashboard.Infrastructure.Services.Csv;
+using AnalyticDashboard.Application.Datasets.Persistence;
+using AnalyticDashboard.Domain.Repositories;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -30,6 +31,8 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.AddScoped<IDatasetRepository, DatasetRepository>();
+
+        services.AddScoped<IDatasetVersionRepository, DatasetVersionRepository>();
 
         services.AddScoped<ICsvImportService, CsvImportService>();
 

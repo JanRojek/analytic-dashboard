@@ -1,29 +1,71 @@
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Datasets.Persistence;
+using AnalyticDashboard.Domain.Entities;
 
 namespace AnalyticDashboard.Application.Datasets.GetDatasetById;
 
 public sealed class GetDatasetByIdHandler
 {
-    private readonly IDatasetRepository _repository;
+    private readonly IDatasetRepository _datasetRepository;
+    private readonly IDatasetVersionRepository _versionRepository;
 
-    public GetDatasetByIdHandler(IDatasetRepository repository)
+    public GetDatasetByIdHandler(
+        IDatasetRepository datasetRepository,
+        IDatasetVersionRepository versionRepository)
     {
-        _repository = repository;
+        _datasetRepository = datasetRepository;
+        _versionRepository = versionRepository;
     }
 
-    public async Task<GetDatasetByIdResponse?> Handle(
-        GetDatasetByIdQuery query, 
+    public async Task<GetDatasetByIdResult> HandleAsync(
+        GetDatasetByIdQuery query,
         CancellationToken cancellationToken)
     {
-        var dataset = await _repository.GetByIdAsync(query.Id, cancellationToken);
+        var dataset =
+            await _datasetRepository.GetByIdAndProjectOwnerAsync(
+                query.DatasetId,
+                query.ProjectId,
+                query.OwnerId,
+                cancellationToken
+            );
 
-        return dataset == null ? null : new GetDatasetByIdResponse(
+        if (dataset is null)
+        {
+            return new GetDatasetByIdResult.NotFound();
+        }
+
+        GetDatasetByIdResult.CurrentVersion? currentVersion = null;
+
+        if (dataset.CurrentVersionId is { } versionId)
+        {
+            var version = await _versionRepository.GetByIdAsync(
+                versionId,
+                dataset.Id,
+                cancellationToken
+            );
+
+            if (version is
+                {
+                    Status: DatasetVersionStatus.Ready,
+                    RowCount: { } rowCount,
+                    ColumnCount: { } columnCount
+                })
+            {
+                currentVersion =
+                    new GetDatasetByIdResult.CurrentVersion(
+                        version.Id,
+                        version.VersionNumber,
+                        version.OriginalFileName,
+                        rowCount,
+                        columnCount
+                    );
+            }
+        }
+
+        return new GetDatasetByIdResult.Found(
             dataset.Id,
             dataset.Name,
-            dataset.OriginalFileName,
             dataset.CreatedAtUtc,
-            dataset.RowCount,
-            dataset.ColumnCount
+            currentVersion
         );
     }
 }

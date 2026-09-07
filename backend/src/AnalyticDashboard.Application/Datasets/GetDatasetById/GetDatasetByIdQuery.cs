@@ -1,5 +1,7 @@
 namespace AnalyticDashboard.Application.Datasets.GetDatasetById;
 
 public sealed record GetDatasetByIdQuery(
-    Guid Id
+    Guid DatasetId,
+    Guid ProjectId,
+    Guid OwnerId
 );

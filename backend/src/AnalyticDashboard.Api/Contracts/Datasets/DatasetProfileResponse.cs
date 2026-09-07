@@ -1,16 +1,16 @@
-namespace AnalyticDashboard.Application.Datasets.GetDatasetProfile;
+﻿namespace AnalyticDashboard.Api.Contracts.Datasets;
 
-public sealed record GetDatasetProfileResponse(
+public sealed record DatasetProfileResponse(
     Guid Id,
     string Name,
     string OriginalFileName,
     int RowCount,
     int ColumnCount,
-    IReadOnlyList<ColumnProfile> Columns,
+    IReadOnlyList<DatasetColumnProfileResponse> Columns,
     IReadOnlyList<IReadOnlyDictionary<string, string?>> PreviewRows
 );
 
-public sealed record ColumnProfile(
+public sealed record DatasetColumnProfileResponse(
     string Name,
     string Type,
     int NullCount,

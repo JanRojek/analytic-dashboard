@@ -1,5 +1,5 @@
 using System.Globalization;
-using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
+
 using AnalyticDashboard.Application.Profiling;
 using AnalyticDashboard.Infrastructure.Services.Csv;
 
@@ -13,8 +13,8 @@ public sealed class CsvDatasetProfileReader : IDatasetProfileReader
     {
         _csvDatasetReader = csvDatasetReader;
     }
-    
-    public async Task<GetDatasetProfileResponse> ReadProfileAsync(
+
+    public async Task<DatasetProfile> ReadProfileAsync(
         Guid datasetId,
         string name,
         string originalFileName,
@@ -61,7 +61,7 @@ public sealed class CsvDatasetProfileReader : IDatasetProfileReader
             .Select(h => stats[h].ToProfile())
             .ToList();
 
-        return new GetDatasetProfileResponse(
+        return new DatasetProfile(
             datasetId,
             name,
             originalFileName,
@@ -124,7 +124,7 @@ public sealed class CsvDatasetProfileReader : IDatasetProfileReader
                 CanBeDate = false;
             }
         }
-        
+
         public ColumnProfile ToProfile()
         {
             if (CanBeNumber && NumberCount > 0)

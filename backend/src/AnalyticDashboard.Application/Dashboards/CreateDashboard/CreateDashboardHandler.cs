@@ -1,3 +1,4 @@
+using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Domain.Repositories;
 
@@ -7,7 +8,7 @@ public sealed class CreateDashboardHandler
 {
     private readonly IDashboardRepository _repository;
     private readonly IDatasetRepository _datasetRepository;
-    
+
     public CreateDashboardHandler(
         IDashboardRepository repository,
         IDatasetRepository datasetRepository)
@@ -15,21 +16,24 @@ public sealed class CreateDashboardHandler
         _repository = repository;
         _datasetRepository = datasetRepository;
     }
-    
-    public async Task<CreateDashboardResponse> Handle(
+
+    public async Task<CreateDashboardResponse?> Handle(
         CreateDashboardCommand command,
         CancellationToken cancellationToken)
     {
-        var dataset = await _datasetRepository.GetByIdAsync(
-            command.DatasetId,
-            cancellationToken);
+        var dataset =
+            await _datasetRepository.GetByIdAndProjectOwnerAsync(
+                command.DatasetId,
+                command.ProjectId,
+                command.OwnerId,
+                cancellationToken
+            );
 
         if (dataset is null)
         {
-            throw new InvalidOperationException(
-                $"Dataset with ID {command.DatasetId} was not found.");
+            return null;
         }
-        
+
         var dashboard = new Dashboard(
             Guid.NewGuid(),
             command.DatasetId,
@@ -37,8 +41,13 @@ public sealed class CreateDashboardHandler
             DateTime.UtcNow
         );
 
-        await _repository.AddAsync(dashboard, cancellationToken);
+        await _repository.AddAsync(
+            dashboard,
+            cancellationToken
+        );
 
-        return new CreateDashboardResponse(dashboard.Id);
+        return new CreateDashboardResponse(
+            dashboard.Id
+        );
     }
 }
