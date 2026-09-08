@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Claims;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Datasets;
+using AnalyticDashboard.Application.Analytics.QueryDataset;
 using AnalyticDashboard.Application.Datasets.DeleteDataset;
 using AnalyticDashboard.Application.Datasets.GetDatasetById;
 using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
@@ -317,6 +318,89 @@ public static class DatasetEndpoints
         })
         .WithName("GetDatasetProfile")
         .Produces<DatasetProfileResponse>()
+        .Produces(
+            StatusCodes.Status401Unauthorized
+        )
+        .Produces(
+            StatusCodes.Status404NotFound
+        );
+
+        datasets.MapPost("/{datasetId:guid}/query", async (
+            Guid projectId,
+            Guid datasetId,
+            QueryDatasetRequest request,
+            QueryDatasetHandler handler,
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken) =>
+        {
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            if (!Enum.TryParse<AggregationType>(
+                request.Aggregation,
+                ignoreCase: true,
+                out var aggregation))
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["Aggregation"] =
+                        [
+                            "Aggregation must be one of: Sum, Average, Min, Max, Count."
+                        ]
+                    }
+                );
+            }
+
+            var query = new QueryDatasetQuery(
+                datasetId,
+                projectId,
+                ownerId,
+                request.GroupByColumn,
+                request.MeasureColumn,
+                aggregation
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
+            return result switch
+            {
+                QueryDatasetResult.Success success =>
+                    Results.Ok(
+                        new QueryDatasetResponse(
+                            success.Items
+                                .Select(item =>
+                                    new QueryDatasetItemResponse(
+                                        item.Label,
+                                        item.Value
+                                    )
+                                )
+                                .ToList()
+                        )
+                    ),
+
+                QueryDatasetResult.NotFound =>
+                    Results.NotFound(),
+
+                QueryDatasetResult.InvalidQuery invalid =>
+                    Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["Query"] = [invalid.Message]
+                        }
+                    ),
+
+                _ => throw new UnreachableException()
+            };
+        })
+        .WithName("QueryDataset")
+        .Produces<QueryDatasetResponse>()
+        .ProducesValidationProblem()
         .Produces(
             StatusCodes.Status401Unauthorized
         )

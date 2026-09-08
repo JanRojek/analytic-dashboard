@@ -15,6 +15,8 @@ using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Infrastructure.Storage;
+using AnalyticDashboard.Application.Analytics.QueryDataset;
+using AnalyticDashboard.Infrastructure.Services.Analytics;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -59,6 +61,8 @@ public static class DependencyInjection
         services.AddScoped<DuckDbCsvImporter>();
 
         services.AddScoped<ImportJobProcessor>();
+
+        services.AddScoped<IDatasetQueryReader, DuckDbDatasetQueryReader>();
 
         services.AddScoped<IEmailSender, SmtpEmailSender>();
 

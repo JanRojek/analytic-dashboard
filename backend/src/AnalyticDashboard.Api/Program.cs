@@ -14,6 +14,7 @@ using AnalyticDashboard.Application.Widgets.DeleteWidget;
 using AnalyticDashboard.Application.Widgets.GetWidgets;
 using System.Text.Json.Serialization;
 using AnalyticDashboard.Api.Auth;
+using AnalyticDashboard.Application.Analytics.QueryDataset;
 using AnalyticDashboard.Application.Auth.CompleteRegistration;
 using AnalyticDashboard.Application.Auth.ConfirmEmail;
 using AnalyticDashboard.Application.Auth.CurrentUser;
@@ -139,6 +140,7 @@ builder.Services.AddScoped<GetCurrentUserHandler>();
 builder.Services.AddScoped<ResendConfirmationHandler>();
 builder.Services.AddScoped<ForgotPasswordHandler>();
 builder.Services.AddScoped<ResetPasswordHandler>();
+builder.Services.AddScoped<QueryDatasetHandler>();
 
 builder.Services.AddHttpContextAccessor();
 
