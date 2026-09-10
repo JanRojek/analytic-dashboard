@@ -1,99 +1,78 @@
-using AnalyticDashboard.Application.Datasets.Persistence;
-using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
-using AnalyticDashboard.Application.Storage;
+using AnalyticDashboard.Application.Analytics.QueryDataset;
+using AnalyticDashboard.Application.Widgets.Persistence;
 
 namespace AnalyticDashboard.Application.Widgets.GetWidgetData;
 
 public sealed class GetWidgetDataHandler
 {
     private readonly IWidgetRepository _widgetRepository;
-    private readonly IDashboardRepository _dashboardRepository;
-    private readonly IDatasetRepository _datasetRepository;
-    private readonly IDatasetVersionRepository _versionRepository;
-    private readonly IWidgetDataReader _widgetDataReader;
-    private readonly IFileStorage _fileStorage;
+    private readonly DatasetQueryExecutor _queryExecutor;
 
     public GetWidgetDataHandler(
         IWidgetRepository widgetRepository,
-        IDashboardRepository dashboardRepository,
-        IDatasetRepository datasetRepository,
-        IDatasetVersionRepository versionRepository,
-        IWidgetDataReader dataReader,
-        IFileStorage fileStorage)
+        DatasetQueryExecutor queryExecutor)
     {
         _widgetRepository = widgetRepository;
-        _dashboardRepository = dashboardRepository;
-        _datasetRepository = datasetRepository;
-        _versionRepository = versionRepository;
-        _widgetDataReader = dataReader;
-        _fileStorage = fileStorage;
+        _queryExecutor = queryExecutor;
     }
 
-    public async Task<GetWidgetDataResponse?> Handle(
+    public async Task<GetWidgetDataResult> HandleAsync(
         GetWidgetDataQuery query,
         CancellationToken cancellationToken)
     {
-        var widget = await _widgetRepository.GetByIdAsync(
-            query.WidgetId,
-            cancellationToken
-        );
+        var widget =
+            await _widgetRepository
+                .GetByIdAndDashboardProjectOwnerAsync(
+                    query.WidgetId,
+                    query.DashboardId,
+                    query.ProjectId,
+                    query.OwnerId,
+                    cancellationToken
+                );
 
         if (widget is null)
         {
-            return null;
+            return new GetWidgetDataResult.NotFound();
         }
 
-        var dashboard = await _dashboardRepository.GetByIdAsync(
-            widget.DashboardId,
+        var queryResult = await _queryExecutor.ExecuteAsync(
+            widget.DatasetId,
+            query.ProjectId,
+            query.OwnerId,
+            widget.GroupByColumn,
+            widget.MeasureColumn,
+            widget.Aggregation,
             cancellationToken
         );
 
-        if (dashboard is null)
+        return queryResult switch
         {
-            return null;
-        }
+            DatasetQueryExecutionResult.Success success =>
+                new GetWidgetDataResult.Success(
+                    widget.Id,
+                    widget.Type,
+                    widget.Title,
+                    success.Items
+                        .Select(item =>
+                            new GetWidgetDataResult.Item(
+                                item.Label,
+                                item.Value
+                            )
+                        )
+                        .ToList()
+                ),
 
-        var dataset =
-            await _datasetRepository.GetByIdAndProjectOwnerAsync(
-                dashboard.DatasetId,
-                query.ProjectId,
-                query.OwnerId,
-                cancellationToken
-            );
+            DatasetQueryExecutionResult.NotFound =>
+                new GetWidgetDataResult.NotFound(),
 
-        if (dataset is not { CurrentVersionId: { } versionId })
-        {
-            return null;
-        }
+            DatasetQueryExecutionResult.InvalidQuery invalid =>
+                new GetWidgetDataResult.InvalidQuery(
+                    invalid.Message
+                ),
 
-        var version = await _versionRepository.GetByIdAsync(
-            versionId,
-            dataset.Id,
-            cancellationToken
-        );
-
-        if (version is null
-            || version.Status != DatasetVersionStatus.Ready
-            || version.StorageKey is null)
-        {
-            return null;
-        }
-
-        var fileExists = await _fileStorage.ExistsAsync(
-            version.StorageKey,
-            cancellationToken
-        );
-
-        if (!fileExists)
-        {
-            return null;
-        }
-
-        return await _widgetDataReader.ReadDataAsync(
-            widget,
-            version.StorageKey,
-            cancellationToken
-        );
+            _ => throw new InvalidOperationException(
+                "Unsupported dataset query execution result."
+            )
+        };
     }
 }

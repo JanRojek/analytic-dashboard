@@ -2,8 +2,7 @@ namespace AnalyticDashboard.Application.Dashboards.GetDashboardById;
 
 public sealed record GetDashboardByIdResponse(
     Guid Id,
-    Guid DatasetId,
-    string DatasetName,
+    Guid ProjectId,
     string Name,
     DateTime CreatedAtUtc
 );

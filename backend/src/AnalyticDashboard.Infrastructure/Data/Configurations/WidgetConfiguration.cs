@@ -9,36 +9,50 @@ public sealed class WidgetConfiguration : IEntityTypeConfiguration<Widget>
     public void Configure(EntityTypeBuilder<Widget> builder)
     {
         builder.ToTable("Widgets");
-        
-        builder.HasKey(w => w.Id);
 
-        builder.Property(w => w.DashboardId)
+        builder.HasKey(widget => widget.Id);
+
+        builder.Property(widget => widget.DashboardId)
             .IsRequired();
 
-        builder.Property(w => w.Type)
+        builder.Property(widget => widget.DatasetId)
+            .IsRequired();
+
+        builder.Property(widget => widget.Type)
             .IsRequired()
             .HasConversion<string>();
-            
-        builder.Property(w => w.Title)
-            .IsRequired()
-            .HasMaxLength(200);
 
-        builder.Property(w => w.XColumn)
-            .HasMaxLength(200);
-        
-        builder.Property(w => w.YColumn)
-            .HasMaxLength(200);
-        
-        builder.Property(w => w.Aggregation)
+        builder.Property(widget => widget.Title)
             .IsRequired()
-            .HasMaxLength(50);
+            .HasMaxLength(Widget.MaxTitleLength);
 
-        builder.Property(w => w.CreatedAtUtc)
+        builder.Property(widget => widget.GroupByColumn)
+            .IsRequired()
+            .HasMaxLength(Widget.MaxGroupByColumnLength);
+
+        builder.Property(widget => widget.MeasureColumn)
+            .IsRequired()
+            .HasMaxLength(Widget.MaxMeasureColumnLength);
+
+        builder.Property(widget => widget.Aggregation)
+            .IsRequired()
+            .HasConversion<string>();
+
+        builder.Property(widget => widget.CreatedAtUtc)
             .IsRequired();
-        
-        builder.HasOne(w => w.Dashboard)
+
+        builder.HasOne<Dashboard>()
             .WithMany()
-            .HasForeignKey(w => w.DashboardId)
+            .HasForeignKey(widget => widget.DashboardId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<Dataset>()
+            .WithMany()
+            .HasForeignKey(widget => widget.DatasetId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(widget => widget.DashboardId);
+
+        builder.HasIndex(widget => widget.DatasetId);
     }
 }

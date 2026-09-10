@@ -1,11 +1,7 @@
-using AnalyticDashboard.Api.Contracts.Widgets;
 using AnalyticDashboard.Application.Dashboards.CreateDashboard;
 using AnalyticDashboard.Application.Dashboards.DeleteDashboard;
 using AnalyticDashboard.Application.Dashboards.GetDashboardById;
 using AnalyticDashboard.Application.Dashboards.GetDashboards;
-using AnalyticDashboard.Application.Widgets.CreateWidget;
-using AnalyticDashboard.Application.Widgets.DeleteWidget;
-using AnalyticDashboard.Application.Widgets.GetWidgets;
 using System.Security.Claims;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Dashboards;
@@ -14,9 +10,21 @@ namespace AnalyticDashboard.Api.Endpoints;
 
 public static class DashboardEndpoints
 {
-    public static void MapDashboardEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapDashboardEndpoints(
+        this IEndpointRouteBuilder app)
     {
-        app.MapPost("/projects/{projectId:guid}/dashboards", async (
+        var dashboards = app
+            .MapGroup("/projects/{projectId:guid}/dashboards")
+            .WithTags("Dashboards")
+            .RequireAuthorization()
+            .ProducesProblem(
+                StatusCodes.Status401Unauthorized
+            )
+            .ProducesProblem(
+                StatusCodes.Status500InternalServerError
+            );
+
+        dashboards.MapPost("", async (
             Guid projectId,
             CreateDashboardRequest request,
             CreateDashboardHandler handler,
@@ -25,137 +33,166 @@ public static class DashboardEndpoints
         {
             if (!user.TryGetUserId(out var ownerId))
             {
-                return Results.Unauthorized();
+                return Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Unauthorized",
+                    detail: "The authenticated user identifier is missing or invalid."
+                );
             }
 
             var command = new CreateDashboardCommand(
                 projectId,
                 ownerId,
-                request.DatasetId,
                 request.Name
             );
 
-            var result = await handler.Handle(
+            var result = await handler.HandleAsync(
                 command,
                 cancellationToken
             );
 
             if (result is null)
             {
-                return Results.NotFound();
+                return Results.Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Project not found",
+                    detail: "The project does not exist or is not accessible by the current user."
+                );
             }
 
             return Results.Created(
-                $"/dashboards/{result.Id}",
+                $"/projects/{projectId}/dashboards/{result.Id}",
                 result
             );
         })
         .WithName("CreateDashboard")
-        .WithTags("Dashboards")
-        .RequireAuthorization();
+        .Produces<CreateDashboardResponse>(
+            StatusCodes.Status201Created
+        )
+        .ProducesProblem(
+            StatusCodes.Status404NotFound
+        );
 
-        app.MapGet("/dashboards", async (
+        dashboards.MapGet("", async (
+            Guid projectId,
             GetDashboardsHandler handler,
+            ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetDashboardsQuery();
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Unauthorized",
+                    detail: "The authenticated user identifier is missing or invalid."
+                );
+            }
 
-            var result = await handler.Handle(query, cancellationToken);
+            var query = new GetDashboardsQuery(
+                projectId,
+                ownerId
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
             return Results.Ok(result);
         })
         .WithName("GetDashboards")
-        .WithTags("Dashboards")
-        .RequireAuthorization();
+        .Produces<IReadOnlyList<GetDashboardsResponse>>();
 
-        app.MapGet("/dashboards/{id:guid}", async (
-            Guid id,
+        dashboards.MapGet("/{dashboardId:guid}", async (
+            Guid projectId,
+            Guid dashboardId,
             GetDashboardByIdHandler handler,
+            ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetDashboardByIdQuery(id);
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Unauthorized",
+                    detail: "The authenticated user identifier is missing or invalid."
+                );
+            }
 
-            var result = await handler.Handle(query, cancellationToken);
+            var query = new GetDashboardByIdQuery(
+                dashboardId,
+                projectId,
+                ownerId
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
 
             if (result is null)
             {
-                return Results.NotFound(new { message = $"Dashboard with ID {id} doesn't exist." });
+                return Results.Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Dashboard not found",
+                    detail: "The dashboard does not exist or is not accessible by the current user."
+                );
             }
 
             return Results.Ok(result);
         })
         .WithName("GetDashboardById")
-        .WithTags("Dashboards")
-        .RequireAuthorization();
+        .Produces<GetDashboardByIdResponse>()
+        .ProducesProblem(
+            StatusCodes.Status404NotFound
+        );
 
-        app.MapDelete("/dashboards/{id:guid}", async (
-            Guid id,
+        dashboards.MapDelete("/{dashboardId:guid}", async (
+            Guid projectId,
+            Guid dashboardId,
             DeleteDashboardHandler handler,
+            ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
-            var command = new DeleteDashboardCommand(id);
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Unauthorized",
+                    detail: "The authenticated user identifier is missing or invalid."
+                );
+            }
 
-            var success = await handler.Handle(command, cancellationToken);
+            var command = new DeleteDashboardCommand(
+                dashboardId,
+                projectId,
+                ownerId
+            );
 
-            return success ? Results.NoContent() : Results.NotFound();
+            var success = await handler.HandleAsync(
+                command,
+                cancellationToken
+            );
+
+            if (!success)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Dashboard not found",
+                    detail: "The dashboard does not exist or is not accessible by the current user."
+                );
+            }
+
+            return Results.NoContent();
         })
         .WithName("DeleteDashboard")
-        .WithTags("Dashboards")
-        .RequireAuthorization();
+        .Produces(
+            StatusCodes.Status204NoContent
+        )
+        .ProducesProblem(
+            StatusCodes.Status404NotFound
+        );
 
-        app.MapPost("/dashboards/{dashboardId:guid}/widgets", async (
-            Guid dashboardId,
-            CreateWidgetRequest request,
-            CreateWidgetHandler handler,
-            CancellationToken cancellationToken) =>
-        {
-            var command = new CreateWidgetCommand(
-                dashboardId,
-                request.Type,
-                request.Title,
-                request.XColumn,
-                request.YColumn,
-                request.Aggregation
-            );
-
-            var result = await handler.Handle(command, cancellationToken);
-
-            return Results.Created(
-                $"/dashboards/{dashboardId}/widgets/{result.Id}",
-                result
-            );
-        })
-        .WithName("CreateWidget")
-        .WithTags("Widgets")
-        .RequireAuthorization();
-
-        app.MapGet("/dashboards/{dashboardId:guid}/widgets", async (
-            Guid dashboardId,
-            GetWidgetsHandler handler,
-            CancellationToken cancellationToken) =>
-        {
-            var query = new GetWidgetsQuery(dashboardId);
-
-            var result = await handler.Handle(query, cancellationToken);
-
-            return Results.Ok(result);
-        })
-        .WithName("GetWidgets")
-        .WithTags("Widgets")
-        .RequireAuthorization();
-
-        app.MapDelete("/widgets/{id:guid}", async (
-            Guid id,
-            DeleteWidgetHandler handler,
-            CancellationToken cancellationToken) =>
-        {
-            var command = new DeleteWidgetCommand(id);
-
-            var success = await handler.Handle(command, cancellationToken);
-
-            return success ? Results.NoContent() : Results.NotFound();
-        })
-        .WithName("DeleteWidget")
-        .WithTags("Widgets")
-        .RequireAuthorization();
+        return app;
     }
 }

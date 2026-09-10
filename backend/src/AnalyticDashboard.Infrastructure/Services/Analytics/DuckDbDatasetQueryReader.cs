@@ -1,12 +1,12 @@
 ﻿using AnalyticDashboard.Application.Analytics.QueryDataset;
 using AnalyticDashboard.Application.Storage;
+using AnalyticDashboard.Domain.Analytics;
 using DuckDB.NET.Data;
 using Microsoft.Extensions.Logging;
 
 namespace AnalyticDashboard.Infrastructure.Services.Analytics;
 
-public sealed class DuckDbDatasetQueryReader
-    : IDatasetQueryReader
+public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
 {
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<DuckDbDatasetQueryReader> _logger;

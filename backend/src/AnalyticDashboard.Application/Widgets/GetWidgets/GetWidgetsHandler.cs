@@ -1,34 +1,38 @@
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Widgets.Persistence;
 
 namespace AnalyticDashboard.Application.Widgets.GetWidgets;
 
 public sealed class GetWidgetsHandler
 {
-    private readonly IWidgetRepository _repository;
+    private readonly IWidgetRepository _widgetRepository;
 
-    public GetWidgetsHandler(IWidgetRepository repository)
+    public GetWidgetsHandler(IWidgetRepository widgetRepository)
     {
-        _repository = repository;
+        _widgetRepository = widgetRepository;
     }
 
-    public async Task<IReadOnlyList<GetWidgetsResponse>> Handle(
-        GetWidgetsQuery query, 
+    public async Task<IReadOnlyList<GetWidgetsResponse>> HandleAsync(
+        GetWidgetsQuery query,
         CancellationToken cancellationToken)
     {
-        var widgets = await _repository.GetByDashboardIdAsync(
-            query.DashboardId, 
-            cancellationToken
-        );
+        var widgets =
+            await _widgetRepository.GetAllByDashboardProjectOwnerAsync(
+                query.DashboardId,
+                query.ProjectId,
+                query.OwnerId,
+                cancellationToken
+            );
 
-        return widgets.Select(w => new GetWidgetsResponse(
-            w.Id,
-            w.DashboardId,
-            w.Type,
-            w.Title,
-            w.XColumn,
-            w.YColumn,
-            w.Aggregation,
-            w.CreatedAtUtc
+        return widgets.Select(widget => new GetWidgetsResponse(
+            widget.Id,
+            widget.DashboardId,
+            widget.DatasetId,
+            widget.Type,
+            widget.Title,
+            widget.GroupByColumn,
+            widget.MeasureColumn,
+            widget.Aggregation,
+            widget.CreatedAtUtc
         )).ToList();
     }
 }

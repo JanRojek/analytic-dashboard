@@ -9,22 +9,24 @@ public sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboard>
     public void Configure(EntityTypeBuilder<Dashboard> builder)
     {
         builder.ToTable("Dashboards");
-        
-        builder.HasKey(d => d.Id);
 
-        builder.Property(d => d.Name)
+        builder.HasKey(dashboard => dashboard.Id);
+
+        builder.Property(dashboard => dashboard.ProjectId)
+            .IsRequired();
+
+        builder.Property(dashboard => dashboard.Name)
             .IsRequired()
-            .HasMaxLength(200);
+            .HasMaxLength(Dashboard.MaxNameLength);
 
-        builder.Property(d => d.DatasetId)
+        builder.Property(dashboard => dashboard.CreatedAtUtc)
             .IsRequired();
 
-        builder.Property(d => d.CreatedAtUtc)
-            .IsRequired();
-        
-        builder.HasOne(d => d.Dataset)
+        builder.HasOne<Project>()
             .WithMany()
-            .HasForeignKey(d => d.DatasetId)
+            .HasForeignKey(dashboard => dashboard.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(dashboard => dashboard.ProjectId);
     }
 }

@@ -31,6 +31,7 @@ using AnalyticDashboard.Application.Projects.DeleteProject;
 using AnalyticDashboard.Application.Projects.GetProjectById;
 using AnalyticDashboard.Application.Projects.GetProjects;
 using AnalyticDashboard.Application.Projects.RenameProject;
+using AnalyticDashboard.Application.Widgets.GetWidgetData;
 using AnalyticDashboard.Infrastructure.Auth.Email;
 using AnalyticDashboard.Infrastructure.Data;
 using AnalyticDashboard.Infrastructure.Identity;
@@ -141,6 +142,8 @@ builder.Services.AddScoped<ResendConfirmationHandler>();
 builder.Services.AddScoped<ForgotPasswordHandler>();
 builder.Services.AddScoped<ResetPasswordHandler>();
 builder.Services.AddScoped<QueryDatasetHandler>();
+builder.Services.AddScoped<GetWidgetDataHandler>();
+builder.Services.AddScoped<DatasetQueryExecutor>();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -165,6 +168,7 @@ app.MapDatasetEndpoints();
 app.MapDashboardEndpoints();
 app.MapProjectEndpoints();
 app.MapAuthEndpoints();
+app.MapWidgetsEndpoints();
 
 if (app.Environment.IsDevelopment())
 {

@@ -26,7 +26,8 @@ public sealed class CreateProjectHandler
                 command.Name
             );
         }
-        catch (InvalidProjectNameException exception)
+        catch (InvalidEntityNameException exception)
+            when (exception.EntityType == nameof(Project))
         {
             return new CreateProjectResult.InvalidName(
                 exception.Message

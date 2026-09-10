@@ -1,4 +1,4 @@
-﻿namespace AnalyticDashboard.Application.Analytics.QueryDataset;
+﻿namespace AnalyticDashboard.Domain.Analytics;
 
 public enum AggregationType
 {

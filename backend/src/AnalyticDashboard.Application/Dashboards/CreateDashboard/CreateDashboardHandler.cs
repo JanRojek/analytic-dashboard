@@ -1,47 +1,43 @@
-using AnalyticDashboard.Application.Datasets.Persistence;
+using AnalyticDashboard.Application.Dashboards.Persistence;
+using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
 
 namespace AnalyticDashboard.Application.Dashboards.CreateDashboard;
 
 public sealed class CreateDashboardHandler
 {
-    private readonly IDashboardRepository _repository;
-    private readonly IDatasetRepository _datasetRepository;
+    private readonly IDashboardRepository _dashboardRepository;
+    private readonly IProjectRepository _projectRepository;
 
     public CreateDashboardHandler(
-        IDashboardRepository repository,
-        IDatasetRepository datasetRepository)
+        IDashboardRepository dashboardRepository,
+        IProjectRepository projectRepository)
     {
-        _repository = repository;
-        _datasetRepository = datasetRepository;
+        _dashboardRepository = dashboardRepository;
+        _projectRepository = projectRepository;
     }
 
-    public async Task<CreateDashboardResponse?> Handle(
+    public async Task<CreateDashboardResponse?> HandleAsync(
         CreateDashboardCommand command,
         CancellationToken cancellationToken)
     {
-        var dataset =
-            await _datasetRepository.GetByIdAndProjectOwnerAsync(
-                command.DatasetId,
-                command.ProjectId,
-                command.OwnerId,
-                cancellationToken
-            );
+        var project = await _projectRepository.GetByIdAndOwnerAsync(
+            command.ProjectId,
+            command.OwnerId,
+            cancellationToken
+        );
 
-        if (dataset is null)
+        if (project is null)
         {
             return null;
         }
 
         var dashboard = new Dashboard(
-            Guid.NewGuid(),
-            command.DatasetId,
-            command.Name,
-            DateTime.UtcNow
+            command.ProjectId,
+            command.Name
         );
 
-        await _repository.AddAsync(
+        await _dashboardRepository.AddAsync(
             dashboard,
             cancellationToken
         );

@@ -24,8 +24,13 @@ public sealed class ProjectTests
     public void Constructor_ShouldThrow_WhenNameIsNullOrWhitespace(
         string? name)
     {
-        Assert.Throws<InvalidProjectNameException>(
+        var exception = Assert.Throws<InvalidEntityNameException>(
             () => new Project(UserId, name!)
+        );
+
+        Assert.Equal(
+            nameof(Project),
+            exception.EntityType
         );
     }
 
@@ -42,8 +47,13 @@ public sealed class ProjectTests
             )
         );
 
-        Assert.Throws<InvalidProjectNameException>(
+        var exception = Assert.Throws<InvalidEntityNameException>(
             () => new Project(UserId, projectName)
+        );
+
+        Assert.Equal(
+            nameof(Project),
+            exception.EntityType
         );
     }
 
@@ -180,8 +190,13 @@ public sealed class ProjectTests
             projectName
         );
 
-        Assert.Throws<InvalidProjectNameException>(
+        var exception = Assert.Throws<InvalidEntityNameException>(
             () => project.Rename(name!)
+        );
+
+        Assert.Equal(
+            nameof(Project),
+            exception.EntityType
         );
 
         Assert.Equal(
@@ -210,8 +225,13 @@ public sealed class ProjectTests
             )
         );
 
-        Assert.Throws<InvalidProjectNameException>(
+        var exception = Assert.Throws<InvalidEntityNameException>(
             () => project.Rename(newName)
+        );
+
+        Assert.Equal(
+            nameof(Project),
+            exception.EntityType
         );
 
         Assert.Equal(

@@ -1,4 +1,6 @@
-﻿namespace AnalyticDashboard.Application.Analytics.QueryDataset;
+﻿using AnalyticDashboard.Domain.Analytics;
+
+namespace AnalyticDashboard.Application.Analytics.QueryDataset;
 
 public interface IDatasetQueryReader
 {

@@ -1,28 +1,32 @@
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Dashboards.Persistence;
 
 namespace AnalyticDashboard.Application.Dashboards.GetDashboards;
 
 public sealed class GetDashboardsHandler
 {
-    private readonly IDashboardRepository _repository;
+    private readonly IDashboardRepository _dashboardRepository;
 
-    public GetDashboardsHandler(IDashboardRepository repository)
+    public GetDashboardsHandler(IDashboardRepository dashboardRepository)
     {
-        _repository = repository;
+        _dashboardRepository = dashboardRepository;
     }
 
-    public async Task<IReadOnlyList<GetDashboardsResponse>> Handle(
-        GetDashboardsQuery query, 
+    public async Task<IReadOnlyList<GetDashboardsResponse>> HandleAsync(
+        GetDashboardsQuery query,
         CancellationToken cancellationToken)
     {
-        var dashboards = await _repository.GetAllAsync(cancellationToken);
+        var dashboards =
+            await _dashboardRepository.GetAllByProjectAndOwnerAsync(
+                query.ProjectId,
+                query.OwnerId,
+                cancellationToken
+            );
 
-        return dashboards.Select(d => new GetDashboardsResponse(
-            d.Id,
-            d.DatasetId,
-            d.Dataset!.Name,
-            d.Name,
-            d.CreatedAtUtc
+        return dashboards.Select(dashboard => new GetDashboardsResponse(
+            dashboard.Id,
+            dashboard.ProjectId,
+            dashboard.Name,
+            dashboard.CreatedAtUtc
         )).ToList();
     }
 }

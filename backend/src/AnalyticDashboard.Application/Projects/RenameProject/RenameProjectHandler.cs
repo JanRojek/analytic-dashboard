@@ -32,7 +32,8 @@ public sealed class RenameProjectHandler
         {
             project.Rename(command.Name);
         }
-        catch (InvalidProjectNameException exception)
+        catch (InvalidEntityNameException exception)
+            when (exception.EntityType == nameof(Project))
         {
             return new RenameProjectResult.InvalidName(
                 exception.Message

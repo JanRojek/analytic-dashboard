@@ -1,21 +1,26 @@
-using AnalyticDashboard.Domain.Repositories;
+using AnalyticDashboard.Application.Dashboards.Persistence;
 
 namespace AnalyticDashboard.Application.Dashboards.GetDashboardById;
 
 public class GetDashboardByIdHandler
 {
-    private IDashboardRepository _repository;
-    
-    public GetDashboardByIdHandler(IDashboardRepository repository)
+    private readonly IDashboardRepository _dashboardRepository;
+
+    public GetDashboardByIdHandler(IDashboardRepository dashboardRepository)
     {
-        _repository = repository;
+        _dashboardRepository = dashboardRepository;
     }
-    
-    public async Task<GetDashboardByIdResponse?> Handle(
-        GetDashboardByIdQuery query, 
+
+    public async Task<GetDashboardByIdResponse?> HandleAsync(
+        GetDashboardByIdQuery query,
         CancellationToken cancellationToken)
     {
-        var dashboard = await _repository.GetByIdAsync(query.Id, cancellationToken);
+        var dashboard = await _dashboardRepository.GetByIdAndProjectOwnerAsync(
+            query.Id,
+            query.ProjectId,
+            query.OwnerId,
+            cancellationToken
+        );
 
         if (dashboard == null)
         {
@@ -24,8 +29,7 @@ public class GetDashboardByIdHandler
 
         return new GetDashboardByIdResponse(
             dashboard.Id,
-            dashboard.DatasetId,
-            dashboard.Dataset!.Name,
+            dashboard.ProjectId,
             dashboard.Name,
             dashboard.CreatedAtUtc
         );

@@ -1,16 +1,16 @@
 ﻿namespace AnalyticDashboard.Application.Analytics.QueryDataset;
 
-public abstract record QueryDatasetResult
+public abstract record DatasetQueryExecutionResult
 {
     public sealed record Success(
         IReadOnlyList<Item> Items
-    ) : QueryDatasetResult;
+    ) : DatasetQueryExecutionResult;
 
-    public sealed record NotFound : QueryDatasetResult;
+    public sealed record NotFound : DatasetQueryExecutionResult;
 
     public sealed record InvalidQuery(
         string Message
-    ) : QueryDatasetResult;
+    ) : DatasetQueryExecutionResult;
 
     public sealed record Item(
         string? Label,

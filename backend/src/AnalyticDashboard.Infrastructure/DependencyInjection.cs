@@ -12,10 +12,11 @@ using AnalyticDashboard.Infrastructure.Auth.Email;
 using AnalyticDashboard.Infrastructure.Identity;
 using AnalyticDashboard.Infrastructure.Services.Profiling;
 using AnalyticDashboard.Application.Datasets.Persistence;
-using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Infrastructure.Storage;
 using AnalyticDashboard.Application.Analytics.QueryDataset;
+using AnalyticDashboard.Application.Dashboards.Persistence;
+using AnalyticDashboard.Application.Widgets.Persistence;
 using AnalyticDashboard.Infrastructure.Services.Analytics;
 
 namespace AnalyticDashboard.Infrastructure;

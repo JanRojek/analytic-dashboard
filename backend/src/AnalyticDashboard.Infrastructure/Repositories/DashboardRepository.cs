@@ -1,5 +1,5 @@
+using AnalyticDashboard.Application.Dashboards.Persistence;
 using AnalyticDashboard.Domain.Entities;
-using AnalyticDashboard.Domain.Repositories;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,42 +13,68 @@ public sealed class DashboardRepository : IDashboardRepository
     {
         _dbContext = dbContext;
     }
-    
-    public async Task AddAsync(Dashboard dashboard, CancellationToken cancellationToken)
+
+    public async Task AddAsync(
+        Dashboard dashboard,
+        CancellationToken cancellationToken)
     {
-        await _dbContext.Dashboards.AddAsync(dashboard, cancellationToken);
+        await _dbContext.Dashboards.AddAsync(
+            dashboard,
+            cancellationToken
+        );
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
-    
-    public async Task<IReadOnlyList<Dashboard>> GetAllAsync(CancellationToken cancellationToken)
+
+    public async Task<IReadOnlyList<Dashboard>> GetAllByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
     {
         return await _dbContext.Dashboards
+            .Where(dashboard =>
+                dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId))
             .AsNoTracking()
-            .Include(d => d.Dataset)
-            .OrderByDescending(d => d.CreatedAtUtc)
+            .OrderByDescending(dashboard => dashboard.CreatedAtUtc)
+            .ThenBy(dashboard => dashboard.Id)
             .ToListAsync(cancellationToken);
     }
-    
-    public async Task<Dashboard?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+
+    public async Task<Dashboard?> GetByIdAndProjectOwnerAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
     {
         return await _dbContext.Dashboards
+            .Where(dashboard =>
+                dashboard.Id == dashboardId
+                && dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId))
             .AsNoTracking()
-            .Include(d => d.Dataset)
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(cancellationToken);
     }
-    
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var dashboard = await _dbContext.Dashboards
-            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
-        if (dashboard == null)
-        {
-            return false;
-        }
-        
-        _dbContext.Dashboards.Remove(dashboard);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return true;
+    public async Task<bool> DeleteByIdAndProjectOwnerAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var affectedRows = await _dbContext.Dashboards
+            .Where(dashboard =>
+                dashboard.Id == dashboardId
+                && dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return affectedRows == 1;
     }
 }

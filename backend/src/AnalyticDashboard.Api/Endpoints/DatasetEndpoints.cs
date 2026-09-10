@@ -8,6 +8,7 @@ using AnalyticDashboard.Application.Datasets.GetDatasetById;
 using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 using AnalyticDashboard.Application.Datasets.GetDatasets;
 using AnalyticDashboard.Application.Datasets.ImportCsvDataset;
+using AnalyticDashboard.Domain.Analytics;
 
 namespace AnalyticDashboard.Api.Endpoints;
 

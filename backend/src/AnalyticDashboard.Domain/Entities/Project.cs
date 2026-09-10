@@ -36,14 +36,17 @@ public sealed class Project
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new InvalidProjectNameException("Project name cannot be empty.");
+            throw new InvalidEntityNameException(
+                nameof(Project),
+                "Project name cannot be empty.");
         }
 
         name = name.Trim();
 
         if (name.EnumerateRunes().Count() > MaxNameLength)
         {
-            throw new InvalidProjectNameException(
+            throw new InvalidEntityNameException(
+                nameof(Project),
                 $"Project name cannot be longer than {MaxNameLength} characters.");
         }
 
