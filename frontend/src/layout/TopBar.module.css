@@ -1,0 +1,182 @@
+.root {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--app-topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 16px 0 14px;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.left,
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background var(--app-dur-fast) var(--app-ease);
+}
+
+.logo:hover {
+  background: var(--app-surface-3);
+}
+
+.breadcrumbs {
+  min-width: 0;
+}
+
+.crumbList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.separator {
+  color: var(--app-text-4);
+  flex-shrink: 0;
+}
+
+.crumbLink,
+.crumbText,
+.switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--app-text-3);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--app-dur-fast) var(--app-ease), color var(--app-dur-fast) var(--app-ease);
+}
+
+.crumbLink:hover,
+.switcher:hover {
+  color: var(--app-text);
+  background: var(--app-surface-3);
+}
+
+.crumbCurrent .crumbText,
+.crumbCurrent .switcher {
+  color: var(--app-text);
+}
+
+.crumbText {
+  cursor: default;
+}
+
+.switcherLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switcherChevron {
+  color: var(--app-text-4);
+  flex-shrink: 0;
+}
+
+.pending {
+  color: var(--app-text-4);
+}
+
+.userButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 4px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  color: var(--app-text-2);
+  transition: background var(--app-dur-fast) var(--app-ease);
+}
+
+.userButton:hover {
+  background: var(--app-surface-3);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--app-ink);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.userName {
+  font-size: 13.5px;
+  font-weight: 500;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userHeader {
+  padding: 8px 10px 6px;
+}
+
+.userHeaderName {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.userHeaderEmail {
+  font-size: 12px;
+  color: var(--app-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) {
+  .crumbRoot {
+    display: none;
+  }
+
+  .crumb:not(.crumbCurrent):not(:nth-child(2)) {
+    display: none;
+  }
+
+  .userName {
+    display: none;
+  }
+}

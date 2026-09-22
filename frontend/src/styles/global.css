@@ -1,0 +1,302 @@
+/* ---------------------------------------------------------------------------
+   Design tokens. Mantine variables are configured in app/theme.ts; the tokens
+   below are the app-level vocabulary used by CSS modules.
+--------------------------------------------------------------------------- */
+:root {
+  --app-font: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+
+  --app-page: #f7f7f5;
+  --app-surface: #ffffff;
+  --app-surface-2: #fafaf9;
+  --app-surface-3: #f3f3f1;
+  --app-border: #e7e5e4;
+  --app-border-strong: #d6d3d1;
+  --app-ink: #1c1917;
+  --app-text: #1c1917;
+  --app-text-2: #57534e;
+  --app-text-3: #78716c;
+  --app-text-4: #a8a29e;
+
+  --app-accent: #0f766e;
+  --app-accent-hover: #115e59;
+  --app-accent-soft: #e6f2f0;
+  --app-accent-soft-2: #ccfbf1;
+  --app-accent-ring: rgba(15, 118, 110, 0.35);
+
+  --app-good: #15803d;
+  --app-good-soft: #e9f7ee;
+  --app-warn: #b45309;
+  --app-warn-soft: #fff4e5;
+  --app-bad: #b91c1c;
+  --app-bad-soft: #fdecec;
+  --app-info: #1d4ed8;
+  --app-info-soft: #e8eefc;
+
+  --app-radius-sm: 6px;
+  --app-radius-md: 8px;
+  --app-radius-lg: 12px;
+  --app-radius-xl: 16px;
+
+  --app-shadow-xs: 0 1px 2px rgba(28, 25, 23, 0.06);
+  --app-shadow-sm: 0 1px 3px rgba(28, 25, 23, 0.08), 0 1px 2px rgba(28, 25, 23, 0.04);
+  --app-shadow-md: 0 4px 12px -2px rgba(28, 25, 23, 0.1), 0 2px 4px rgba(28, 25, 23, 0.05);
+  --app-shadow-lg: 0 12px 32px -8px rgba(28, 25, 23, 0.16), 0 4px 8px rgba(28, 25, 23, 0.06);
+
+  --app-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --app-dur-fast: 120ms;
+  --app-dur: 180ms;
+  --app-dur-slow: 260ms;
+
+  --app-topbar-h: 52px;
+  --app-sidebar-w: 248px;
+  --app-content-max: 1240px;
+
+  /* Mantine size overrides: a slightly denser control scale for a working tool. */
+  --button-height-xs: 28px;
+  --button-height-sm: 32px;
+  --button-height-md: 38px;
+  --button-padding-x-xs: 10px;
+  --button-padding-x-sm: 12px;
+  --button-padding-x-md: 16px;
+  --input-height-xs: 28px;
+  --input-height-sm: 34px;
+  --input-height-md: 38px;
+  --ai-size-sm: 28px;
+  --ai-size-md: 32px;
+  --badge-height-sm: 20px;
+  --badge-fz-sm: 12px;
+  --badge-padding-x-sm: 7px;
+}
+
+html {
+  color-scheme: light;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--app-page);
+  color: var(--app-text);
+  font-family: var(--app-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11' 1, 'ss03' 1;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Visible focus for custom interactive elements (Mantine handles its own). */
+:where(a, button, [tabindex], input, select, textarea):focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--app-accent-soft-2);
+  color: var(--app-ink);
+}
+
+/* Mantine refinements ------------------------------------------------------ */
+.mantine-Input-input {
+  --input-fz: 14px;
+  --input-bd: var(--app-border-strong);
+  background: var(--app-surface);
+  transition: border-color var(--app-dur-fast) var(--app-ease),
+    box-shadow var(--app-dur-fast) var(--app-ease);
+}
+
+.mantine-Input-input:focus,
+.mantine-Input-input:focus-within {
+  --input-bd-focus: var(--app-accent);
+  box-shadow: 0 0 0 3px var(--app-accent-ring);
+}
+
+.mantine-InputWrapper-label {
+  font-weight: 500;
+  color: var(--app-text-2);
+  margin-bottom: 6px;
+}
+
+.mantine-InputWrapper-description {
+  color: var(--app-text-3);
+}
+
+.mantine-Button-root {
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  transition: background-color var(--app-dur-fast) var(--app-ease),
+    border-color var(--app-dur-fast) var(--app-ease), color var(--app-dur-fast) var(--app-ease),
+    transform var(--app-dur-fast) var(--app-ease);
+}
+
+.mantine-Button-root[data-variant='default'] {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--app-shadow-xs);
+}
+
+.mantine-Button-root[data-variant='default']:hover {
+  background: var(--app-surface-2);
+}
+
+.mantine-Button-root:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.mantine-Menu-dropdown {
+  border-color: var(--app-border);
+  padding: 4px;
+}
+
+.mantine-Menu-item {
+  font-size: 13px;
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+.mantine-Menu-itemSection svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mantine-Menu-label {
+  font-size: 11px;
+  color: var(--app-text-4);
+  padding: 6px 10px 4px;
+}
+
+.mantine-Menu-divider {
+  margin: 4px 0;
+}
+
+.mantine-Tooltip-tooltip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 9px;
+}
+
+.mantine-Modal-title {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.mantine-Modal-content,
+.mantine-Drawer-content {
+  border: 1px solid var(--app-border);
+}
+
+.mantine-Tabs-tab {
+  font-weight: 500;
+  color: var(--app-text-3);
+  padding: 10px 12px;
+}
+
+.mantine-Tabs-tab:hover {
+  color: var(--app-text);
+  background: transparent;
+}
+
+.mantine-Tabs-tab[data-active] {
+  color: var(--app-text);
+}
+
+.mantine-Tabs-list::before {
+  border-color: var(--app-border);
+}
+
+.mantine-SegmentedControl-root {
+  background: var(--app-surface-3);
+  border: 1px solid var(--app-border);
+}
+
+.mantine-SegmentedControl-indicator {
+  box-shadow: var(--app-shadow-sm);
+}
+
+.mantine-SegmentedControl-label {
+  font-weight: 500;
+  color: var(--app-text-3);
+}
+
+.mantine-SegmentedControl-label[data-active] {
+  color: var(--app-text);
+}
+
+.mantine-Table-th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--app-text-3);
+  white-space: nowrap;
+}
+
+.mantine-Table-table {
+  --table-border-color: var(--app-border);
+}
+
+.mantine-Notification-root {
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-lg);
+}
+
+.mantine-Skeleton-root::after {
+  background: var(--app-surface-3);
+}
+
+.mantine-Skeleton-root::before {
+  background: var(--app-surface);
+}
+
+/* Utilities ---------------------------------------------------------------- */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

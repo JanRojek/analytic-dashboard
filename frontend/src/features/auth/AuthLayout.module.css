@@ -1,0 +1,170 @@
+.root {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px 48px;
+  background: var(--app-surface-3);
+  border-right: 1px solid var(--app-border);
+}
+
+.brandTop {
+  display: flex;
+}
+
+.brandBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 440px;
+  margin: 40px 0;
+}
+
+.tagline {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--app-text);
+}
+
+.lede {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--app-text-2);
+}
+
+.brandFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--app-text-4);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background: var(--app-page);
+}
+
+.mobileLogo {
+  display: none;
+}
+
+.card {
+  width: min(100%, 400px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Vignette ---------------------------------------------------------------- */
+.vignette {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 12px;
+  align-items: start;
+}
+
+.vCard,
+.vTile {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  box-shadow: var(--app-shadow-sm);
+}
+
+.vCard {
+  padding: 14px 14px 8px;
+}
+
+.vHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.vTitle {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.vMeta {
+  font-size: 11px;
+  color: var(--app-text-4);
+}
+
+.vChart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.vTile {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vLabel {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--app-text-3);
+}
+
+.vValue {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.vMeter {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--app-accent-soft-2);
+  overflow: hidden;
+  display: block;
+}
+
+.vMeter > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--app-accent);
+}
+
+@media (max-width: 960px) {
+  .root {
+    grid-template-columns: 1fr;
+  }
+
+  .brand {
+    display: none;
+  }
+
+  .mobileLogo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+
+  .main {
+    justify-content: flex-start;
+    padding-top: 56px;
+  }
+}

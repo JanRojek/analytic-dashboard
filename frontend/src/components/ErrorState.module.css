@@ -1,0 +1,42 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface);
+}
+
+.compact {
+  padding: 10px 12px;
+  border-radius: var(--app-radius-md);
+  align-items: center;
+}
+
+.icon {
+  color: var(--app-bad);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.message {
+  font-size: 13px;
+  color: var(--app-text-3);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.retry {
+  flex-shrink: 0;
+}

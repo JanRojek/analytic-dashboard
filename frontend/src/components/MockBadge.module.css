@@ -1,0 +1,14 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 1px dashed var(--app-border-strong);
+  color: var(--app-text-3);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: help;
+  background: var(--app-surface);
+}

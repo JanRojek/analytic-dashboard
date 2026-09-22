@@ -1,0 +1,25 @@
+.root {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  color: var(--app-text-3);
+  background: var(--app-surface-3);
+}
+
+.number {
+  color: #1d4ed8;
+  background: #e8eefc;
+}
+
+.date {
+  color: #7c3aed;
+  background: #f1ebfd;
+}
+
+.text {
+  color: var(--app-text-2);
+  background: var(--app-surface-3);
+}

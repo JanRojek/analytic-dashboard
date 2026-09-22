@@ -1,0 +1,115 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--app-text-3);
+  font-size: 14px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rowBetween {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.footer {
+  font-size: 13.5px;
+  color: var(--app-text-3);
+  text-align: center;
+}
+
+.link {
+  color: var(--app-accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--app-text-4);
+  transition: color var(--app-dur-fast) var(--app-ease);
+}
+
+.ruleMet {
+  color: var(--app-good);
+}
+
+.statusCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.statusIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  margin-bottom: 8px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.statusIconBad {
+  background: var(--app-bad-soft);
+  color: var(--app-bad);
+}
+
+.statusIconGood {
+  background: var(--app-good-soft);
+  color: var(--app-good);
+}
+
+.email {
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--app-text-3);
+  margin-top: 4px;
+}

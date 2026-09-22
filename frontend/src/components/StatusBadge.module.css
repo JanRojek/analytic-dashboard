@@ -1,0 +1,66 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--badge-fg);
+  background: var(--badge-bg);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.good {
+  --badge-fg: var(--app-good);
+  --badge-bg: var(--app-good-soft);
+}
+
+.warn {
+  --badge-fg: var(--app-warn);
+  --badge-bg: var(--app-warn-soft);
+}
+
+.bad {
+  --badge-fg: var(--app-bad);
+  --badge-bg: var(--app-bad-soft);
+}
+
+.info {
+  --badge-fg: var(--app-info);
+  --badge-bg: var(--app-info-soft);
+}
+
+.neutral {
+  --badge-fg: var(--app-text-2);
+  --badge-bg: var(--app-surface-3);
+}
+
+.accent {
+  --badge-fg: var(--app-accent);
+  --badge-bg: var(--app-accent-soft);
+}
