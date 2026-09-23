@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { queryKeys } from "../data/queryKeys";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ActionIcon,
@@ -52,8 +53,8 @@ function ProjectDialog({
         ? adapter.renameProject(project.id, name.trim())
         : adapter.createProject(name.trim(), description.trim()),
     onSuccess: async (p) => {
-      await client.invalidateQueries({ queryKey: ["projects"] });
-      await client.invalidateQueries({ queryKey: ["project", p.id] });
+      await client.invalidateQueries({ queryKey: queryKeys.projects.all });
+      await client.invalidateQueries({ queryKey: queryKeys.projects.detail(p.id) });
       onClose();
       if (!project) navigate(`/projects/${p.id}`);
     },
@@ -148,22 +149,26 @@ function ProjectTile({
 }) {
   const { adapter } = useSession();
   const datasets = useQuery({
-    queryKey: ["datasets", project.id],
+    queryKey: queryKeys.datasets.list(project.id),
     queryFn: () => adapter.listDatasets(project.id),
   });
   const dashboards = useQuery({
-    queryKey: ["dashboards", project.id],
+    queryKey: queryKeys.dashboards.list(project.id),
     queryFn: () => adapter.listDashboards(project.id),
   });
   const boardId = dashboards.data?.[0]?.id;
   const widgets = useQuery({
-    queryKey: ["widgets", project.id, boardId],
+    queryKey: queryKeys.dashboards.widgets(project.id, boardId),
     queryFn: () => adapter.listWidgets(project.id, boardId!),
     enabled: !!boardId,
   });
   const previewWidget = widgets.data?.find((w) => w.type !== "Kpi");
   const values = useQuery({
-    queryKey: ["widget-data", project.id, boardId, previewWidget?.id],
+    queryKey: queryKeys.dashboards.widgetData(
+        project.id,
+        boardId,
+        previewWidget?.id,
+    ),
     queryFn: () => adapter.widgetData(project.id, boardId!, previewWidget!.id),
     enabled: !!previewWidget,
   });
@@ -260,7 +265,7 @@ export default function ProjectsPage() {
   const { adapter } = useSession();
   const client = useQueryClient();
   const projects = useQuery({
-    queryKey: ["projects"],
+    queryKey: queryKeys.projects.all,
     queryFn: () => adapter.listProjects(),
   });
   const [createOpen, setCreateOpen] = useState(false);
@@ -278,7 +283,7 @@ export default function ProjectsPage() {
           predicate: (query) => query.queryKey[1] === deleting.id,
         });
       setDeleting(null);
-      await client.invalidateQueries({ queryKey: ["projects"] });
+      await client.invalidateQueries({ queryKey: queryKeys.projects.all });
     },
   });
   const filtered = projects.data
@@ -529,17 +534,17 @@ export function ProjectOverviewPage() {
   const { adapter } = useSession();
   const [importOpen, setImportOpen] = useState(false);
   const datasets = useQuery({
-    queryKey: ["datasets", projectId],
+    queryKey: queryKeys.datasets.list(projectId),
     queryFn: () => adapter.listDatasets(projectId),
   });
   const dashboards = useQuery({
-    queryKey: ["dashboards", projectId],
+    queryKey: queryKeys.dashboards.list(projectId),
     queryFn: () => adapter.listDashboards(projectId),
   });
   const ready = datasets.data?.filter((d) => d.currentVersion) || [];
   const first = ready[0];
   const profile = useQuery({
-    queryKey: ["profile", projectId, first?.id],
+    queryKey: queryKeys.datasets.profile(projectId, first?.id),
     queryFn: () => adapter.getProfile(projectId, first!.id),
     enabled: !!first,
   });

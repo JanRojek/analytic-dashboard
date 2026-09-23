@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { queryKeys } from "../data/queryKeys";
 import {
   Link,
   NavLink,
@@ -26,7 +27,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const projects = useQuery({
-    queryKey: ["projects"],
+    queryKey: queryKeys.projects.all,
     queryFn: () => adapter.listProjects(),
   });
   const [searchOpen, setSearchOpen] = useState(false);
@@ -320,7 +321,7 @@ export function ProjectWorkspace() {
   const { projectId = "" } = useParams();
   const { adapter } = useSession();
   const project = useQuery({
-    queryKey: ["project", projectId],
+    queryKey: queryKeys.projects.detail(projectId),
     queryFn: () => adapter.getProject(projectId),
   });
   if (project.isPending) return <LoadingState />;

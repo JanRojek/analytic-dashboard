@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { queryKeys } from "../data/queryKeys";
 import { Alert, Button, Modal, TextInput } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -44,7 +45,7 @@ export function ImportDataDialog({
     },
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({
-        queryKey: ["datasets", projectId],
+        queryKey: queryKeys.datasets.list(projectId),
       });
       onClose();
       setFile(null);

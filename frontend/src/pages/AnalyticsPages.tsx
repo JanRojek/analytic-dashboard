@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { queryKeys } from "../data/queryKeys";
 import {
   ActionIcon,
   Button,
@@ -256,7 +257,7 @@ export function ExplorePage() {
   const scope = editorScope(mode, session?.user.id || "", projectId);
   const draft = readExploration(scope);
   const datasets = useQuery({
-    queryKey: ["datasets", projectId],
+    queryKey: queryKeys.datasets.list(projectId),
     queryFn: () => adapter.listDatasets(projectId),
   });
   const selected = params.get("dataset") || draft?.datasetId;
@@ -264,7 +265,7 @@ export function ExplorePage() {
     datasets.data?.find((item) => item.id === selected) ||
     datasets.data?.find((item) => item.currentVersion);
   const profile = useQuery({
-    queryKey: ["profile", projectId, dataset?.id],
+    queryKey: queryKeys.datasets.profile(projectId, dataset?.id),
     queryFn: () => adapter.getProfile(projectId, dataset!.id),
     enabled: Boolean(dataset),
   });
@@ -349,13 +350,12 @@ function ExplorationWorkspace({
   const [saving, setSaving] = useState(false);
   const [storageError, setStorageError] = useState("");
   const results = useQuery({
-    queryKey: [
-      "exploration",
-      projectId,
-      dataset.id,
-      dataset.currentVersion?.id,
-      run,
-    ],
+    queryKey: queryKeys.analytics.exploration(
+        projectId,
+        dataset.id,
+        dataset.currentVersion?.id,
+        run,
+    ),
     queryFn: () => adapter.query(projectId, dataset.id, run),
     enabled: Boolean(run.groupByColumn && run.measureColumn),
   });
@@ -561,7 +561,7 @@ function SaveChartDialog({
   const [target, setTarget] = useState<string | null>(null);
   const [name, setName] = useState("");
   const dashboards = useQuery({
-    queryKey: ["dashboards", projectId],
+    queryKey: queryKeys.dashboards.list(projectId),
     queryFn: () => adapter.listDashboards(projectId),
     enabled: opened,
   });
@@ -573,7 +573,7 @@ function SaveChartDialog({
         dashboardId = created.id;
         setTarget(created.id);
         await queryClient.invalidateQueries({
-          queryKey: ["dashboards", projectId],
+          queryKey: queryKeys.dashboards.list(projectId),
         });
       }
       if (!dashboardId) throw new Error("Choose a dashboard first.");
@@ -582,7 +582,7 @@ function SaveChartDialog({
     },
     onSuccess: async (dashboardId) => {
       await queryClient.invalidateQueries({
-        queryKey: ["widgets", projectId, dashboardId],
+        queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
       });
       onClose();
       navigate(`/projects/${projectId}/dashboards/${dashboardId}/edit`);
@@ -668,7 +668,11 @@ function WidgetChart({
     aggregation: widget.aggregation,
   };
   const data = useQuery({
-    queryKey: ["chart-data", projectId, widget.datasetId, config],
+    queryKey: queryKeys.analytics.chartData(
+        projectId,
+        widget.datasetId,
+        config,
+    ),
     queryFn: () => adapter.query(projectId, widget.datasetId, config),
   });
   if (data.isPending)
@@ -703,7 +707,7 @@ function DashboardThumbnail({
 }) {
   const { adapter, mode, session } = useSession();
   const widgets = useQuery({
-    queryKey: ["widgets", projectId, dashboardId],
+    queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
     queryFn: () => adapter.listWidgets(projectId, dashboardId),
   });
   const saved = readEditor(
@@ -751,14 +755,14 @@ export function DashboardsPage() {
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<Dashboard | null>(null);
   const dashboards = useQuery({
-    queryKey: ["dashboards", projectId],
+    queryKey: queryKeys.dashboards.list(projectId),
     queryFn: () => adapter.listDashboards(projectId),
   });
   const create = useMutation({
     mutationFn: () => adapter.createDashboard(projectId, name.trim()),
     onSuccess: async (dashboard) => {
       await queryClient.invalidateQueries({
-        queryKey: ["dashboards", projectId],
+        queryKey: queryKeys.dashboards.list(projectId),
       });
       navigate(`/projects/${projectId}/dashboards/${dashboard.id}/edit`);
     },
@@ -778,7 +782,7 @@ export function DashboardsPage() {
       }
       setDeleting(null);
       await queryClient.invalidateQueries({
-        queryKey: ["dashboards", projectId],
+        queryKey: queryKeys.dashboards.list(projectId),
       });
     },
   });
@@ -1034,11 +1038,14 @@ function DashboardLoader({ editing }: { editing: boolean }) {
   const { projectId = "", dashboardId = "" } = useParams();
   const { adapter } = useSession();
   const dashboard = useQuery({
-    queryKey: ["dashboard", projectId, dashboardId],
+    queryKey: queryKeys.dashboards.detail(
+        projectId,
+        dashboardId,
+    ),
     queryFn: () => adapter.getDashboard(projectId, dashboardId),
   });
   const widgets = useQuery({
-    queryKey: ["widgets", projectId, dashboardId],
+    queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
     queryFn: () => adapter.listWidgets(projectId, dashboardId),
   });
   if (dashboard.isPending || widgets.isPending)
@@ -1100,7 +1107,7 @@ function DashboardWorkspace({
   const selected =
     widgets.find((widget) => widget.id === selectedId) || widgets[0];
   const datasets = useQuery({
-    queryKey: ["datasets", dashboard.projectId],
+    queryKey: queryKeys.datasets.list(dashboard.projectId),
     queryFn: () => adapter.listDatasets(dashboard.projectId),
     enabled: editing,
   });
@@ -1187,7 +1194,10 @@ function DashboardWorkspace({
     onSuccess: async () => {
       setDeleteOpen(false);
       await queryClient.invalidateQueries({
-        queryKey: ["widgets", dashboard.projectId, dashboard.id],
+        queryKey: queryKeys.dashboards.widgets(
+            dashboard.projectId,
+            dashboard.id,
+        )
       });
     },
   });
@@ -1637,7 +1647,10 @@ function InspectorQuery({
 }) {
   const { adapter } = useSession();
   const profile = useQuery({
-    queryKey: ["profile", projectId, widget.datasetId],
+    queryKey: queryKeys.datasets.profile(
+        projectId,
+        widget.datasetId,
+    ),
     queryFn: () => adapter.getProfile(projectId, widget.datasetId),
   });
   return (
@@ -1682,7 +1695,11 @@ function WidgetResults({
     aggregation: widget.aggregation,
   };
   const results = useQuery({
-    queryKey: ["chart-data", projectId, widget.datasetId, config],
+    queryKey: queryKeys.analytics.chartData(
+        projectId,
+        widget.datasetId,
+        config,
+    ),
     queryFn: () => adapter.query(projectId, widget.datasetId, config),
   });
   return results.isPending ? (
@@ -1720,7 +1737,10 @@ function NewChartDialog({
     datasets.find((item) => item.id === datasetId) ||
     datasets.find((item) => item.currentVersion);
   const profile = useQuery({
-    queryKey: ["profile", dashboard.projectId, current?.id],
+    queryKey: queryKeys.datasets.profile(
+        dashboard.projectId,
+        current?.id,
+    ),
     queryFn: () => adapter.getProfile(dashboard.projectId, current!.id),
     enabled: opened && Boolean(current),
   });
@@ -1825,7 +1845,10 @@ function NewChartForm({
     },
     onSuccess: async (widget) => {
       await queryClient.invalidateQueries({
-        queryKey: ["widgets", dashboard.projectId, dashboard.id],
+        queryKey: queryKeys.dashboards.widgets(
+            dashboard.projectId,
+            dashboard.id,
+        )
       });
       onCreated(widget.id);
     },

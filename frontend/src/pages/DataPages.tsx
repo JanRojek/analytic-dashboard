@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { queryKeys } from "../data/queryKeys";
 import {
   ActionIcon,
   Alert,
@@ -63,7 +64,7 @@ export function DataPage() {
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<Dataset | null>(null);
   const datasets = useQuery({
-    queryKey: ["datasets", projectId],
+    queryKey: queryKeys.datasets.list(projectId),
     queryFn: () => adapter.listDatasets(projectId),
   });
   async function findDatasetUsage(id: string) {
@@ -80,7 +81,7 @@ export function DataPage() {
     return usages.filter((usage) => usage.count > 0);
   }
   const usage = useQuery({
-    queryKey: ["dataset-usage", projectId, deleting?.id],
+    queryKey: queryKeys.datasets.usage(projectId, deleting?.id),
     queryFn: () => findDatasetUsage(deleting!.id),
     enabled: !!deleting,
     staleTime: 0,
@@ -96,13 +97,13 @@ export function DataPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["datasets", projectId],
+        queryKey: queryKeys.datasets.list(projectId),
       });
       queryClient.removeQueries({
-        queryKey: ["dataset", projectId, deleting?.id],
+        queryKey: queryKeys.datasets.detail(projectId, deleting?.id),
       });
       queryClient.removeQueries({
-        queryKey: ["profile", projectId, deleting?.id],
+        queryKey: queryKeys.datasets.profile(projectId, deleting?.id),
       });
       setDeleting(null);
     },
@@ -421,7 +422,7 @@ function DatasetWorkspace({
       : "preview";
   const [pollingStarted, setPollingStarted] = useState(() => Date.now());
   const dataset = useQuery({
-    queryKey: ["dataset", projectId, datasetId],
+    queryKey: queryKeys.datasets.detail(projectId, datasetId),
     queryFn: () => adapter.getDataset(projectId, datasetId),
     refetchInterval: (query) =>
       !query.state.data?.currentVersion &&
@@ -431,7 +432,7 @@ function DatasetWorkspace({
         : false,
   });
   const profile = useQuery({
-    queryKey: ["profile", projectId, datasetId],
+    queryKey: queryKeys.datasets.profile(projectId, datasetId),
     queryFn: () => adapter.getProfile(projectId, datasetId),
     enabled: !!dataset.data?.currentVersion,
   });
@@ -999,7 +1000,11 @@ function PreparationPanel({
   const [editError, setEditError] = useState<string | null>(null);
   const [demoConfirmation, setDemoConfirmation] = useState(false);
   const preview = useQuery({
-    queryKey: ["prepared-preview", projectId, datasetId, steps],
+    queryKey: queryKeys.datasets.preparedPreview(
+        projectId,
+        datasetId,
+        steps,
+    ),
     queryFn: () => mockPreparation.preview(projectId, datasetId, steps),
     enabled: mode === "demo" && steps.length > 0,
   });
@@ -1007,7 +1012,7 @@ function PreparationPanel({
     mutationFn: () => mockPreparation.applyRecipe(projectId, datasetId, steps),
     onSuccess: async (dataset) => {
       await queryClient.invalidateQueries({
-        queryKey: ["datasets", projectId],
+        queryKey: queryKeys.datasets.list(projectId),
       });
       navigate(`/projects/${projectId}/data/${dataset.id}`);
     },
