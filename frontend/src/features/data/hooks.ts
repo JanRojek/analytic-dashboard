@@ -121,3 +121,19 @@ export function useDatasetProfile(
         enabled,
     });
 }
+
+export function useImportDataset(projectId: string) {
+    const { adapter } = useSession();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (upload: File) =>
+            adapter.importCsv(projectId, upload),
+
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.datasets.list(projectId),
+            });
+        },
+    });
+}

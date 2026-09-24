@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { queryKeys } from "../data/queryKeys";
+import {
+  useProject,
+  useProjects,
+} from "../features/projects/hooks";
 import {
   Link,
   NavLink,
@@ -16,20 +19,16 @@ import {
   Modal,
   TextInput,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../data/session";
 import { Brand } from "./Brand";
 import { Icon } from "./Icon";
 import { ErrorState, LoadingState } from "./Feedback";
 
 export default function AppLayout() {
-  const { adapter, mode, session, signOut } = useSession();
+  const { mode, session, signOut } = useSession();
   const navigate = useNavigate();
   const { projectId } = useParams();
-  const projects = useQuery({
-    queryKey: queryKeys.projects.all,
-    queryFn: () => adapter.listProjects(),
-  });
+  const projects = useProjects();
   const [searchOpen, setSearchOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -319,11 +318,7 @@ export default function AppLayout() {
 
 export function ProjectWorkspace() {
   const { projectId = "" } = useParams();
-  const { adapter } = useSession();
-  const project = useQuery({
-    queryKey: queryKeys.projects.detail(projectId),
-    queryFn: () => adapter.getProject(projectId),
-  });
+  const project = useProject(projectId);
   if (project.isPending) return <LoadingState />;
   if (project.error || !project.data)
     return (

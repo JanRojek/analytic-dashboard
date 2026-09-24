@@ -11,6 +11,15 @@ export function useProjects() {
     });
 }
 
+export function useProject(projectId: string) {
+    const { adapter } = useSession();
+
+    return useQuery({
+        queryKey: queryKeys.projects.detail(projectId),
+        queryFn: () => adapter.getProject(projectId),
+    });
+}
+
 export function useCreateProject() {
     const { adapter } = useSession();
     const queryClient = useQueryClient();

@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
-import { queryKeys } from "../data/queryKeys";
+import { useImportDataset } from "../features/data/hooks";
 import { Alert, Button, Modal, TextInput } from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "../data/session";
 import { createSampleFile, parseCsv } from "../mocks/csv";
@@ -17,9 +16,8 @@ export function ImportDataDialog({
   opened: boolean;
   onClose: () => void;
 }) {
-  const { adapter, mode } = useSession();
+  const { mode } = useSession();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const selection = useRef(0);
   const [file, setFile] = useState<File | null>(null);
@@ -32,27 +30,26 @@ export function ImportDataDialog({
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!file || !name.trim())
-        throw new Error("Choose a CSV file and give your dataset a name.");
-      const upload = new File(
+  const mutation = useImportDataset(projectId);
+
+  function importDataset() {
+    if (!file || !name.trim()) return;
+
+    const upload = new File(
         [file],
         `${name.trim().replace(/[\\/:*?"<>|]/g, "-")}.csv`,
         { type: "text/csv" },
-      );
-      return adapter.importCsv(projectId, upload);
-    },
-    onSuccess: async (result) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.datasets.list(projectId),
-      });
-      onClose();
-      setFile(null);
-      setPreview(null);
-      navigate(`/projects/${projectId}/data/${result.datasetId}`);
-    },
-  });
+    );
+
+    mutation.mutate(upload, {
+      onSuccess: (result) => {
+        onClose();
+        setFile(null);
+        setPreview(null);
+        navigate(`/projects/${projectId}/data/${result.datasetId}`);
+      },
+    });
+  }
 
   async function chooseFile(candidate?: File) {
     if (!candidate) return;
@@ -300,7 +297,7 @@ export function ImportDataDialog({
             rightSection={<Icon name="arrow" size={16} />}
             disabled={!file || !name.trim() || reading}
             loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
+            onClick={importDataset}
           >
             Import dataset
           </Button>
