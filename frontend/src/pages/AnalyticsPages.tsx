@@ -7,6 +7,10 @@ import {
   useDeleteDashboard,
   useDeleteWidget,
 } from "../features/dashboards/hooks";
+import {
+  useChartData,
+  useExplorationResults,
+} from "../features/analytics/hooks";
 import { queryKeys } from "../data/queryKeys";
 import {
   ActionIcon,
@@ -333,7 +337,6 @@ function ExplorationWorkspace({
   profile: DatasetProfile;
   onDataset: (id: string) => void;
 }) {
-  const { adapter } = useSession();
   const [config, setConfig] = useState<WidgetInput>(() => {
     const draft = readExploration(scope);
     const usable =
@@ -357,16 +360,13 @@ function ExplorationWorkspace({
   const [view, setView] = useState("chart");
   const [saving, setSaving] = useState(false);
   const [storageError, setStorageError] = useState("");
-  const results = useQuery({
-    queryKey: queryKeys.analytics.exploration(
-        projectId,
-        dataset.id,
-        dataset.currentVersion?.id,
-        run,
-    ),
-    queryFn: () => adapter.query(projectId, dataset.id, run),
-    enabled: Boolean(run.groupByColumn && run.measureColumn),
-  });
+  const results = useExplorationResults(
+      projectId,
+      dataset.id,
+      dataset.currentVersion?.id,
+      run,
+      Boolean(run.groupByColumn && run.measureColumn),
+  );
   const changed =
     config.groupByColumn !== run.groupByColumn ||
     config.measureColumn !== run.measureColumn ||
@@ -665,20 +665,16 @@ function WidgetChart({
   projectId: string;
   compact?: boolean;
 }) {
-  const { adapter } = useSession();
   const config = {
     groupByColumn: widget.groupByColumn,
     measureColumn: widget.measureColumn,
     aggregation: widget.aggregation,
   };
-  const data = useQuery({
-    queryKey: queryKeys.analytics.chartData(
-        projectId,
-        widget.datasetId,
-        config,
-    ),
-    queryFn: () => adapter.query(projectId, widget.datasetId, config),
-  });
+  const data = useChartData(
+      projectId,
+      widget.datasetId,
+      config,
+  );
   if (data.isPending)
     return (
       <div className="widget-loading" role="status">
@@ -1669,20 +1665,16 @@ function WidgetResults({
   widget: Widget;
   projectId: string;
 }) {
-  const { adapter } = useSession();
   const config = {
     groupByColumn: widget.groupByColumn,
     measureColumn: widget.measureColumn,
     aggregation: widget.aggregation,
   };
-  const results = useQuery({
-    queryKey: queryKeys.analytics.chartData(
-        projectId,
-        widget.datasetId,
-        config,
-    ),
-    queryFn: () => adapter.query(projectId, widget.datasetId, config),
-  });
+  const results = useChartData(
+      projectId,
+      widget.datasetId,
+      config,
+  );
   return results.isPending ? (
     <LoadingState />
   ) : results.isError ? (
