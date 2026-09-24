@@ -42,3 +42,26 @@ export function useExplorationResults(
         enabled,
     });
 }
+
+export function useWidgetData(
+    projectId: string,
+    dashboardId: string | undefined,
+    widgetId: string | undefined,
+) {
+    const { adapter } = useSession();
+
+    return useQuery({
+        queryKey: queryKeys.dashboards.widgetData(
+            projectId,
+            dashboardId,
+            widgetId,
+        ),
+        queryFn: () =>
+            adapter.widgetData(
+                projectId,
+                dashboardId!,
+                widgetId!,
+            ),
+        enabled: Boolean(dashboardId && widgetId),
+    });
+}

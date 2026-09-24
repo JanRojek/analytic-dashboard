@@ -5,7 +5,15 @@ import {
   useProjects,
   useRenameProject,
 } from "../features/projects/hooks";
-import { queryKeys } from "../data/queryKeys";
+import {
+  useDatasets,
+  useDatasetProfile,
+} from "../features/data/hooks";
+import {
+  useDashboards,
+  useDashboardWidgets,
+} from "../features/dashboards/hooks";
+import { useWidgetData } from "../features/analytics/hooks";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ActionIcon,
@@ -18,8 +26,6 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
-import { useSession } from "../data/session";
 import type { Project } from "../data/types";
 import { Icon } from "../components/Icon";
 import {
@@ -183,31 +189,21 @@ function ProjectTile({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const { adapter } = useSession();
-  const datasets = useQuery({
-    queryKey: queryKeys.datasets.list(project.id),
-    queryFn: () => adapter.listDatasets(project.id),
-  });
-  const dashboards = useQuery({
-    queryKey: queryKeys.dashboards.list(project.id),
-    queryFn: () => adapter.listDashboards(project.id),
-  });
+  const datasets = useDatasets(project.id);
+  const dashboards = useDashboards(project.id);
   const boardId = dashboards.data?.[0]?.id;
-  const widgets = useQuery({
-    queryKey: queryKeys.dashboards.widgets(project.id, boardId),
-    queryFn: () => adapter.listWidgets(project.id, boardId!),
-    enabled: !!boardId,
-  });
-  const previewWidget = widgets.data?.find((w) => w.type !== "Kpi");
-  const values = useQuery({
-    queryKey: queryKeys.dashboards.widgetData(
-        project.id,
-        boardId,
-        previewWidget?.id,
-    ),
-    queryFn: () => adapter.widgetData(project.id, boardId!, previewWidget!.id),
-    enabled: !!previewWidget,
-  });
+  const widgets = useDashboardWidgets(
+      project.id,
+      boardId,
+  );
+  const previewWidget = widgets.data?.find(
+      (widget) => widget.type !== "Kpi",
+  );
+  const values = useWidgetData(
+      project.id,
+      boardId,
+      previewWidget?.id,
+  );
   return (
     <article className={`project-card project-tone-${index % 3}`}>
       <Link to={`/projects/${project.id}`} className="project-card-link">
@@ -558,23 +554,17 @@ export default function ProjectsPage() {
 
 export function ProjectOverviewPage() {
   const { projectId = "" } = useParams();
-  const { adapter } = useSession();
   const [importOpen, setImportOpen] = useState(false);
-  const datasets = useQuery({
-    queryKey: queryKeys.datasets.list(projectId),
-    queryFn: () => adapter.listDatasets(projectId),
-  });
-  const dashboards = useQuery({
-    queryKey: queryKeys.dashboards.list(projectId),
-    queryFn: () => adapter.listDashboards(projectId),
-  });
-  const ready = datasets.data?.filter((d) => d.currentVersion) || [];
+  const datasets = useDatasets(projectId);
+  const dashboards = useDashboards(projectId);
+  const ready =
+      datasets.data?.filter((dataset) => dataset.currentVersion) ?? [];
   const first = ready[0];
-  const profile = useQuery({
-    queryKey: queryKeys.datasets.profile(projectId, first?.id),
-    queryFn: () => adapter.getProfile(projectId, first!.id),
-    enabled: !!first,
-  });
+  const profile = useDatasetProfile(
+      projectId,
+      first?.id ?? "",
+      Boolean(first),
+  );
   const missing =
     profile.data?.columns.reduce((total, c) => total + c.nullCount, 0) || 0;
   const dataPath = `/projects/${projectId}/data`;
