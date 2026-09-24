@@ -8,6 +8,10 @@ import {
   useDeleteWidget,
 } from "../features/dashboards/hooks";
 import {
+  useDatasets,
+  useDatasetProfile,
+} from "../features/data/hooks";
+import {
   useChartData,
   useExplorationResults,
 } from "../features/analytics/hooks";
@@ -22,7 +26,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Link,
   useNavigate,
@@ -264,23 +268,20 @@ function ResultsTable({
 
 export function ExplorePage() {
   const { projectId = "" } = useParams();
-  const { adapter, mode, session } = useSession();
+  const { mode, session } = useSession();
   const [params, setParams] = useSearchParams();
   const scope = editorScope(mode, session?.user.id || "", projectId);
   const draft = readExploration(scope);
-  const datasets = useQuery({
-    queryKey: queryKeys.datasets.list(projectId),
-    queryFn: () => adapter.listDatasets(projectId),
-  });
+  const datasets = useDatasets(projectId);
   const selected = params.get("dataset") || draft?.datasetId;
   const dataset =
     datasets.data?.find((item) => item.id === selected) ||
     datasets.data?.find((item) => item.currentVersion);
-  const profile = useQuery({
-    queryKey: queryKeys.datasets.profile(projectId, dataset?.id),
-    queryFn: () => adapter.getProfile(projectId, dataset!.id),
-    enabled: Boolean(dataset),
-  });
+  const profile = useDatasetProfile(
+      projectId,
+      dataset?.id ?? "",
+      Boolean(dataset),
+  );
   return (
     <div className="page-content analytics-page">
       <PageHeading
@@ -1068,7 +1069,7 @@ function DashboardWorkspace({
   sourceWidgets: Widget[];
   editing: boolean;
 }) {
-  const { adapter, mode, session } = useSession();
+  const { mode, session } = useSession();
   const navigate = useNavigate();
   const scope = editorScope(mode, session?.user.id || "", dashboard.projectId);
   const [initial] = useState(() => readEditor(scope, dashboard.id, editing));
@@ -1083,11 +1084,10 @@ function DashboardWorkspace({
   const widgets = orderedWidgets(sourceWidgets, document);
   const selected =
     widgets.find((widget) => widget.id === selectedId) || widgets[0];
-  const datasets = useQuery({
-    queryKey: queryKeys.datasets.list(dashboard.projectId),
-    queryFn: () => adapter.listDatasets(dashboard.projectId),
-    enabled: editing,
-  });
+  const datasets = useDatasets(
+      dashboard.projectId,
+      editing,
+  );
   useEffect(() => {
     if (!dirty || !editing) return;
     const guard = (event: BeforeUnloadEvent) => {
@@ -1622,14 +1622,10 @@ function InspectorQuery({
   onChange: (value: Partial<WidgetInput>) => void;
   onOpenDataset: () => void;
 }) {
-  const { adapter } = useSession();
-  const profile = useQuery({
-    queryKey: queryKeys.datasets.profile(
-        projectId,
-        widget.datasetId,
-    ),
-    queryFn: () => adapter.getProfile(projectId, widget.datasetId),
-  });
+  const profile = useDatasetProfile(
+      projectId,
+      widget.datasetId,
+  );
   return (
     <div className="inspector-section">
       <span className="inspector-label">Data & question</span>
@@ -1703,20 +1699,16 @@ function NewChartDialog({
   retryDatasets: () => void;
   onCreated: (id: string) => void;
 }) {
-  const { adapter } = useSession();
   const [datasetId, setDatasetId] = useState("");
   const [busy, setBusy] = useState(false);
   const current =
     datasets.find((item) => item.id === datasetId) ||
     datasets.find((item) => item.currentVersion);
-  const profile = useQuery({
-    queryKey: queryKeys.datasets.profile(
-        dashboard.projectId,
-        current?.id,
-    ),
-    queryFn: () => adapter.getProfile(dashboard.projectId, current!.id),
-    enabled: opened && Boolean(current),
-  });
+  const profile = useDatasetProfile(
+      dashboard.projectId,
+      current?.id ?? "",
+      opened && Boolean(current),
+  );
   return (
     <Modal
       opened={opened}

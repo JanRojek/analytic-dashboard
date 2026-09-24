@@ -24,12 +24,16 @@ async function findDatasetUsage(
     return usages.filter((usage) => usage.count > 0);
 }
 
-export function useDatasets(projectId: string) {
+export function useDatasets(
+    projectId: string,
+    enabled = true,
+) {
     const { adapter } = useSession();
 
     return useQuery({
         queryKey: queryKeys.datasets.list(projectId),
         queryFn: () => adapter.listDatasets(projectId),
+        enabled,
     });
 }
 
