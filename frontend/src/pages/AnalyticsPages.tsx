@@ -1,4 +1,12 @@
 import { useEffect, useState } from "react";
+import {
+  useDashboard,
+  useDashboards,
+  useDashboardWidgets,
+  useCreateDashboard,
+  useDeleteDashboard,
+  useDeleteWidget,
+} from "../features/dashboards/hooks";
 import { queryKeys } from "../data/queryKeys";
 import {
   ActionIcon,
@@ -560,11 +568,7 @@ function SaveChartDialog({
   const navigate = useNavigate();
   const [target, setTarget] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const dashboards = useQuery({
-    queryKey: queryKeys.dashboards.list(projectId),
-    queryFn: () => adapter.listDashboards(projectId),
-    enabled: opened,
-  });
+  const dashboards = useDashboards(projectId, opened);
   const save = useMutation({
     mutationFn: async () => {
       let dashboardId = target;
@@ -705,11 +709,8 @@ function DashboardThumbnail({
   projectId: string;
   dashboardId: string;
 }) {
-  const { adapter, mode, session } = useSession();
-  const widgets = useQuery({
-    queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
-    queryFn: () => adapter.listWidgets(projectId, dashboardId),
-  });
+  const { mode, session } = useSession();
+  const widgets = useDashboardWidgets(projectId, dashboardId);
   const saved = readEditor(
     editorScope(mode, session?.user.id || "", projectId),
     dashboardId,
@@ -747,45 +748,15 @@ function DashboardThumbnail({
 
 export function DashboardsPage() {
   const { projectId = "" } = useParams();
-  const { adapter, mode, session } = useSession();
+  const { mode, session } = useSession();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<Dashboard | null>(null);
-  const dashboards = useQuery({
-    queryKey: queryKeys.dashboards.list(projectId),
-    queryFn: () => adapter.listDashboards(projectId),
-  });
-  const create = useMutation({
-    mutationFn: () => adapter.createDashboard(projectId, name.trim()),
-    onSuccess: async (dashboard) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboards.list(projectId),
-      });
-      navigate(`/projects/${projectId}/dashboards/${dashboard.id}/edit`);
-    },
-  });
-  const remove = useMutation({
-    mutationFn: () => adapter.deleteDashboard(projectId, deleting!.id),
-    onSuccess: async () => {
-      if (deleting) {
-        try {
-          removeEditor(
-            editorScope(mode, session?.user.id || "", projectId),
-            deleting.id,
-          );
-        } catch {
-          /* Deletion succeeded; stale browser settings cannot restore a deleted dashboard. */
-        }
-      }
-      setDeleting(null);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboards.list(projectId),
-      });
-    },
-  });
+  const dashboards = useDashboards(projectId);
+  const create = useCreateDashboard(projectId);
+  const remove = useDeleteDashboard(projectId);
   const filtered =
     dashboards.data?.filter((item) =>
       item.name.toLowerCase().includes(search.toLowerCase()),
@@ -944,7 +915,11 @@ export function DashboardsPage() {
           className="analytics-dialog"
           onSubmit={(event) => {
             event.preventDefault();
-            if (name.trim()) create.mutate();
+            if (name.trim()) create.mutate(name.trim(), {
+              onSuccess: (dashboard) => {
+                navigate(`/projects/${projectId}/dashboards/${dashboard.id}/edit`);
+              },
+            });
           }}
         >
           <p className="muted">
@@ -1000,9 +975,26 @@ export function DashboardsPage() {
               Keep dashboard
             </Button>
             <Button
-              color="red"
-              loading={remove.isPending}
-              onClick={() => remove.mutate()}
+                color="red"
+                loading={remove.isPending}
+                onClick={() => {
+                  if (!deleting) return;
+
+                  const dashboard = deleting;
+
+                  remove.mutate(dashboard.id, {
+                    onSuccess: () => {
+                      try {
+                        removeEditor(
+                            editorScope(mode, session?.user.id || "", projectId),
+                            dashboard.id,
+                        );
+                      } catch {}
+
+                      setDeleting(null);
+                    },
+                  });
+                }}
             >
               Delete dashboard
             </Button>
@@ -1036,18 +1028,8 @@ export function DashboardViewPage() {
 }
 function DashboardLoader({ editing }: { editing: boolean }) {
   const { projectId = "", dashboardId = "" } = useParams();
-  const { adapter } = useSession();
-  const dashboard = useQuery({
-    queryKey: queryKeys.dashboards.detail(
-        projectId,
-        dashboardId,
-    ),
-    queryFn: () => adapter.getDashboard(projectId, dashboardId),
-  });
-  const widgets = useQuery({
-    queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
-    queryFn: () => adapter.listWidgets(projectId, dashboardId),
-  });
+  const dashboard = useDashboard(projectId, dashboardId);
+  const widgets = useDashboardWidgets(projectId, dashboardId);
   if (dashboard.isPending || widgets.isPending)
     return (
       <main className="canvas-loading">
@@ -1092,7 +1074,6 @@ function DashboardWorkspace({
 }) {
   const { adapter, mode, session } = useSession();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const scope = editorScope(mode, session?.user.id || "", dashboard.projectId);
   const [initial] = useState(() => readEditor(scope, dashboard.id, editing));
   const [document, setDocument] = useState(initial.document);
@@ -1188,19 +1169,7 @@ function DashboardWorkspace({
     [ids[index], ids[index + direction]] = [ids[index + direction], ids[index]];
     update({ ...document, order: ids });
   }
-  const remove = useMutation({
-    mutationFn: () =>
-      adapter.deleteWidget(dashboard.projectId, dashboard.id, selected!.id),
-    onSuccess: async () => {
-      setDeleteOpen(false);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboards.widgets(
-            dashboard.projectId,
-            dashboard.id,
-        )
-      });
-    },
-  });
+  const remove = useDeleteWidget(dashboard.projectId);
   return (
     <div
       className={`dashboard-workspace ${editing ? "is-editing" : "is-viewing"}`}
@@ -1610,9 +1579,21 @@ function DashboardWorkspace({
               Keep chart
             </Button>
             <Button
-              color="red"
-              loading={remove.isPending}
-              onClick={() => remove.mutate()}
+                color="red"
+                loading={remove.isPending}
+                onClick={() => {
+                  if (!selected) return;
+
+                  remove.mutate(
+                      {
+                        dashboardId: dashboard.id,
+                        widgetId: selected.id,
+                      },
+                      {
+                        onSuccess: () => setDeleteOpen(false),
+                      },
+                  );
+                }}
             >
               Remove chart
             </Button>
