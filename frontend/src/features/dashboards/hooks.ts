@@ -1,6 +1,7 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../data/session";
 import { queryKeys } from "../../data/queryKeys";
+import type { WidgetInput } from "../../data/types";
 
 export function useDashboards(projectId: string, enabled = true) {
     const { adapter } = useSession();
@@ -48,6 +49,30 @@ export function useCreateDashboard(projectId: string) {
         onSuccess: async () => {
             await queryClient.invalidateQueries({
                 queryKey: queryKeys.dashboards.list(projectId),
+            });
+        },
+    });
+}
+
+export function useCreateWidget(projectId: string) {
+    const { adapter } = useSession();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            dashboardId,
+            input,
+        }: {
+            dashboardId: string;
+            input: WidgetInput;
+        }) => adapter.createWidget(projectId, dashboardId, input),
+
+        onSuccess: async (_, { dashboardId }) => {
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.dashboards.widgets(
+                    projectId,
+                    dashboardId,
+                ),
             });
         },
     });

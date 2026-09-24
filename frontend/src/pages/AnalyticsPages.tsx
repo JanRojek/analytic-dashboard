@@ -4,6 +4,7 @@ import {
   useDashboards,
   useDashboardWidgets,
   useCreateDashboard,
+  useCreateWidget,
   useDeleteDashboard,
   useDeleteWidget,
 } from "../features/dashboards/hooks";
@@ -15,7 +16,6 @@ import {
   useChartData,
   useExplorationResults,
 } from "../features/analytics/hooks";
-import { queryKeys } from "../data/queryKeys";
 import {
   ActionIcon,
   Button,
@@ -26,7 +26,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   Link,
   useNavigate,
@@ -564,8 +564,8 @@ function SaveChartDialog({
   projectId: string;
   input: WidgetInput;
 }) {
-  const { adapter } = useSession();
-  const queryClient = useQueryClient();
+  const createDashboard = useCreateDashboard(projectId);
+  const createWidget = useCreateWidget(projectId);
   const navigate = useNavigate();
   const [target, setTarget] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -573,22 +573,26 @@ function SaveChartDialog({
   const save = useMutation({
     mutationFn: async () => {
       let dashboardId = target;
+
       if (target === "__new__") {
-        const created = await adapter.createDashboard(projectId, name.trim());
+        const created = await createDashboard.mutateAsync(name.trim());
         dashboardId = created.id;
         setTarget(created.id);
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.dashboards.list(projectId),
-        });
       }
-      if (!dashboardId) throw new Error("Choose a dashboard first.");
-      await adapter.createWidget(projectId, dashboardId, input);
+
+      if (!dashboardId) {
+        throw new Error("Choose a dashboard first.");
+      }
+
+      await createWidget.mutateAsync({
+        dashboardId,
+        input,
+      });
+
       return dashboardId;
     },
-    onSuccess: async (dashboardId) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
-      });
+
+    onSuccess: (dashboardId) => {
       onClose();
       navigate(`/projects/${projectId}/dashboards/${dashboardId}/edit`);
     },
@@ -1788,8 +1792,8 @@ function NewChartForm({
   onCreated: (id: string) => void;
   onBusyChange: (busy: boolean) => void;
 }) {
+  const createWidget = useCreateWidget(dashboard.projectId);
   const { adapter } = useSession();
-  const queryClient = useQueryClient();
   const [input, setInput] = useState<WidgetInput>({
     datasetId: dataset.id,
     ...defaults(profile),
@@ -1803,18 +1807,15 @@ function NewChartForm({
         throw new Error(
           "This question returned no values. Try another measure.",
         );
-      return adapter.createWidget(dashboard.projectId, dashboard.id, {
-        ...input,
-        title: input.title.trim() || queryCaption(input),
+      return createWidget.mutateAsync({
+        dashboardId: dashboard.id,
+        input: {
+          ...input,
+          title: input.title.trim() || queryCaption(input),
+        },
       });
     },
-    onSuccess: async (widget) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboards.widgets(
-            dashboard.projectId,
-            dashboard.id,
-        )
-      });
+    onSuccess: (widget) => {
       onCreated(widget.id);
     },
     onSettled: () => onBusyChange(false),
