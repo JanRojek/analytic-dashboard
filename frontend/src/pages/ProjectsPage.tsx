@@ -1,4 +1,10 @@
 import { useState, type FormEvent } from "react";
+import {
+  useCreateProject,
+  useDeleteProject,
+  useProjects,
+  useRenameProject,
+} from "../features/projects/hooks";
 import { queryKeys } from "../data/queryKeys";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -12,7 +18,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useSession } from "../data/session";
 import type { Project } from "../data/types";
 import { Icon } from "../components/Icon";
@@ -42,97 +48,127 @@ function ProjectDialog({
   onClose: () => void;
   project?: Project;
 }) {
-  const { adapter, mode } = useSession();
-  const client = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState(project?.name || "");
   const [description, setDescription] = useState("");
-  const mutation = useMutation({
-    mutationFn: () =>
-      project
-        ? adapter.renameProject(project.id, name.trim())
-        : adapter.createProject(name.trim(), description.trim()),
-    onSuccess: async (p) => {
-      await client.invalidateQueries({ queryKey: queryKeys.projects.all });
-      await client.invalidateQueries({ queryKey: queryKeys.projects.detail(p.id) });
-      onClose();
-      if (!project) navigate(`/projects/${p.id}`);
-    },
-  });
+
+  const createProject = useCreateProject();
+  const renameProject = useRenameProject();
+
+  const isPending = createProject.isPending || renameProject.isPending;
+  const error = project ? renameProject.error : createProject.error;
+
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (name.trim() && !mutation.isPending) mutation.mutate();
+
+    const trimmedName = name.trim();
+
+    if (!trimmedName || isPending) return;
+
+    if (project) {
+      renameProject.mutate(
+          {
+            projectId: project.id,
+            name: trimmedName,
+          },
+          {
+            onSuccess: () => {
+              onClose();
+            },
+          },
+      );
+
+      return;
+    }
+
+    createProject.mutate(
+        {
+          name: trimmedName,
+          description: description.trim(),
+        },
+        {
+          onSuccess: (createdProject) => {
+            onClose();
+            navigate(`/projects/${createdProject.id}`);
+          },
+        },
+    );
   }
+
   return (
-    <Modal
-      opened={opened}
-      onClose={() => {
-        if (!mutation.isPending) onClose();
-      }}
-      closeOnClickOutside={!mutation.isPending}
-      closeOnEscape={!mutation.isPending}
-      withCloseButton={!mutation.isPending}
-      title={project ? "Rename project" : "Make room for a new question"}
-      centered
-      size="md"
-    >
-      <form onSubmit={submit}>
-        <div className="new-project-intro">
-          <span className="empty-icon">
-            <Icon name="folder" size={25} />
-          </span>
-          <p>
-            A project brings related datasets, explorations, and dashboards
-            together. Start with a name that means something to you.
-          </p>
-        </div>
-        <TextInput
-          data-autofocus
-          label="Project name"
-          placeholder="e.g. Retail performance"
-          value={name}
-          disabled={mutation.isPending}
-          onChange={(e) => setName(e.currentTarget.value)}
-          required
-          maxLength={100}
-        />
-        {mode === "demo" && !project && (
-          <Textarea
-            label="What are you exploring?"
-            description="Optional · Give this project a little context."
-            placeholder="Understand what drives our sales…"
-            mt="md"
-            minRows={3}
-            value={description}
-            disabled={mutation.isPending}
-            onChange={(e) => setDescription(e.currentTarget.value)}
-            maxLength={400}
+      <Modal
+          opened={opened}
+          onClose={() => {
+            if (!isPending) onClose();
+          }}
+          closeOnClickOutside={!isPending}
+          closeOnEscape={!isPending}
+          withCloseButton={!isPending}
+          title={project ? "Rename project" : "Make room for a new question"}
+          centered
+          size="md"
+      >
+        <form onSubmit={submit}>
+          <div className="new-project-intro">
+            <p className="muted">
+              {project
+                  ? "Give this project a name that makes it easy to recognize."
+                  : "Start with a name. You can bring in your data once the project is ready."}
+            </p>
+          </div>
+
+          <TextInput
+              label="Project name"
+              placeholder="e.g. Retail performance"
+              value={name}
+              onChange={(e) => setName(e.currentTarget.value)}
+              disabled={isPending}
+              autoFocus
+              required
           />
-        )}
-        {mutation.error && (
-          <Alert role="alert" color="red" mt="md">
-            {mutation.error.message}
-          </Alert>
-        )}
-        <div className="dialog-actions">
-          <Button
-            variant="default"
-            disabled={mutation.isPending}
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={!name.trim()}
-            loading={mutation.isPending}
-            rightSection={<Icon name="arrow" size={16} />}
-          >
-            {project ? "Save name" : "Create project"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+
+          {!project && (
+              <Textarea
+                  mt="md"
+                  label="What are you exploring?"
+                  description="Optional"
+                  placeholder="A short note about the question or topic behind this project."
+                  value={description}
+                  onChange={(e) => setDescription(e.currentTarget.value)}
+                  disabled={isPending}
+                  autosize
+                  minRows={3}
+              />
+          )}
+
+          {error && (
+              <Alert color="red" mt="md">
+                {error instanceof Error
+                    ? error.message
+                    : "Something went wrong. Please try again."}
+              </Alert>
+          )}
+
+          <div className="dialog-actions">
+            <Button
+                variant="default"
+                type="button"
+                disabled={isPending}
+                onClick={onClose}
+            >
+              Cancel
+            </Button>
+
+            <Button
+                type="submit"
+                loading={isPending}
+                disabled={!name.trim()}
+            >
+              {project ? "Save changes" : "Create project"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
   );
 }
 
@@ -262,12 +298,7 @@ function ProjectTile({
 }
 
 export default function ProjectsPage() {
-  const { adapter } = useSession();
-  const client = useQueryClient();
-  const projects = useQuery({
-    queryKey: queryKeys.projects.all,
-    queryFn: () => adapter.listProjects(),
-  });
+  const projects = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
   const [renaming, setRenaming] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
@@ -275,17 +306,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<string | null>("newest");
   const [view, setView] = useState("grid");
-  const remove = useMutation({
-    mutationFn: () => adapter.deleteProject(deleting!.id),
-    onSuccess: async () => {
-      if (deleting)
-        client.removeQueries({
-          predicate: (query) => query.queryKey[1] === deleting.id,
-        });
-      setDeleting(null);
-      await client.invalidateQueries({ queryKey: queryKeys.projects.all });
-    },
-  });
+  const remove = useDeleteProject();
   const filtered = projects.data
     ?.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) =>
@@ -519,7 +540,13 @@ export default function ProjectsPage() {
             color="red"
             disabled={deleteName !== deleting?.name}
             loading={remove.isPending}
-            onClick={() => remove.mutate()}
+            onClick={() => {
+              if (deleting) {
+                remove.mutate(deleting.id, {
+                  onSuccess: () => setDeleting(null),
+                });
+              }
+            }}
           >
             Delete project
           </Button>
