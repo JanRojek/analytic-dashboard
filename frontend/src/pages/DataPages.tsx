@@ -1,4 +1,11 @@
 import { useMemo, useState } from "react";
+import {
+  useDataset,
+  useDatasetProfile,
+  useDatasets,
+  useDatasetUsage,
+  useDeleteDataset,
+} from "../features/data/hooks";
 import { queryKeys } from "../data/queryKeys";
 import {
   ActionIcon,
@@ -58,60 +65,20 @@ const fieldIcon = (type: ColumnProfile["type"]) =>
 
 export function DataPage() {
   const { projectId = "" } = useParams();
-  const { adapter } = useSession();
-  const queryClient = useQueryClient();
+
   const [importOpen, setImportOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<Dataset | null>(null);
-  const datasets = useQuery({
-    queryKey: queryKeys.datasets.list(projectId),
-    queryFn: () => adapter.listDatasets(projectId),
-  });
-  async function findDatasetUsage(id: string) {
-    const dashboards = await adapter.listDashboards(projectId);
-    const usages = await Promise.all(
-      dashboards.map(async (dashboard) => {
-        const widgets = await adapter.listWidgets(projectId, dashboard.id);
-        return {
-          dashboard,
-          count: widgets.filter((widget) => widget.datasetId === id).length,
-        };
-      }),
-    );
-    return usages.filter((usage) => usage.count > 0);
-  }
-  const usage = useQuery({
-    queryKey: queryKeys.datasets.usage(projectId, deleting?.id),
-    queryFn: () => findDatasetUsage(deleting!.id),
-    enabled: !!deleting,
-    staleTime: 0,
-  });
-  const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const references = await findDatasetUsage(id);
-      if (references.length)
-        throw new Error(
-          "This dataset is used by a dashboard. Remove its charts before deleting it.",
-        );
-      return adapter.deleteDataset(projectId, id);
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.datasets.list(projectId),
-      });
-      queryClient.removeQueries({
-        queryKey: queryKeys.datasets.detail(projectId, deleting?.id),
-      });
-      queryClient.removeQueries({
-        queryKey: queryKeys.datasets.profile(projectId, deleting?.id),
-      });
-      setDeleting(null);
-    },
-  });
+
+  const datasets = useDatasets(projectId);
+  const usage = useDatasetUsage(projectId, deleting?.id);
+  const remove = useDeleteDataset(projectId);
+
   const visible =
-    datasets.data?.filter((item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
+      datasets.data?.filter((item) =>
+          item.name.toLowerCase().includes(search.toLowerCase()),
+      ) ?? [];
+
   const ready = datasets.data?.filter((item) => item.currentVersion) ?? [];
 
   return (
@@ -385,7 +352,13 @@ export function DataPage() {
               usage.isFetching ||
               !!usage.data?.length
             }
-            onClick={() => deleting && remove.mutate(deleting.id)}
+            onClick={() => {
+              if (deleting) {
+                remove.mutate(deleting.id, {
+                  onSuccess: () => setDeleting(null),
+                });
+              }
+            }}
           >
             Delete dataset
           </Button>
@@ -413,7 +386,6 @@ function DatasetWorkspace({
   projectId: string;
   datasetId: string;
 }) {
-  const { adapter } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTab = searchParams.get("tab");
   const tab =
@@ -421,21 +393,16 @@ function DatasetWorkspace({
       ? selectedTab
       : "preview";
   const [pollingStarted, setPollingStarted] = useState(() => Date.now());
-  const dataset = useQuery({
-    queryKey: queryKeys.datasets.detail(projectId, datasetId),
-    queryFn: () => adapter.getDataset(projectId, datasetId),
-    refetchInterval: (query) =>
-      !query.state.data?.currentVersion &&
-      Date.now() - pollingStarted < 60_000 &&
-      !query.state.error
-        ? 2500
-        : false,
-  });
-  const profile = useQuery({
-    queryKey: queryKeys.datasets.profile(projectId, datasetId),
-    queryFn: () => adapter.getProfile(projectId, datasetId),
-    enabled: !!dataset.data?.currentVersion,
-  });
+  const dataset = useDataset(
+      projectId,
+      datasetId,
+      pollingStarted,
+  );
+  const profile = useDatasetProfile(
+      projectId,
+      datasetId,
+      Boolean(dataset.data?.currentVersion),
+  );
   const [activeField, setActiveField] = useState<string | null>(null);
   const field =
     profile.data?.columns.find((column) => column.name === activeField) ??
