@@ -6,6 +6,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from "react";
+import { GuestOnly } from "./features/auth/components/GuestOnly";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import AppLayout, { ProjectWorkspace } from "./components/AppLayout";
 import { useSession } from "./data/session";
@@ -16,7 +17,27 @@ const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
 const ProjectOverviewPage = lazy(async () => ({
   default: (await import("./pages/ProjectsPage")).ProjectOverviewPage,
 }));
-const AuthPage = lazy(() => import("./pages/AuthPage"));
+
+const LoginPage = lazy(
+    () => import("./features/auth/pages/LoginPage"),
+);
+
+const RegisterPage = lazy(
+    () => import("./features/auth/pages/RegisterPage"),
+);
+
+const ForgotPasswordPage = lazy(
+    () => import("./features/auth/pages/ForgotPasswordPage"),
+);
+
+const ResetPasswordPage = lazy(
+    () => import("./features/auth/pages/ResetPasswordPage"),
+);
+
+const ConfirmEmailPage = lazy(
+    () => import("./features/auth/pages/ConfirmEmailPage"),
+);
+
 const DataPage = lazy(async () => ({
   default: (await import("./pages/DataPages")).DataPage,
 }));
@@ -87,10 +108,7 @@ class ApplicationBoundary extends Component<
     );
   }
 }
-function AuthRoute() {
-  const location = useLocation();
-  return <AuthPage key={location.pathname} />;
-}
+
 function RoutePosition() {
   const { pathname } = useLocation();
   useLayoutEffect(() => {
@@ -105,15 +123,38 @@ export default function App() {
       <Suspense fallback={<LoadingState label="Opening your workspace…" />}>
         <Routes>
           <Route path="/" element={<Navigate to="/projects" replace />} />
-          {[
-            "login",
-            "register",
-            "forgot-password",
-            "reset-password",
-            "confirm-email",
-          ].map((path) => (
-            <Route key={path} path={path} element={<AuthRoute />} />
-          ))}
+
+          <Route
+              path="login"
+              element={
+                <GuestOnly>
+                  <LoginPage />
+                </GuestOnly>
+              }
+          />
+
+          <Route
+              path="register"
+              element={
+                <GuestOnly>
+                  <RegisterPage />
+                </GuestOnly>
+              }
+          />
+
+          <Route
+              path="forgot-password"
+              element={
+                <GuestOnly>
+                  <ForgotPasswordPage />
+                </GuestOnly>
+              }
+          />
+
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+
+          <Route path="confirm-email" element={<ConfirmEmailPage />} />
+
           <Route element={<ProtectedWorkspace />}>
             <Route element={<AppLayout />}>
               <Route path="projects" element={<ProjectsPage />} />
