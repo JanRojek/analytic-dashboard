@@ -1,0 +1,163 @@
+﻿.auth-art {
+    position: relative;
+    margin: 48px auto 0;
+    height: 285px;
+    width: 100%;
+    max-width: 440px;
+    transform: translateX(-7px);
+}
+
+.art-paper {
+    position: absolute;
+    top: 20px;
+    left: 15px;
+    right: 15px;
+    padding: 25px 28px 20px;
+    background: #fffef8;
+    border: 1px solid #d9e3ce;
+    border-radius: 8px;
+    transform: rotate(-5deg);
+    box-shadow: 0 14px 50px #536c3020;
+    z-index: 2;
+}
+
+.art-paper-back {
+    z-index: 1;
+    transform: rotate(7deg);
+    inset: 25px 5px 28px 25px;
+    background: #e1ead6;
+    box-shadow: none;
+    border: 1px solid #cfdbc1;
+}
+
+.art-label {
+    font-size: 7px;
+    letter-spacing: 1.4px;
+    color: #627850;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.art-label .tiny-dot {
+    width: 4px;
+    height: 4px;
+}
+
+.art-number {
+    font-size: 21px;
+    font-weight: 500;
+    letter-spacing: -0.65px;
+    color: #4c6740;
+    margin-top: 12px;
+}
+
+.art-chart {
+    margin-top: 16px;
+}
+
+.art-chart svg {
+    width: 100%;
+    height: 115px;
+    overflow: visible;
+}
+
+.art-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 6px;
+    color: #627850;
+    letter-spacing: 1px;
+    margin-top: 8px;
+}
+
+.art-floating {
+    position: absolute;
+    bottom: 0;
+    right: -8px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    border: 1px solid #dae4cf;
+    background: #fffefa;
+    padding: 14px 18px;
+    z-index: 3;
+    border-radius: 7px;
+    transform: rotate(2deg);
+    box-shadow: 0 8px 25px #485e2212;
+}
+
+.art-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: #eaf2e1;
+    border-radius: 50%;
+    color: #83a266;
+}
+
+.art-floating strong {
+    display: block;
+    font-size: 10px;
+    color: #5d784c;
+}
+
+.art-floating div > span {
+    display: block;
+    margin-top: 3px;
+    font-size: 9px;
+    color: #61764f;
+}
+
+.orbit {
+    position: absolute;
+    width: 360px;
+    height: 360px;
+    border: 1px solid #d9e3cf;
+    border-radius: 50%;
+    left: -80px;
+    top: -70px;
+    transform: translateX(28px);
+    z-index: 0;
+}
+
+.orbit-two {
+    width: 440px;
+    height: 440px;
+    left: -120px;
+    top: -110px;
+}
+
+@media (max-width: 1200px) {
+    .auth-art {
+        margin-top: 40px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .auth-art {
+        height: 255px;
+    }
+
+    .art-paper {
+        left: 0;
+        right: 0;
+        padding: 20px;
+    }
+
+    .art-floating {
+        right: -12px;
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .art-floating div > span {
+        font-size: 7px;
+    }
+
+    .art-number {
+        font-size: 18px;
+    }
+}

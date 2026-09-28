@@ -1,0 +1,159 @@
+﻿.auth-subtitle {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--auth-text-3);
+    margin-top: 12px;
+    margin-bottom: 31px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.auth-form .mantine-Input-input {
+    border-color: var(--auth-border-strong);
+    border-radius: 8px;
+    min-height: 42px;
+    background: var(--auth-surface);
+}
+
+.auth-form .mantine-Input-input:focus,
+.auth-form .mantine-Input-input:focus-within {
+    border-color: var(--auth-accent);
+    box-shadow: 0 0 0 3px rgb(44 101 75 / 14%);
+}
+
+.auth-form .mantine-Input-label {
+    font-size: 13px;
+    color: var(--auth-text-2);
+}
+
+.auth-form .mantine-Input-description {
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+.auth-form .mantine-PasswordInput-innerInput {
+    height: 42px;
+}
+
+.auth-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--auth-text-3);
+}
+
+.auth-options > a {
+    color: var(--auth-accent);
+}
+
+.auth-options .mantine-Checkbox-label {
+    font-size: 12px;
+    color: var(--auth-text-3);
+}
+
+.auth-form .mantine-Button-root {
+    height: 43px;
+    font-size: 13px;
+    box-shadow: 0 2px 2px #2c654b10;
+}
+
+.auth-form .google-button {
+    background: #ffffff;
+    border: 1px solid #747775;
+    color: #1f1f1f;
+    box-shadow: none;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.auth-form .google-button:hover {
+    background: var(--auth-surface-2);
+    border-color: #747775;
+}
+
+.auth-form-wrap .mantine-Divider-label {
+    font-size: 11px;
+    color: var(--auth-text-3);
+}
+
+.auth-form-wrap .demo-button {
+    height: 42px;
+    font-size: 12px;
+    border-color: var(--auth-border);
+    color: var(--auth-text-2);
+    background: var(--auth-surface);
+}
+
+.auth-form-wrap .demo-button:hover {
+    background: var(--auth-surface-2);
+    border-color: var(--auth-border-strong);
+    color: var(--auth-ink);
+}
+
+.demo-caption {
+    font-size: 11px;
+    line-height: 1.7;
+    text-align: center;
+    color: var(--auth-text-3);
+    margin: 12px auto 0;
+    max-width: 350px;
+}
+
+.auth-back {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 25px;
+    font-size: 12px;
+    color: var(--auth-accent);
+}
+
+.confirmation-symbol {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 85px;
+    background: #f0f5e9;
+    border-radius: 10px;
+    color: #759c61;
+}
+
+.auth-layout .mantine-Input-input::placeholder,
+.auth-layout .mantine-PasswordInput-innerInput::placeholder {
+    color: #7b8477;
+    opacity: 1;
+}
+
+@media (max-width: 780px) {
+    .auth-subtitle {
+        font-size: 12px;
+    }
+
+    .auth-form .mantine-Input-label {
+        font-size: 12px;
+    }
+
+    .auth-form .mantine-Input-input {
+        font-size: 14px;
+    }
+
+    .auth-options,
+    .auth-options .mantine-Checkbox-label {
+        font-size: 11px;
+    }
+
+    .auth-form .mantine-Button-root {
+        font-size: 13px;
+    }
+
+    .auth-form-wrap .demo-button {
+        font-size: 12px;
+    }
+}

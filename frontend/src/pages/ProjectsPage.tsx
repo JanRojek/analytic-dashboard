@@ -36,6 +36,7 @@ import {
 } from "../components/Feedback";
 import { ImportDataDialog } from "../components/ImportDataDialog";
 import { Chart } from "../components/Charts";
+import "../features/projects/styles/projects.css"
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-GB", {

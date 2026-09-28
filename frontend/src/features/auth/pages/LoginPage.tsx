@@ -21,8 +21,9 @@ export default function LoginPage() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [remember, setRemember] = useState(true);
+    const [remember, setRemember] = useState(false);
     const [needsConfirmation, setNeedsConfirmation] = useState(false);
+    const [googleNotice, setGoogleNotice] = useState(false);
 
     const {
         busy,
@@ -97,10 +98,16 @@ export default function LoginPage() {
                 </Alert>
             )}
 
+            {googleNotice && (
+                <Alert color="gray" mb="md" role="status">
+                    Google sign-in is not enabled yet.
+                </Alert>
+            )}
+
             <form className="auth-form" onSubmit={submit}>
                 <TextInput
                     label="Email address"
-                    placeholder="you@example.com"
+                    placeholder="Enter your email address"
                     value={email}
                     onChange={(e) => setEmail(e.currentTarget.value)}
                     type="email"
@@ -130,12 +137,26 @@ export default function LoginPage() {
 
                 <Button
                     type="submit"
+                    color="ink"
                     loading={busy}
                     fullWidth
                     size="md"
                     rightSection={<Icon name="arrow" size={17} />}
                 >
                     Sign in
+                </Button>
+
+                <Button
+                    type="button"
+                    className="google-button"
+                    variant="default"
+                    fullWidth
+                    size="md"
+                    disabled={busy}
+                    leftSection={<GoogleLogo />}
+                    onClick={() => setGoogleNotice(true)}
+                >
+                    Continue with Google
                 </Button>
             </form>
 
@@ -178,5 +199,33 @@ export default function LoginPage() {
                 Sample data. No account needed. Your changes stay in this browser.
             </p>
         </AuthLayout>
+    );
+}
+
+function GoogleLogo() {
+    return (
+        <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            aria-hidden="true"
+        >
+            <path
+                fill="#4285F4"
+                d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.482h4.844a4.14 4.14 0 0 1-1.797 2.716v2.258h2.909c1.702-1.567 2.684-3.874 2.684-6.615Z"
+            />
+            <path
+                fill="#34A853"
+                d="M9 18c2.43 0 4.468-.806 5.956-2.18l-2.909-2.258c-.806.54-1.836.859-3.047.859-2.345 0-4.33-1.585-5.04-3.714H.952v2.332A9 9 0 0 0 9 18Z"
+            />
+            <path
+                fill="#FBBC05"
+                d="M3.96 12.707A5.42 5.42 0 0 1 3.682 11c0-.593.102-1.168.278-1.707V6.961H.952A9 9 0 0 0 0 11c0 1.452.347 2.827.952 4.039l3.008-2.332Z"
+            />
+            <path
+                fill="#EA4335"
+                d="M9 3.58c1.322 0 2.508.455 3.441 1.346l2.581-2.581C13.464.891 11.427 0 9 0A9 9 0 0 0 .952 6.961L3.96 9.293C4.67 7.165 6.655 3.58 9 3.58Z"
+            />
+        </svg>
     );
 }

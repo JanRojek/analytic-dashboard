@@ -1,6 +1,9 @@
 ﻿import type { ReactNode } from "react";
 import { Brand } from "../../../components/Brand";
 import { Icon } from "../../../components/Icon";
+import "../styles/auth-layout.css";
+import "../styles/auth-artwork.css";
+import "../styles/auth-form.css";
 
 function AuthArtwork() {
     return (

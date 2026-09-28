@@ -1,12 +1,29 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { MantineProvider, createTheme } from "@mantine/core";
+import {
+  MantineProvider,
+  createTheme,
+  type MantineColorsTuple,
+} from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "./components/SessionProvider";
 import "@mantine/core/styles.css";
 import "./index.css";
 import App from "./App";
+
+const ink: MantineColorsTuple = [
+  "#f5f5f4",
+  "#e7e5e4",
+  "#d6d3d1",
+  "#a8a29e",
+  "#78716c",
+  "#57534e",
+  "#44403c",
+  "#292524",
+  "#1c1917",
+  "#0c0a09",
+];
 
 const theme = createTheme({
   primaryColor: "forest",
@@ -25,6 +42,7 @@ const theme = createTheme({
       "#24533e",
       "#1e4435",
     ],
+    ink,
   },
   fontFamily:
     '"Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif',

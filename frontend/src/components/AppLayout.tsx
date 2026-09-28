@@ -23,6 +23,7 @@ import { useSession } from "../data/session";
 import { Brand } from "./Brand";
 import { Icon } from "./Icon";
 import { ErrorState, LoadingState } from "./Feedback";
+import "../layout/styles/app-shell.css";
 
 export default function AppLayout() {
   const { mode, session, signOut } = useSession();
