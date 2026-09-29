@@ -1,20 +1,26 @@
 import { useState, type FormEvent } from "react";
+
 import {
   useCreateProject,
   useDeleteProject,
   useProjects,
   useRenameProject,
-} from "../features/projects/hooks";
+} from "../hooks";
+
 import {
   useDatasets,
   useDatasetProfile,
-} from "../features/data/hooks";
+} from "../../data/hooks";
+
 import {
   useDashboards,
   useDashboardWidgets,
-} from "../features/dashboards/hooks";
-import { useWidgetData } from "../features/analytics/hooks";
+} from "../../dashboards/hooks";
+
+import { useWidgetData } from "../../analytics/hooks";
+
 import { Link, useNavigate, useParams } from "react-router-dom";
+
 import {
   ActionIcon,
   Alert,
@@ -26,17 +32,21 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import type { Project } from "../data/types";
-import { Icon } from "../components/Icon";
+
+import type { Project } from "../../../data/types";
+
+import { Icon } from "../../../components/Icon";
 import {
   EmptyState,
   ErrorState,
   LoadingState,
   PageHeading,
-} from "../components/Feedback";
-import { ImportDataDialog } from "../components/ImportDataDialog";
-import { Chart } from "../components/Charts";
-import "../features/projects/styles/projects.css"
+} from "../../../components/Feedback";
+
+import { ImportDataDialog } from "../../data/components/ImportDataDialog";
+import { Chart } from "../../../components/Charts";
+
+import "../styles/projects.css";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-GB", {

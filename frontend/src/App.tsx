@@ -8,15 +8,20 @@ import {
 } from "react";
 import { GuestOnly } from "./features/auth/components/GuestOnly";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import AppLayout, { ProjectWorkspace } from "./components/AppLayout";
-import { useSession } from "./data/session";
+import AppLayout, { ProjectWorkspace } from "./layout/AppLayout.tsx";
+import { useSession } from "./session/SessionContext";
 import { EmptyState, ErrorState, LoadingState } from "./components/Feedback";
 import { Button } from "@mantine/core";
 
-const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
-const ProjectOverviewPage = lazy(async () => ({
-  default: (await import("./pages/ProjectsPage")).ProjectOverviewPage,
-}));
+const ProjectsPage = lazy(
+    () => import("./features/projects/pages/ProjectsPage.tsx")
+);
+
+const ProjectOverviewPage = lazy(
+    async () => ({
+        default: (await import("./features/projects/pages/ProjectsPage.tsx")).ProjectOverviewPage,
+    })
+);
 
 const LoginPage = lazy(
     () => import("./features/auth/pages/LoginPage"),
@@ -39,22 +44,22 @@ const ConfirmEmailPage = lazy(
 );
 
 const DataPage = lazy(async () => ({
-  default: (await import("./pages/DataPages")).DataPage,
+    default: (await import("./features/data/pages/DataPages")).DataPage,
 }));
 const DatasetPage = lazy(async () => ({
-  default: (await import("./pages/DataPages")).DatasetPage,
+    default: (await import("./features/data/pages/DataPages")).DatasetPage,
 }));
 const ExplorePage = lazy(async () => ({
-  default: (await import("./pages/AnalyticsPages")).ExplorePage,
+  default: (await import("./features/analytics/pages/AnalyticsPages")).ExplorePage,
 }));
 const DashboardsPage = lazy(async () => ({
-  default: (await import("./pages/AnalyticsPages")).DashboardsPage,
+  default: (await import("./features/analytics/pages/AnalyticsPages")).DashboardsPage,
 }));
 const DashboardEditorPage = lazy(async () => ({
-  default: (await import("./pages/AnalyticsPages")).DashboardEditorPage,
+  default: (await import("./features/analytics/pages/AnalyticsPages")).DashboardEditorPage,
 }));
 const DashboardViewPage = lazy(async () => ({
-  default: (await import("./pages/AnalyticsPages")).DashboardViewPage,
+  default: (await import("./features/analytics/pages/AnalyticsPages")).DashboardViewPage,
 }));
 
 function ProtectedWorkspace() {

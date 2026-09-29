@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
+
 import {
   useDataset,
   useDatasetProfile,
   useDatasets,
   useDatasetUsage,
   useDeleteDataset,
-} from "../features/data/hooks";
-import { queryKeys } from "../data/queryKeys";
+} from "../hooks";
+
+import { queryKeys } from "../../../data/queryKeys";
+
 import {
   ActionIcon,
   Alert,
@@ -17,29 +20,37 @@ import {
   Tabs,
   TextInput,
 } from "@mantine/core";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import {
   Link,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { Icon } from "../components/Icon";
+
+import { Icon } from "../../../components/Icon";
+
 import {
   EmptyState,
   ErrorState,
   LoadingState,
   PageHeading,
-} from "../components/Feedback";
+} from "../../../components/Feedback";
+
 import { ImportDataDialog } from "../components/ImportDataDialog";
-import { useSession } from "../data/session";
+import { useSession } from "../../../session/SessionContext";
+
 import type {
   ColumnProfile,
   Dataset,
   DatasetProfile,
   TransformStep,
-} from "../data/types";
-import { mockPreparation } from "../mocks/preparation";
+} from "../../../data/types";
+
+import { mockPreparation } from "../../../mocks/preparation";
+
 import "../styles/data.css";
 
 const number = new Intl.NumberFormat("en", { maximumFractionDigits: 2 });

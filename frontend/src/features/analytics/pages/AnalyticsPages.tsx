@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   useDashboard,
   useDashboards,
@@ -7,15 +8,18 @@ import {
   useCreateWidget,
   useDeleteDashboard,
   useDeleteWidget,
-} from "../features/dashboards/hooks";
+} from "../../dashboards/hooks";
+
 import {
   useDatasets,
   useDatasetProfile,
-} from "../features/data/hooks";
+} from "../../data/hooks";
+
 import {
   useChartData,
   useExplorationResults,
-} from "../features/analytics/hooks";
+} from "../hooks";
+
 import {
   ActionIcon,
   Button,
@@ -26,23 +30,30 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
+
 import { useMutation } from "@tanstack/react-query";
+
 import {
   Link,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { Brand } from "../components/Brand";
-import { Chart } from "../components/Charts";
+
+import { Brand } from "../../../components/Brand";
+import { Chart } from "../../../components/Charts";
+
 import {
   EmptyState,
   ErrorState,
   LoadingState,
   PageHeading,
-} from "../components/Feedback";
-import { Icon, type IconName } from "../components/Icon";
-import { useSession } from "../data/session";
+} from "../../../components/Feedback";
+
+import { Icon, type IconName } from "../../../components/Icon";
+
+import { useSession } from "../../../session/SessionContext";
+
 import type {
   Aggregation,
   Dashboard,
@@ -53,7 +64,8 @@ import type {
   Widget,
   WidgetInput,
   WidgetType,
-} from "../data/types";
+} from "../../../data/types";
+
 import {
   editorScope,
   persistEditorDraft,
@@ -63,8 +75,9 @@ import {
   saveEditor,
   saveExploration,
   type EditorDocument,
-} from "../mocks/editor";
-import "../styles/analytics.css";
+} from "../../../mocks/editor";
+
+import "../../../styles/analytics.css";
 
 const chartTypes: {
   value: WidgetType;

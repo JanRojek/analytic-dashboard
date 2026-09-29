@@ -19,10 +19,10 @@ import {
   Modal,
   TextInput,
 } from "@mantine/core";
-import { useSession } from "../data/session";
-import { Brand } from "./Brand";
-import { Icon } from "./Icon";
-import { ErrorState, LoadingState } from "./Feedback";
+import { useSession } from "../session/SessionContext";
+import { Brand } from "../components/Brand.tsx";
+import { Icon } from "../components/Icon.tsx";
+import { ErrorState, LoadingState } from "../components/Feedback.tsx";
 import "../layout/styles/app-shell.css";
 import "../features/projects/styles/project-workspace.css"
 

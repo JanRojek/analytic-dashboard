@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../components/Icon";
 import { authApi } from "../../../data/api";
-import { useSession } from "../../../data/session";
+import { useSession } from "../../../session/SessionContext";
 import { useAuthAction } from "../hooks/useAuthAction";
 import { subscribeToEmailConfirmed } from "../registrationEvents";
 

@@ -11,7 +11,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { Icon } from "../../../components/Icon";
 import { authApi } from "../../../data/api";
-import { useSession } from "../../../data/session";
+import { useSession } from "../../../session/SessionContext";
 import { AuthLayout } from "../components/AuthLayout";
 import { RegistrationPending } from "../components/RegistrationPending";
 import { useAuthAction } from "../hooks/useAuthAction";

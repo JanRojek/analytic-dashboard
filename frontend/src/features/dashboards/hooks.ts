@@ -1,5 +1,5 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "../../data/session";
+import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
 import type { WidgetInput } from "../../data/types";
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAdapter } from "../data/adapter";
 import { ApiError, authApi, subscribeToSessionExpiry } from "../data/api";
-import { SessionContext, type Session } from "../data/session";
+import { SessionContext, type Session } from "./SessionContext";
 import type { User } from "../data/types";
 import { demoUser } from "../mocks/seed";
 

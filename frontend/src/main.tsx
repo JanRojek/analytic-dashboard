@@ -7,9 +7,9 @@ import {
   type MantineColorsTuple,
 } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SessionProvider } from "./components/SessionProvider";
+import { SessionProvider } from "./session/SessionProvider";
 import "@mantine/core/styles.css";
-import "./index.css";
+import "./styles/global.css";
 import App from "./App";
 
 const ink: MantineColorsTuple = [

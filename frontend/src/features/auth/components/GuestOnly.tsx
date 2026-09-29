@@ -1,7 +1,7 @@
 ﻿import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
-import { useSession } from "../../../data/session";
+import { useSession } from "../../../session/SessionContext";
 
 type GuestOnlyProps = {
     children: ReactNode;

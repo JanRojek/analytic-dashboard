@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { DataAdapter, User } from "./types";
+import type { DataAdapter, User } from "../data/types";
 
 export type SessionMode = "demo" | "api";
 export type Session = { mode: SessionMode; user: User };

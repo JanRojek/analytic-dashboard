@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
-import { useImportDataset } from "../features/data/hooks";
 import { Alert, Button, Modal, TextInput } from "@mantine/core";
 import { useNavigate } from "react-router-dom";
-import { useSession } from "../data/session";
-import { createSampleFile, parseCsv } from "../mocks/csv";
-import { Icon } from "./Icon";
+
+import { useImportDataset } from "../hooks";
+import { useSession } from "../../../session/SessionContext";
+import { createSampleFile, parseCsv } from "../../../mocks/csv";
+import { Icon } from "../../../components/Icon";
+
 import "../styles/data.css";
 
 export function ImportDataDialog({
