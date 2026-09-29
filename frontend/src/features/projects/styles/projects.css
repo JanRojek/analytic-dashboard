@@ -485,6 +485,45 @@
     display: none;
 }
 
+.dialog-actions {
+display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.new-project-intro {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    margin-bottom: 26px;
+}
+
+.new-project-intro > p {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+.panel {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: white;
+    overflow: hidden;
+}
+
+.panel-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 21px 23px;
+    border-bottom: 1px solid #edf0e8;
+}
+
+.panel-heading h2 {
+    font-size: 16px;
+}
+
 @media (min-width: 1550px) {
     .workflow-art {
         margin-right: 40px;
@@ -728,5 +767,13 @@
 
     .desktop-br {
         display: none;
+    }
+
+    .dialog-actions {
+        gap: 8px;
+    }
+
+    .dialog-actions > .mantine-Button-root {
+        font-size: 12px;
     }
 }
