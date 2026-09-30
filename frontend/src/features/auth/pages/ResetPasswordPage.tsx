@@ -116,6 +116,7 @@ export default function ResetPasswordPage() {
 
                 <Button
                     type="submit"
+                    color="ink"
                     loading={busy}
                     fullWidth
                     size="md"

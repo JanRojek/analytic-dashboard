@@ -123,8 +123,9 @@ export function RegistrationPending({
             <h1>Check your inbox.</h1>
 
             <p className="auth-subtitle">
-                We sent a confirmation link to {email}. Confirm your email and
-                we’ll continue automatically.
+                We sent a confirmation link to{" "}
+                <strong className="confirmation-email">{email}</strong>. Confirm your email
+                and we’ll continue automatically.
             </p>
 
             {(error || pollError) && (
@@ -149,19 +150,22 @@ export function RegistrationPending({
                     <Icon name="mail" size={30} />
                 </div>
 
-                <p className="demo-caption" aria-live="polite">
+                <p className="confirmation-status" aria-live="polite">
                     {completing
                         ? "Finishing your registration…"
                         : "Waiting for email confirmation…"}
                 </p>
 
                 <Button
-                    variant="subtle"
+                    className="confirmation-resend"
+                    variant="default"
+                    fullWidth
                     loading={busy}
                     disabled={completing}
                     onClick={() =>
                         void perform(async () => {
                             await authApi.resendConfirmation(email);
+
                             setMessage(
                                 "A new confirmation email has been requested.",
                             );

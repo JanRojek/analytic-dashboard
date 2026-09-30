@@ -3,7 +3,7 @@
     line-height: 1.8;
     color: var(--auth-text-3);
     margin-top: 12px;
-    margin-bottom: 31px;
+    margin-bottom: 24px;
 }
 
 .auth-form {
@@ -129,6 +129,32 @@
 .auth-layout .mantine-PasswordInput-innerInput::placeholder {
     color: #7b8477;
     opacity: 1;
+}
+
+.confirmation-email {
+    color: var(--auth-ink);
+    font-weight: 600;
+}
+
+.confirmation-status {
+    margin: -2px auto 0;
+    font-size: 11px;
+    line-height: 1.7;
+    text-align: center;
+    color: var(--auth-text-3);
+}
+
+.auth-form .confirmation-resend {
+    background: var(--auth-surface);
+    border-color: var(--auth-border);
+    color: var(--auth-text-2);
+    box-shadow: none;
+}
+
+.auth-form .confirmation-resend:hover {
+    background: var(--auth-surface-2);
+    border-color: var(--auth-border-strong);
+    color: var(--auth-ink);
 }
 
 @media (max-width: 780px) {

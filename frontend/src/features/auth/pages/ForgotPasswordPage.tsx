@@ -51,7 +51,12 @@ export default function ForgotPasswordPage() {
             </p>
 
             {error && (
-                <Alert color="red" mb="md" role="alert" title="Unable to continue">
+                <Alert
+                    color="red"
+                    mb="md"
+                    role="alert"
+                    title="Unable to continue"
+                >
                     {error}
                 </Alert>
             )}
@@ -65,7 +70,7 @@ export default function ForgotPasswordPage() {
             <form className="auth-form" onSubmit={submit}>
                 <TextInput
                     label="Email address"
-                    placeholder="you@example.com"
+                    placeholder="Enter your email address"
                     value={email}
                     onChange={(e) => setEmail(e.currentTarget.value)}
                     type="email"
@@ -75,6 +80,7 @@ export default function ForgotPasswordPage() {
 
                 <Button
                     type="submit"
+                    color="ink"
                     loading={busy}
                     fullWidth
                     size="md"
@@ -85,7 +91,8 @@ export default function ForgotPasswordPage() {
             </form>
 
             <Link className="auth-back" to="/login">
-                <Icon name="back" size={15} /> Back to sign in
+                <Icon name="back" size={15} />
+                Back to sign in
             </Link>
         </AuthLayout>
     );

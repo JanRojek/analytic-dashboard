@@ -79,6 +79,7 @@ export default function ConfirmEmailPage() {
             {!message && (
                 <div className="auth-form">
                     <Button
+                        color="ink"
                         loading={busy}
                         fullWidth
                         size="md"

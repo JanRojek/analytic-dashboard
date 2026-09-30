@@ -103,11 +103,6 @@ export function AuthLayout({
 
                     {children}
                 </div>
-
-                <footer className="auth-footer">
-                    <Icon name="lock" size={13} />
-                    Your projects. Your perspective.
-                </footer>
             </main>
         </div>
     );

@@ -180,7 +180,7 @@ export default function LoginPage() {
             <Divider
                 label="or take a look around"
                 labelPosition="center"
-                my={24}
+                my={16}
             />
 
             <Button

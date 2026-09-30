@@ -110,7 +110,7 @@
     width: 100%;
     max-width: 368px;
     margin: auto;
-    padding: 45px 0;
+    padding: 0;
 }
 
 .auth-form-wrap > .eyebrow {
@@ -126,15 +126,6 @@
     font-weight: 550;
     line-height: 1.25;
     color: var(--auth-ink);
-}
-
-.auth-footer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--auth-text-3);
 }
 
 .mobile-brand {
@@ -211,10 +202,6 @@
 
     .auth-form-wrap > .eyebrow {
         font-size: 9px;
-    }
-
-    .auth-footer {
-        font-size: 10px;
     }
 }
 
