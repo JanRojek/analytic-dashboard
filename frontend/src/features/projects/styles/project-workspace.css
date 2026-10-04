@@ -186,53 +186,105 @@
     font-size: 12px;
 }
 
-.quality-callout {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    padding: 19px 22px;
-    border: 1px solid #dfebd8;
-    background: #f0f6eb;
-    border-radius: 7px;
+
+.quality-panel {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
     margin-bottom: 30px;
 }
 
-.quality-callout.has-missing {
-    background: #f6f3e9;
-    border-color: #e9e2cd;
+.quality-panel-heading > div {
+    min-width: 0;
 }
 
-.quality-callout-icon {
+.quality-panel-heading p {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.quality-dataset-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.quality-dataset-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 62px;
+    padding: 13px 22px;
+    border-bottom: 1px solid #eef1e9;
+    color: var(--ink);
+}
+
+.quality-dataset-row:last-child {
+    border-bottom: 0;
+}
+
+a.quality-dataset-row:hover {
+    background: #fafcf8;
+}
+
+.quality-dataset-row.has-issues {
+    background: #fffdf7;
+}
+
+a.quality-dataset-row.has-issues:hover {
+    background: #fbf7ea;
+}
+
+.quality-dataset-row.is-pending {
+    color: var(--muted);
+}
+
+.quality-dataset-icon {
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    color: #7e966f;
+    flex-shrink: 0;
+    border-radius: 6px;
+    background: #eff5ec;
+    color: #64835d;
 }
 
-.has-missing .quality-callout-icon {
-    color: #9d8a4f;
+.quality-dataset-row.has-issues .quality-dataset-icon {
+    background: #f6f0df;
+    color: #9a8141;
 }
 
-.quality-callout > div {
+.quality-dataset-row > div {
     flex: 1;
+    min-width: 0;
 }
 
-.quality-callout strong {
+.quality-dataset-row strong {
+    display: block;
     font-size: 13px;
     font-weight: 600;
-}
-
-.quality-callout p {
-    margin-top: 3px;
-    font-size: 12px;
-    color: #726e53;
-}
-
-.quality-callout > .text-link {
-    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.quality-dataset-row small {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.quality-dataset-row > svg {
+    color: #95a28b;
+}
+
+.quality-dataset-row .pill {
+    font-size: 9px;
+    flex-shrink: 0;
 }
 
 .overview-bottom-grid {
@@ -244,10 +296,9 @@
 .resource-row {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 20px 23px;
-    border-bottom: 1px solid #eef1e9;
+    gap: 7px;
     min-width: 0;
+    border-bottom: 1px solid #eef1e9;
 }
 
 .resource-row:last-child {
@@ -256,6 +307,20 @@
 
 .resource-row:hover {
     background: #fafcf7;
+}
+
+.resource-row-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    flex: 1;
+    padding: 20px 8px 20px 23px;
+}
+
+.resource-row > .mantine-ActionIcon-root {
+    flex-shrink: 0;
+    margin-right: 14px;
 }
 
 .resource-icon {
@@ -270,12 +335,12 @@
     flex-shrink: 0;
 }
 
-.resource-row > div {
+.resource-row-main > div {
     flex: 1;
     min-width: 0;
 }
 
-.resource-row strong {
+.resource-row-main strong {
     display: block;
     font-size: 13px;
     font-weight: 550;
@@ -284,19 +349,16 @@
     white-space: nowrap;
 }
 
-.resource-row small {
+.resource-row-main small {
     display: block;
     margin-top: 3px;
     font-size: 11px;
     color: #64725c;
 }
 
-.resource-row > svg {
-    color: #95a28b;
-}
-
-.resource-row .pill {
+.resource-row-main .pill {
     font-size: 9px;
+    flex-shrink: 0;
 }
 
 .overview-bottom-grid .empty-state {
@@ -311,6 +373,20 @@
     font-size: 11px;
 }
 
+.overview-dialog-description {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+.overview-usage-list {
+    margin: 10px 0 0;
+    padding-left: 20px;
+}
+
+.overview-usage-list a {
+    text-decoration: underline;
+}
 @media (max-width: 1200px) {
     .journey-cards {
         gap: 12px;
@@ -340,7 +416,7 @@
         padding: 20px;
     }
 
-    .quality-callout > .text-link {
+    .quality-panel-heading > .text-link {
         display: none;
     }
 }
@@ -433,16 +509,20 @@
         max-width: 100%;
     }
 
-    .quality-callout {
-        padding: 15px;
+    .quality-dataset-row {
+        padding: 13px 15px;
         gap: 10px;
     }
 
-    .quality-callout-icon {
-        width: 25px;
+    .quality-dataset-row .pill {
+        display: none;
     }
 
-    .resource-row {
-        padding: 17px;
+    .resource-row-main {
+        padding: 17px 6px 17px 17px;
+    }
+
+    .resource-row > .mantine-ActionIcon-root {
+        margin-right: 10px;
     }
 }
