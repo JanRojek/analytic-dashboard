@@ -18,9 +18,7 @@ const ProjectsPage = lazy(
 );
 
 const ProjectOverviewPage = lazy(
-    async () => ({
-        default: (await import("./features/projects/pages/ProjectsPage.tsx")).ProjectOverviewPage,
-    })
+    () => import("./features/projects/pages/ProjectOverviewPage.tsx")
 );
 
 const LoginPage = lazy(
