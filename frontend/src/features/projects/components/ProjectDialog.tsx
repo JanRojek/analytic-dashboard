@@ -5,9 +5,9 @@ import {useCreateProject, useRenameProject} from "../hooks.ts";
 import {Alert, Button, Modal, Textarea, TextInput} from "@mantine/core";
 
 export function ProjectDialog({
-  opened,
-  onClose,
-  project
+    opened,
+    onClose,
+    project
 }: {
     opened: boolean;
     onClose: () => void;
