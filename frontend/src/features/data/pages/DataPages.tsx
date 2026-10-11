@@ -425,6 +425,12 @@ function DatasetWorkspace({
     setSteps(next);
   }
 
+  const preparedPreview = useQuery({
+    queryKey: queryKeys.datasets.preparedPreview(projectId, datasetId, steps),
+    queryFn: () => mockPreparation.preview(projectId, datasetId, steps),
+    enabled: mode === "demo" && steps.length > 0,
+  });
+
   return (
     <div className="page-content data-page dataset-page">
       <Link className="data-back-link" to={`/projects/${projectId}/data`}>
@@ -550,23 +556,39 @@ function DatasetWorkspace({
                   </Tabs.Tab>
                 </Tabs.List>
                 <Tabs.Panel value="preview">
+                  {preparedPreview.isError && (
+                    <ErrorState
+                      error={preparedPreview.error}
+                      retry={() => void preparedPreview.refetch()}
+                    />
+                  )}
+
+                  {preparedPreview.isFetching && steps.length > 0 && (
+                    <div className="dataset-preview-updating">
+                      Updating preview…
+                    </div>
+                  )}
+
                   <div className="dataset-preview-layout">
                     <div>
-                      <DataPreview profile={profile.data} />
+                      <DataPreview
+                        profile={preparedPreview.data ?? profile.data}
+                      />
                     </div>
+
                     <div className="dataset-right-rail">
                       <DatasetIssuesPanel
-                        profile={profile.data}
+                        profile={preparedPreview.data ?? profile.data}
                         selectedField={field}
                         onSelectField={setActiveField}
                         onBackToIssues={() => setActiveField(null)}
                       />
 
                       <AppliedStepsPanel
-                          profile={profile.data}
-                          steps={steps}
-                          editable={mode === "demo"}
-                          onStepsChange={saveSteps}
+                        profile={profile.data}
+                        steps={steps}
+                        editable={mode === "demo"}
+                        onStepsChange={saveSteps}
                       />
                     </div>
                   </div>

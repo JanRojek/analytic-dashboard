@@ -1691,3 +1691,12 @@
   gap: 7px;
   margin-top: 14px;
 }
+
+.dataset-preview-updating {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  background: #fafbf9;
+  color: var(--muted);
+  font-size: 10px;
+}
