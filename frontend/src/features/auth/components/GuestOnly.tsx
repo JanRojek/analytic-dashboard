@@ -4,15 +4,15 @@ import { Navigate } from "react-router-dom";
 import { useSession } from "../../../session/SessionContext";
 
 type GuestOnlyProps = {
-    children: ReactNode;
+  children: ReactNode;
 };
 
 export function GuestOnly({ children }: GuestOnlyProps) {
-    const { session } = useSession();
+  const { session } = useSession();
 
-    if (session) {
-        return <Navigate to="/projects" replace />;
-    }
+  if (session) {
+    return <Navigate to="/projects" replace />;
+  }
 
-    return children;
+  return children;
 }

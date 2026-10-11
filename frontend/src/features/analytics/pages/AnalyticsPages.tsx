@@ -10,15 +10,9 @@ import {
   useDeleteWidget,
 } from "../../dashboards/hooks";
 
-import {
-  useDatasets,
-  useDatasetProfile,
-} from "../../data/hooks";
+import { useDatasets, useDatasetProfile } from "../../data/hooks";
 
-import {
-  useChartData,
-  useExplorationResults,
-} from "../hooks";
+import { useChartData, useExplorationResults } from "../hooks";
 
 import {
   ActionIcon,
@@ -291,9 +285,9 @@ export function ExplorePage() {
     datasets.data?.find((item) => item.id === selected) ||
     datasets.data?.find((item) => item.currentVersion);
   const profile = useDatasetProfile(
-      projectId,
-      dataset?.id ?? "",
-      Boolean(dataset),
+    projectId,
+    dataset?.id ?? "",
+    Boolean(dataset),
   );
   return (
     <div className="page-content analytics-page">
@@ -375,11 +369,11 @@ function ExplorationWorkspace({
   const [saving, setSaving] = useState(false);
   const [storageError, setStorageError] = useState("");
   const results = useExplorationResults(
-      projectId,
-      dataset.id,
-      dataset.currentVersion?.id,
-      run,
-      Boolean(run.groupByColumn && run.measureColumn),
+    projectId,
+    dataset.id,
+    dataset.currentVersion?.id,
+    run,
+    Boolean(run.groupByColumn && run.measureColumn),
   );
   const changed =
     config.groupByColumn !== run.groupByColumn ||
@@ -688,11 +682,7 @@ function WidgetChart({
     measureColumn: widget.measureColumn,
     aggregation: widget.aggregation,
   };
-  const data = useChartData(
-      projectId,
-      widget.datasetId,
-      config,
-  );
+  const data = useChartData(projectId, widget.datasetId, config);
   if (data.isPending)
     return (
       <div className="widget-loading" role="status">
@@ -929,11 +919,14 @@ export function DashboardsPage() {
           className="analytics-dialog"
           onSubmit={(event) => {
             event.preventDefault();
-            if (name.trim()) create.mutate(name.trim(), {
-              onSuccess: (dashboard) => {
-                navigate(`/projects/${projectId}/dashboards/${dashboard.id}/edit`);
-              },
-            });
+            if (name.trim())
+              create.mutate(name.trim(), {
+                onSuccess: (dashboard) => {
+                  navigate(
+                    `/projects/${projectId}/dashboards/${dashboard.id}/edit`,
+                  );
+                },
+              });
           }}
         >
           <p className="muted">
@@ -989,26 +982,26 @@ export function DashboardsPage() {
               Keep dashboard
             </Button>
             <Button
-                color="red"
-                loading={remove.isPending}
-                onClick={() => {
-                  if (!deleting) return;
+              color="red"
+              loading={remove.isPending}
+              onClick={() => {
+                if (!deleting) return;
 
-                  const dashboard = deleting;
+                const dashboard = deleting;
 
-                  remove.mutate(dashboard.id, {
-                    onSuccess: () => {
-                      try {
-                        removeEditor(
-                            editorScope(mode, session?.user.id || "", projectId),
-                            dashboard.id,
-                        );
-                      } catch {}
+                remove.mutate(dashboard.id, {
+                  onSuccess: () => {
+                    try {
+                      removeEditor(
+                        editorScope(mode, session?.user.id || "", projectId),
+                        dashboard.id,
+                      );
+                    } catch {}
 
-                      setDeleting(null);
-                    },
-                  });
-                }}
+                    setDeleting(null);
+                  },
+                });
+              }}
             >
               Delete dashboard
             </Button>
@@ -1101,10 +1094,7 @@ function DashboardWorkspace({
   const widgets = orderedWidgets(sourceWidgets, document);
   const selected =
     widgets.find((widget) => widget.id === selectedId) || widgets[0];
-  const datasets = useDatasets(
-      dashboard.projectId,
-      editing,
-  );
+  const datasets = useDatasets(dashboard.projectId, editing);
   useEffect(() => {
     if (!dirty || !editing) return;
     const guard = (event: BeforeUnloadEvent) => {
@@ -1592,21 +1582,21 @@ function DashboardWorkspace({
               Keep chart
             </Button>
             <Button
-                color="red"
-                loading={remove.isPending}
-                onClick={() => {
-                  if (!selected) return;
+              color="red"
+              loading={remove.isPending}
+              onClick={() => {
+                if (!selected) return;
 
-                  remove.mutate(
-                      {
-                        dashboardId: dashboard.id,
-                        widgetId: selected.id,
-                      },
-                      {
-                        onSuccess: () => setDeleteOpen(false),
-                      },
-                  );
-                }}
+                remove.mutate(
+                  {
+                    dashboardId: dashboard.id,
+                    widgetId: selected.id,
+                  },
+                  {
+                    onSuccess: () => setDeleteOpen(false),
+                  },
+                );
+              }}
             >
               Remove chart
             </Button>
@@ -1639,10 +1629,7 @@ function InspectorQuery({
   onChange: (value: Partial<WidgetInput>) => void;
   onOpenDataset: () => void;
 }) {
-  const profile = useDatasetProfile(
-      projectId,
-      widget.datasetId,
-  );
+  const profile = useDatasetProfile(projectId, widget.datasetId);
   return (
     <div className="inspector-section">
       <span className="inspector-label">Data & question</span>
@@ -1683,11 +1670,7 @@ function WidgetResults({
     measureColumn: widget.measureColumn,
     aggregation: widget.aggregation,
   };
-  const results = useChartData(
-      projectId,
-      widget.datasetId,
-      config,
-  );
+  const results = useChartData(projectId, widget.datasetId, config);
   return results.isPending ? (
     <LoadingState />
   ) : results.isError ? (
@@ -1722,9 +1705,9 @@ function NewChartDialog({
     datasets.find((item) => item.id === datasetId) ||
     datasets.find((item) => item.currentVersion);
   const profile = useDatasetProfile(
-      dashboard.projectId,
-      current?.id ?? "",
-      opened && Boolean(current),
+    dashboard.projectId,
+    current?.id ?? "",
+    opened && Boolean(current),
   );
   return (
     <Modal

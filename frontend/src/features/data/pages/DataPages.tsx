@@ -42,6 +42,8 @@ import {
 import { ImportDataDialog } from "../components/ImportDataDialog";
 import { useSession } from "../../../session/SessionContext";
 
+import { DatasetIssuesPanel } from "../components/DatasetIssuesPanel";
+
 import type {
   ColumnProfile,
   Dataset,
@@ -50,6 +52,8 @@ import type {
 } from "../../../data/types";
 
 import { mockPreparation } from "../../../mocks/preparation";
+
+import { AppliedStepsPanel } from "../components/AppliedStepsPanel";
 
 import "../styles/data.css";
 
@@ -86,9 +90,9 @@ export function DataPage() {
   const remove = useDeleteDataset(projectId);
 
   const visible =
-      datasets.data?.filter((item) =>
-          item.name.toLowerCase().includes(search.toLowerCase()),
-      ) ?? [];
+    datasets.data?.filter((item) =>
+      item.name.toLowerCase().includes(search.toLowerCase()),
+    ) ?? [];
 
   const ready = datasets.data?.filter((item) => item.currentVersion) ?? [];
 
@@ -399,25 +403,27 @@ function DatasetWorkspace({
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTab = searchParams.get("tab");
-  const tab =
-    selectedTab === "quality" || selectedTab === "prepare"
-      ? selectedTab
-      : "preview";
+  const tab = selectedTab === "prepare" ? "prepare" : "preview";
   const [pollingStarted, setPollingStarted] = useState(() => Date.now());
-  const dataset = useDataset(
-      projectId,
-      datasetId,
-      pollingStarted,
-  );
+  const dataset = useDataset(projectId, datasetId, pollingStarted);
   const profile = useDatasetProfile(
-      projectId,
-      datasetId,
-      Boolean(dataset.data?.currentVersion),
+    projectId,
+    datasetId,
+    Boolean(dataset.data?.currentVersion),
   );
   const [activeField, setActiveField] = useState<string | null>(null);
-  const field =
-    profile.data?.columns.find((column) => column.name === activeField) ??
-    profile.data?.columns[0];
+  const field = profile.data?.columns.find(
+    (column) => column.name === activeField,
+  );
+  const { mode } = useSession();
+  const [steps, setSteps] = useState<TransformStep[]>(() =>
+    mode === "demo" ? mockPreparation.getRecipe(datasetId) : [],
+  );
+
+  function saveSteps(next: TransformStep[]) {
+    mockPreparation.saveRecipe(datasetId, next);
+    setSteps(next);
+  }
 
   return (
     <div className="page-content data-page dataset-page">
@@ -537,15 +543,6 @@ function DatasetWorkspace({
                     Data preview
                   </Tabs.Tab>
                   <Tabs.Tab
-                    value="quality"
-                    leftSection={<Icon name="shield" size={16} />}
-                  >
-                    Quality & profile
-                    {missingCells(profile.data) > 0 && (
-                      <span className="tab-notice-dot" />
-                    )}
-                  </Tabs.Tab>
-                  <Tabs.Tab
                     value="prepare"
                     leftSection={<Icon name="settings" size={16} />}
                   >
@@ -556,245 +553,22 @@ function DatasetWorkspace({
                   <div className="dataset-preview-layout">
                     <div>
                       <DataPreview profile={profile.data} />
-                      <div className="data-next-step">
-                        <span>
-                          <Icon name="shield" size={18} />
-                          <strong>
-                            Every good analysis starts with a quick check.
-                          </strong>
-                        </span>
-                        <Button
-                          variant="subtle"
-                          size="xs"
-                          rightSection={<Icon name="arrow" size={14} />}
-                          onClick={() => setSearchParams({ tab: "quality" })}
-                        >
-                          Review data quality
-                        </Button>
-                      </div>
                     </div>
-                    <aside className="data-sidebar-panel">
-                      <div className="data-section-label">
-                        ABOUT THIS DATASET
-                      </div>
-                      <dl>
-                        <div>
-                          <dt>Source</dt>
-                          <dd>
-                            <Icon name="data" size={14} /> CSV upload
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Fields</dt>
-                          <dd>
-                            {
-                              profile.data.columns.filter(
-                                (column) => column.type === "number",
-                              ).length
-                            }{" "}
-                            numeric
-                            <br />
-                            {
-                              profile.data.columns.filter(
-                                (column) => column.type === "text",
-                              ).length
-                            }{" "}
-                            text
-                            <br />
-                            {
-                              profile.data.columns.filter(
-                                (column) => column.type === "date",
-                              ).length
-                            }{" "}
-                            date
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Coverage</dt>
-                          <dd>
-                            Profile covers all{" "}
-                            {number.format(profile.data.rowCount)} rows
-                          </dd>
-                        </div>
-                      </dl>
-                      <div className="data-sidebar-tip">
-                        <Icon name="bolt" size={18} />
-                        <strong>A useful starting point</strong>
-                        <p>
-                          Group a text field and add a numeric measure to reveal
-                          your first pattern.
-                        </p>
-                        <Link
-                          to={`/projects/${projectId}/explore?dataset=${datasetId}`}
-                        >
-                          Explore this dataset <Icon name="arrow" size={14} />
-                        </Link>
-                      </div>
-                    </aside>
-                  </div>
-                </Tabs.Panel>
-                <Tabs.Panel value="quality">
-                  <div className="quality-summary">
-                    <span
-                      className={`quality-summary-icon ${missingCells(profile.data) ? "attention" : ""}`}
-                    >
-                      <Icon
-                        name={missingCells(profile.data) ? "warning" : "check"}
-                        size={22}
+                    <div className="dataset-right-rail">
+                      <DatasetIssuesPanel
+                        profile={profile.data}
+                        selectedField={field}
+                        onSelectField={setActiveField}
+                        onBackToIssues={() => setActiveField(null)}
                       />
-                    </span>
-                    <div>
-                      <h2>
-                        {missingCells(profile.data)
-                          ? "A few gaps worth a closer look."
-                          : "A complete starting point."}
-                      </h2>
-                      <p>
-                        {missingCells(profile.data)
-                          ? `${number.format(missingCells(profile.data))} empty cells across ${profile.data.columns.filter((column) => column.nullCount > 0).length} fields. Review them before choosing your measures.`
-                          : "Every cell has a value. Review the detected types and ranges to check that your data makes sense."}
-                      </p>
+
+                      <AppliedStepsPanel
+                          profile={profile.data}
+                          steps={steps}
+                          editable={mode === "demo"}
+                          onStepsChange={saveSteps}
+                      />
                     </div>
-                    {missingCells(profile.data) > 0 && (
-                      <Button
-                        variant="default"
-                        onClick={() => setSearchParams({ tab: "prepare" })}
-                      >
-                        Prepare data <Icon name="arrow" size={15} />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="profile-layout">
-                    <div className="data-table-card">
-                      <div
-                        className="data-table-scroll"
-                        tabIndex={0}
-                        aria-label="Column quality profiles"
-                      >
-                        <table className="data-table profile-table">
-                          <thead>
-                            <tr>
-                              <th>Field</th>
-                              <th>Detected type</th>
-                              <th>Completeness</th>
-                              <th>Empty cells</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {profile.data.columns.map((column) => {
-                              const complete = profile.data.rowCount
-                                ? (1 -
-                                    column.nullCount / profile.data.rowCount) *
-                                  100
-                                : 100;
-                              return (
-                                <tr
-                                  className={
-                                    field?.name === column.name
-                                      ? "selected-field"
-                                      : ""
-                                  }
-                                  key={column.name}
-                                >
-                                  <td>
-                                    <button
-                                      className="profile-field-button"
-                                      aria-pressed={field?.name === column.name}
-                                      onClick={() =>
-                                        setActiveField(column.name)
-                                      }
-                                    >
-                                      <Icon
-                                        name={fieldIcon(column.type)}
-                                        size={16}
-                                      />
-                                      {column.name}
-                                    </button>
-                                  </td>
-                                  <td>
-                                    <span className="field-type-label">
-                                      {column.type}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <div className="quality-bar-cell">
-                                      <div
-                                        className="quality-bar"
-                                        aria-label={`${complete.toFixed(1)}% complete`}
-                                      >
-                                        <span
-                                          style={{ width: `${complete}%` }}
-                                        />
-                                      </div>
-                                      <span>{complete.toFixed(1)}%</span>
-                                    </div>
-                                  </td>
-                                  <td>
-                                    <span
-                                      className={
-                                        column.nullCount
-                                          ? "missing-count"
-                                          : "data-muted"
-                                      }
-                                    >
-                                      {number.format(column.nullCount)}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    {field && (
-                      <aside className="data-sidebar-panel field-inspector">
-                        <div className="data-section-label">FIELD PROFILE</div>
-                        <div className="field-inspector-title">
-                          <span>
-                            <Icon name={fieldIcon(field.type)} size={22} />
-                          </span>
-                          <h3>{field.name}</h3>
-                        </div>
-                        <span className="field-type-label">{field.type}</span>
-                        <dl>
-                          <div>
-                            <dt>Filled values</dt>
-                            <dd>
-                              {number.format(
-                                profile.data.rowCount - field.nullCount,
-                              )}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>Empty values</dt>
-                            <dd>{number.format(field.nullCount)}</dd>
-                          </div>
-                          <div>
-                            <dt>Minimum</dt>
-                            <dd>{field.min ?? "Not available"}</dd>
-                          </div>
-                          <div>
-                            <dt>Maximum</dt>
-                            <dd>{field.max ?? "Not available"}</dd>
-                          </div>
-                          {field.type === "number" && (
-                            <div>
-                              <dt>Average</dt>
-                              <dd>
-                                {field.avg === null
-                                  ? "Not available"
-                                  : number.format(field.avg)}
-                              </dd>
-                            </div>
-                          )}
-                        </dl>
-                        <p className="field-profile-note">
-                          Completeness measures missing values. It does not
-                          validate accuracy or detect duplicates.
-                        </p>
-                      </aside>
-                    )}
                   </div>
                 </Tabs.Panel>
                 <Tabs.Panel value="prepare">
@@ -803,6 +577,8 @@ function DatasetWorkspace({
                     projectId={projectId}
                     datasetId={datasetId}
                     profile={profile.data}
+                    steps={steps}
+                    onStepsChange={setSteps}
                   />
                 </Tabs.Panel>
               </Tabs>
@@ -961,28 +737,25 @@ function PreparationPanel({
   projectId,
   datasetId,
   profile,
+  steps,
+  onStepsChange,
 }: {
   projectId: string;
   datasetId: string;
   profile: DatasetProfile;
+  steps: TransformStep[];
+  onStepsChange: (steps: TransformStep[]) => void;
 }) {
   const { mode, startDemo } = useSession();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [steps, setSteps] = useState<TransformStep[]>(() =>
-    mode === "demo" ? mockPreparation.getRecipe(datasetId) : [],
-  );
   const [kind, setKind] = useState<TransformStep["kind"]>("trim");
   const [column, setColumn] = useState(profile.columns[0]?.name ?? "");
   const [value, setValue] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [demoConfirmation, setDemoConfirmation] = useState(false);
   const preview = useQuery({
-    queryKey: queryKeys.datasets.preparedPreview(
-        projectId,
-        datasetId,
-        steps,
-    ),
+    queryKey: queryKeys.datasets.preparedPreview(projectId, datasetId, steps),
     queryFn: () => mockPreparation.preview(projectId, datasetId, steps),
     enabled: mode === "demo" && steps.length > 0,
   });
@@ -1000,7 +773,7 @@ function PreparationPanel({
   function saveSteps(next: TransformStep[]) {
     try {
       mockPreparation.saveRecipe(datasetId, next);
-      setSteps(next);
+      onStepsChange(next);
       setEditError(null);
       apply.reset();
     } catch (error) {

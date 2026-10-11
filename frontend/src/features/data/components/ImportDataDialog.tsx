@@ -38,9 +38,9 @@ export function ImportDataDialog({
     if (!file || !name.trim()) return;
 
     const upload = new File(
-        [file],
-        `${name.trim().replace(/[\\/:*?"<>|]/g, "-")}.csv`,
-        { type: "text/csv" },
+      [file],
+      `${name.trim().replace(/[\\/:*?"<>|]/g, "-")}.csv`,
+      { type: "text/csv" },
     );
 
     mutation.mutate(upload, {

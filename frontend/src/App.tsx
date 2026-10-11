@@ -14,50 +14,50 @@ import { EmptyState, ErrorState, LoadingState } from "./components/Feedback";
 import { Button } from "@mantine/core";
 
 const ProjectsPage = lazy(
-    () => import("./features/projects/pages/ProjectsPage.tsx")
+  () => import("./features/projects/pages/ProjectsPage.tsx"),
 );
 
 const ProjectOverviewPage = lazy(
-    () => import("./features/projects/pages/ProjectOverviewPage.tsx")
+  () => import("./features/projects/pages/ProjectOverviewPage.tsx"),
 );
 
-const LoginPage = lazy(
-    () => import("./features/auth/pages/LoginPage"),
-);
+const LoginPage = lazy(() => import("./features/auth/pages/LoginPage"));
 
-const RegisterPage = lazy(
-    () => import("./features/auth/pages/RegisterPage"),
-);
+const RegisterPage = lazy(() => import("./features/auth/pages/RegisterPage"));
 
 const ForgotPasswordPage = lazy(
-    () => import("./features/auth/pages/ForgotPasswordPage"),
+  () => import("./features/auth/pages/ForgotPasswordPage"),
 );
 
 const ResetPasswordPage = lazy(
-    () => import("./features/auth/pages/ResetPasswordPage"),
+  () => import("./features/auth/pages/ResetPasswordPage"),
 );
 
 const ConfirmEmailPage = lazy(
-    () => import("./features/auth/pages/ConfirmEmailPage"),
+  () => import("./features/auth/pages/ConfirmEmailPage"),
 );
 
 const DataPage = lazy(async () => ({
-    default: (await import("./features/data/pages/DataPages")).DataPage,
+  default: (await import("./features/data/pages/DataPages")).DataPage,
 }));
 const DatasetPage = lazy(async () => ({
-    default: (await import("./features/data/pages/DataPages")).DatasetPage,
+  default: (await import("./features/data/pages/DataPages")).DatasetPage,
 }));
 const ExplorePage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages")).ExplorePage,
+  default: (await import("./features/analytics/pages/AnalyticsPages"))
+    .ExplorePage,
 }));
 const DashboardsPage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages")).DashboardsPage,
+  default: (await import("./features/analytics/pages/AnalyticsPages"))
+    .DashboardsPage,
 }));
 const DashboardEditorPage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages")).DashboardEditorPage,
+  default: (await import("./features/analytics/pages/AnalyticsPages"))
+    .DashboardEditorPage,
 }));
 const DashboardViewPage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages")).DashboardViewPage,
+  default: (await import("./features/analytics/pages/AnalyticsPages"))
+    .DashboardViewPage,
 }));
 
 function ProtectedWorkspace() {
@@ -128,30 +128,30 @@ export default function App() {
           <Route path="/" element={<Navigate to="/projects" replace />} />
 
           <Route
-              path="login"
-              element={
-                <GuestOnly>
-                  <LoginPage />
-                </GuestOnly>
-              }
+            path="login"
+            element={
+              <GuestOnly>
+                <LoginPage />
+              </GuestOnly>
+            }
           />
 
           <Route
-              path="register"
-              element={
-                <GuestOnly>
-                  <RegisterPage />
-                </GuestOnly>
-              }
+            path="register"
+            element={
+              <GuestOnly>
+                <RegisterPage />
+              </GuestOnly>
+            }
           />
 
           <Route
-              path="forgot-password"
-              element={
-                <GuestOnly>
-                  <ForgotPasswordPage />
-                </GuestOnly>
-              }
+            path="forgot-password"
+            element={
+              <GuestOnly>
+                <ForgotPasswordPage />
+              </GuestOnly>
+            }
           />
 
           <Route path="reset-password" element={<ResetPasswordPage />} />
