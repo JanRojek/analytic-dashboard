@@ -1700,3 +1700,27 @@
   color: var(--muted);
   font-size: 10px;
 }
+
+.dataset-apply-panel {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.dataset-apply-panel p {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.dataset-apply-error {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #ead3d0;
+  background: #fff7f6;
+  color: #9a433b;
+  font-size: 10px;
+  line-height: 1.4;
+}

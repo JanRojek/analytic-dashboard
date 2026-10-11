@@ -16,19 +16,12 @@ import {
   Button,
   Menu,
   Modal,
-  Select,
-  Tabs,
   TextInput,
 } from "@mantine/core";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Icon } from "../../../components/Icon";
 
@@ -401,9 +394,8 @@ function DatasetWorkspace({
   projectId: string;
   datasetId: string;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedTab = searchParams.get("tab");
-  const tab = selectedTab === "prepare" ? "prepare" : "preview";
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [pollingStarted, setPollingStarted] = useState(() => Date.now());
   const dataset = useDataset(projectId, datasetId, pollingStarted);
   const profile = useDatasetProfile(
@@ -429,6 +421,18 @@ function DatasetWorkspace({
     queryKey: queryKeys.datasets.preparedPreview(projectId, datasetId, steps),
     queryFn: () => mockPreparation.preview(projectId, datasetId, steps),
     enabled: mode === "demo" && steps.length > 0,
+  });
+
+  const apply = useMutation({
+    mutationFn: () => mockPreparation.applyRecipe(projectId, datasetId, steps),
+
+    onSuccess: async (dataset) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.datasets.list(projectId),
+      });
+
+      navigate(`/projects/${projectId}/data/${dataset.id}`);
+    },
   });
 
   return (
@@ -531,79 +535,74 @@ function DatasetWorkspace({
                   </strong>
                 </div>
               </div>
-              <Tabs
-                value={tab}
-                onChange={(value) =>
-                  setSearchParams(
-                    value === "preview" ? {} : { tab: value ?? "preview" },
-                  )
-                }
-                className="dataset-tabs"
-                keepMounted={false}
-              >
-                <Tabs.List>
-                  <Tabs.Tab
-                    value="preview"
-                    leftSection={<Icon name="data" size={16} />}
-                  >
-                    Data preview
-                  </Tabs.Tab>
-                  <Tabs.Tab
-                    value="prepare"
-                    leftSection={<Icon name="settings" size={16} />}
-                  >
-                    Prepare data
-                  </Tabs.Tab>
-                </Tabs.List>
-                <Tabs.Panel value="preview">
-                  {preparedPreview.isError && (
-                    <ErrorState
-                      error={preparedPreview.error}
-                      retry={() => void preparedPreview.refetch()}
-                    />
-                  )}
+              {preparedPreview.isError && (
+                <ErrorState
+                  error={preparedPreview.error}
+                  retry={() => void preparedPreview.refetch()}
+                />
+              )}
 
-                  {preparedPreview.isFetching && steps.length > 0 && (
-                    <div className="dataset-preview-updating">
-                      Updating preview…
-                    </div>
-                  )}
+              {preparedPreview.isFetching && steps.length > 0 && (
+                <div className="dataset-preview-updating">
+                  Updating preview…
+                </div>
+              )}
 
-                  <div className="dataset-preview-layout">
-                    <div>
-                      <DataPreview
-                        profile={preparedPreview.data ?? profile.data}
-                      />
-                    </div>
+              <div className="dataset-preview-layout">
+                <div>
+                  <DataPreview profile={preparedPreview.data ?? profile.data} />
+                </div>
 
-                    <div className="dataset-right-rail">
-                      <DatasetIssuesPanel
-                        profile={preparedPreview.data ?? profile.data}
-                        selectedField={field}
-                        onSelectField={setActiveField}
-                        onBackToIssues={() => setActiveField(null)}
-                      />
+                <div className="dataset-right-rail">
+                  <DatasetIssuesPanel
+                    profile={preparedPreview.data ?? profile.data}
+                    selectedField={field}
+                    onSelectField={setActiveField}
+                    onBackToIssues={() => setActiveField(null)}
+                  />
 
-                      <AppliedStepsPanel
-                        profile={profile.data}
-                        steps={steps}
-                        editable={mode === "demo"}
-                        onStepsChange={saveSteps}
-                      />
-                    </div>
-                  </div>
-                </Tabs.Panel>
-                <Tabs.Panel value="prepare">
-                  <PreparationPanel
-                    key={datasetId}
-                    projectId={projectId}
-                    datasetId={datasetId}
+                  <AppliedStepsPanel
                     profile={profile.data}
                     steps={steps}
-                    onStepsChange={setSteps}
+                    editable={mode === "demo"}
+                    onStepsChange={saveSteps}
                   />
-                </Tabs.Panel>
-              </Tabs>
+
+                  {mode === "demo" && (
+                    <section className="dataset-apply-panel">
+                      <div className="data-section-label">PREPARED DATA</div>
+
+                      <p>
+                        Create a new dataset with these preparation steps
+                        applied. Your source dataset stays unchanged.
+                      </p>
+
+                      {apply.isError && (
+                        <div className="dataset-apply-error">
+                          {apply.error instanceof Error
+                            ? apply.error.message
+                            : "The prepared copy could not be created."}
+                        </div>
+                      )}
+
+                      <Button
+                        fullWidth
+                        leftSection={<Icon name="copy" size={15} />}
+                        disabled={
+                          !steps.length ||
+                          preparedPreview.isFetching ||
+                          preparedPreview.isError ||
+                          !(preparedPreview.data ?? profile.data).rowCount
+                        }
+                        loading={apply.isPending}
+                        onClick={() => apply.mutate()}
+                      >
+                        Create prepared copy
+                      </Button>
+                    </section>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </>
@@ -745,352 +744,5 @@ function DataPreview({
         <span>{profile.columnCount} columns</span>
       </div>
     </section>
-  );
-}
-
-const transformations = [
-  { value: "trim", label: "Trim whitespace" },
-  { value: "fill", label: "Fill empty values" },
-  { value: "drop-empty", label: "Remove rows with empty values" },
-  { value: "deduplicate", label: "Remove duplicate rows" },
-];
-
-function PreparationPanel({
-  projectId,
-  datasetId,
-  profile,
-  steps,
-  onStepsChange,
-}: {
-  projectId: string;
-  datasetId: string;
-  profile: DatasetProfile;
-  steps: TransformStep[];
-  onStepsChange: (steps: TransformStep[]) => void;
-}) {
-  const { mode, startDemo } = useSession();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const [kind, setKind] = useState<TransformStep["kind"]>("trim");
-  const [column, setColumn] = useState(profile.columns[0]?.name ?? "");
-  const [value, setValue] = useState("");
-  const [editError, setEditError] = useState<string | null>(null);
-  const [demoConfirmation, setDemoConfirmation] = useState(false);
-  const preview = useQuery({
-    queryKey: queryKeys.datasets.preparedPreview(projectId, datasetId, steps),
-    queryFn: () => mockPreparation.preview(projectId, datasetId, steps),
-    enabled: mode === "demo" && steps.length > 0,
-  });
-  const apply = useMutation({
-    mutationFn: () => mockPreparation.applyRecipe(projectId, datasetId, steps),
-    onSuccess: async (dataset) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.datasets.list(projectId),
-      });
-      navigate(`/projects/${projectId}/data/${dataset.id}`);
-    },
-  });
-  const prepared = steps.length ? preview.data : profile;
-
-  function saveSteps(next: TransformStep[]) {
-    try {
-      mockPreparation.saveRecipe(datasetId, next);
-      onStepsChange(next);
-      setEditError(null);
-      apply.reset();
-    } catch (error) {
-      setEditError(
-        error instanceof Error
-          ? error.message
-          : "Your preparation steps could not be saved.",
-      );
-    }
-  }
-
-  if (mode !== "demo")
-    return (
-      <>
-        <div className="preparation-unavailable">
-          <span className="empty-icon">
-            <Icon name="settings" size={26} />
-          </span>
-          <span className="data-feature-label">PRODUCT PREVIEW</span>
-          <h2>Make your data analysis-ready.</h2>
-          <p>
-            Build a sequence of preparation steps, preview the result, and keep
-            your original data intact. Preparation is available in the demo
-            workspace while server support is being built.
-          </p>
-          <div className="preparation-capabilities">
-            <span>
-              <Icon name="check" size={16} /> Trim whitespace
-            </span>
-            <span>
-              <Icon name="check" size={16} /> Fill empty values
-            </span>
-            <span>
-              <Icon name="check" size={16} /> Remove duplicates
-            </span>
-          </div>
-          <Button onClick={() => setDemoConfirmation(true)}>
-            Try preparation in the demo
-          </Button>
-          <small>This project's data will stay in your account.</small>
-        </div>
-        <Modal
-          opened={demoConfirmation}
-          onClose={() => setDemoConfirmation(false)}
-          title="Open the demo workspace?"
-          centered
-        >
-          <p className="data-dialog-description">
-            You’ll switch to a separate local workspace with sample data. Your
-            account’s projects remain unchanged. Sign in again to return to
-            them.
-          </p>
-          <div className="dialog-footer">
-            <Button
-              variant="default"
-              onClick={() => setDemoConfirmation(false)}
-            >
-              Stay here
-            </Button>
-            <Button
-              onClick={() => {
-                startDemo();
-                navigate("/projects");
-              }}
-            >
-              Open demo
-            </Button>
-          </div>
-        </Modal>
-      </>
-    );
-
-  return (
-    <div className="preparation-workspace">
-      <div className="preparation-intro">
-        <div>
-          <h2>A few steps to better data.</h2>
-          <p>
-            Preview your changes, then create a prepared copy. Your original
-            stays intact.
-          </p>
-        </div>
-        <span className="data-feature-label">LOCAL DEMO</span>
-      </div>
-      <div className="preparation-layout">
-        <aside className="preparation-recipe">
-          <div className="recipe-header">
-            <h3>Preparation steps</h3>
-            <span>
-              {steps.length} {steps.length === 1 ? "step" : "steps"}
-            </span>
-          </div>
-          {steps.length ? (
-            <ol className="recipe-steps">
-              {steps.map((step, index) => (
-                <li key={step.id}>
-                  <span className="recipe-step-number">{index + 1}</span>
-                  <div>
-                    <strong>
-                      {
-                        transformations.find((item) => item.value === step.kind)
-                          ?.label
-                      }
-                    </strong>
-                    <small>
-                      {step.kind === "deduplicate"
-                        ? "Compare all fields"
-                        : step.column}
-                      {step.kind === "fill" ? ` → ${step.value}` : ""}
-                    </small>
-                  </div>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    disabled={apply.isPending}
-                    aria-label={`Remove preparation step ${index + 1}`}
-                    onClick={() =>
-                      saveSteps(steps.filter((item) => item.id !== step.id))
-                    }
-                  >
-                    <Icon name="close" size={14} />
-                  </ActionIcon>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <div className="recipe-empty">
-              <Icon name="settings" size={23} />
-              <p>
-                No steps yet.
-                <br />
-                Start with one small improvement.
-              </p>
-            </div>
-          )}
-          <form
-            className="recipe-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (kind !== "deduplicate" && !column) return;
-              if (kind === "fill" && !value.trim()) return;
-              saveSteps([
-                ...steps,
-                {
-                  id: crypto.randomUUID(),
-                  kind,
-                  column: kind === "deduplicate" ? "" : column,
-                  ...(kind === "fill" ? { value } : {}),
-                },
-              ]);
-              setValue("");
-            }}
-          >
-            <div className="data-section-label">ADD A STEP</div>
-            <Select
-              label="Operation"
-              value={kind}
-              data={transformations}
-              allowDeselect={false}
-              onChange={(next) => setKind(next as TransformStep["kind"])}
-              disabled={apply.isPending}
-            />
-            {kind !== "deduplicate" && (
-              <Select
-                label="Field"
-                data={profile.columns.map((item) => item.name)}
-                value={column}
-                onChange={(next) => setColumn(next ?? "")}
-                searchable
-                allowDeselect={false}
-                disabled={apply.isPending}
-              />
-            )}
-            {kind === "fill" && (
-              <TextInput
-                label="Replace empty values with"
-                placeholder="e.g. Unknown or 0"
-                value={value}
-                onChange={(event) => setValue(event.currentTarget.value)}
-                required
-                disabled={apply.isPending}
-              />
-            )}
-            <p className="recipe-operation-hint">
-              {kind === "trim"
-                ? "Remove spaces from the beginning and end of values."
-                : kind === "fill"
-                  ? "Use a replacement value wherever this field is empty."
-                  : kind === "drop-empty"
-                    ? "Exclude rows where the selected field has no value."
-                    : "Keep the first instance of each identical row."}
-            </p>
-            <Button
-              type="submit"
-              variant="default"
-              leftSection={<Icon name="plus" size={15} />}
-              fullWidth
-              disabled={
-                apply.isPending ||
-                (kind !== "deduplicate" && !column) ||
-                (kind === "fill" && !value.trim())
-              }
-            >
-              Add step
-            </Button>
-          </form>
-          <div className="recipe-saved">
-            <Icon name="check" size={13} /> Steps saved in this browser
-          </div>
-        </aside>
-        <div className="preparation-results">
-          {(editError || apply.error) && (
-            <ErrorState
-              error={editError ? new Error(editError) : apply.error}
-            />
-          )}
-          {preview.isError ? (
-            <ErrorState
-              error={preview.error}
-              retry={() => void preview.refetch()}
-            />
-          ) : steps.length > 0 && preview.isPending ? (
-            <LoadingState label="Previewing your preparation steps…" />
-          ) : (
-            prepared && (
-              <>
-                <div className="preparation-comparison">
-                  <div>
-                    <span>Rows after preparation</span>
-                    <strong>
-                      {number.format(prepared.rowCount)}{" "}
-                      <small>of {number.format(profile.rowCount)}</small>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Empty cells</span>
-                    <strong>
-                      {number.format(missingCells(prepared))}{" "}
-                      <small>was {number.format(missingCells(profile))}</small>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Completeness</span>
-                    <strong>
-                      {completeness(prepared).toFixed(1)}
-                      <small>%</small>
-                    </strong>
-                  </div>
-                </div>
-                <>
-                  {!prepared.rowCount && (
-                    <Alert color="orange" icon={<Icon name="warning" />}>
-                      These steps remove every row. Adjust your recipe before
-                      creating a prepared copy.
-                    </Alert>
-                  )}
-                </>
-                <DataPreview
-                  profile={prepared}
-                  title={
-                    steps.length
-                      ? "Your prepared data"
-                      : "Original data preview"
-                  }
-                />
-                <div className="preparation-apply">
-                  <p>
-                    <Icon name="copy" size={17} />
-                    <span>
-                      Creates a new dataset with all steps applied.
-                      <br />
-                      <small>
-                        The source dataset and its charts stay unchanged.
-                      </small>
-                    </span>
-                  </p>
-                  <Button
-                    leftSection={<Icon name="check" size={16} />}
-                    disabled={
-                      !steps.length ||
-                      preview.isFetching ||
-                      preview.isError ||
-                      !prepared.rowCount
-                    }
-                    loading={apply.isPending}
-                    onClick={() => apply.mutate()}
-                  >
-                    Create prepared copy
-                  </Button>
-                </div>
-              </>
-            )
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
