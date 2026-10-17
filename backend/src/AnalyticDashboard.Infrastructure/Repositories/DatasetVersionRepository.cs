@@ -42,6 +42,17 @@ public sealed class DatasetVersionRepository
             );
     }
 
+    public async Task<DatasetVersion?> GetByIdForUpdateAsync(
+        Guid versionId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.DatasetVersions
+            .SingleOrDefaultAsync(version =>
+                version.Id == versionId,
+                cancellationToken
+            );
+    }
+
     public async Task<IReadOnlyList<DatasetVersion>> GetByIdsAsync(
         IReadOnlyCollection<Guid> versionIds,
         CancellationToken cancellationToken)

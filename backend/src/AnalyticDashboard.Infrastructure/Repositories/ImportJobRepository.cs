@@ -63,6 +63,30 @@ public sealed class ImportJobRepository : IImportJobRepository
             );
     }
 
+    public async Task<ImportJob?> GetLatestByDatasetIdAsync(
+        Guid datasetId,
+        CancellationToken cancellationToken)
+    {
+        var datasetVersionIds = _dbContext.DatasetVersions
+            .Where(version => version.DatasetId == datasetId)
+            .Select(version => version.Id);
+
+        return await _dbContext.ImportJobs
+            .AsNoTracking()
+            .Where(job => datasetVersionIds.Contains(job.DatasetVersionId))
+            .OrderByDescending(job => job.CreatedAtUtc)
+            .ThenByDescending(job => job.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ImportJob>> GetRunningAsync(
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.ImportJobs
+            .Where(job => job.Status == ImportJobStatus.Running)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task SaveChangesAsync(
         CancellationToken cancellationToken)
     {

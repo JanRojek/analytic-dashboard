@@ -23,7 +23,7 @@ public sealed class GetProjectsHandler
         }
 
         var normalizedPage = query.Page <= 0
-            ? 1
+            ? GetProjectsQuery.DefaultPage
             : query.Page;
 
         var totalCount = await _projectRepository.CountByOwnerAsync(

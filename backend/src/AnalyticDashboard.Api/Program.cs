@@ -26,6 +26,8 @@ using AnalyticDashboard.Application.Auth.Register;
 using AnalyticDashboard.Application.Auth.RegistrationStatus;
 using AnalyticDashboard.Application.Auth.ResendConfirmation;
 using AnalyticDashboard.Application.Auth.ResetPassword;
+using AnalyticDashboard.Application.Datasets.GetDatasetRows;
+using AnalyticDashboard.Application.Datasets.GetImportStatus;
 using AnalyticDashboard.Application.Projects.CreateProject;
 using AnalyticDashboard.Application.Projects.DeleteProject;
 using AnalyticDashboard.Application.Projects.GetProjectById;
@@ -144,6 +146,8 @@ builder.Services.AddScoped<ResetPasswordHandler>();
 builder.Services.AddScoped<QueryDatasetHandler>();
 builder.Services.AddScoped<GetWidgetDataHandler>();
 builder.Services.AddScoped<DatasetQueryExecutor>();
+builder.Services.AddScoped<GetDatasetRowsHandler>();
+builder.Services.AddScoped<GetImportStatusHandler>();
 
 builder.Services.AddHttpContextAccessor();
 

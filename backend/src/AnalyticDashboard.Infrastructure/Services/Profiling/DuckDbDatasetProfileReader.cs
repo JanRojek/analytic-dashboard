@@ -1,23 +1,19 @@
 ﻿using System.Globalization;
 using AnalyticDashboard.Application.Profiling;
-using AnalyticDashboard.Application.Storage;
+using AnalyticDashboard.Infrastructure.Services.DuckDb;
 using DuckDB.NET.Data;
-using Microsoft.Extensions.Logging;
 
 namespace AnalyticDashboard.Infrastructure.Services.Profiling;
 
 public sealed class DuckDbDatasetProfileReader
     : IDatasetProfileReader
 {
-    private readonly IFileStorage _fileStorage;
-    private readonly ILogger<DuckDbDatasetProfileReader> _logger;
+    private readonly DuckDbParquetExecutor _executor;
 
     public DuckDbDatasetProfileReader(
-        IFileStorage fileStorage,
-        ILogger<DuckDbDatasetProfileReader> logger)
+        DuckDbParquetExecutor executor)
     {
-        _fileStorage = fileStorage;
-        _logger = logger;
+        _executor = executor;
     }
 
     public async Task<DatasetProfile> ReadProfileAsync(
@@ -29,88 +25,42 @@ public sealed class DuckDbDatasetProfileReader
         int columnCount,
         CancellationToken cancellationToken)
     {
-        var tempParquetPath = Path.Combine(
-            Path.GetTempPath(),
-            $"analytic-dashboard-profile-{Guid.NewGuid():N}.parquet"
-        );
+        return await _executor.ExecuteAsync<DatasetProfile>(
+            storageKey,
+            async (connection, parquetPath, ct) =>
+            {
+                var columns = await ReadColumnProfilesAsync(
+                    connection,
+                    parquetPath,
+                    ct
+                );
 
-        try
-        {
-            await CopyToTempAsync(
-                storageKey,
-                tempParquetPath,
-                cancellationToken
-            );
+                var preview = await DuckDbRowReader.ReadAsync(
+                    connection,
+                    parquetPath,
+                    offset: 0,
+                    limit: 10,
+                    ct
+                );
 
-            await using var connection = new DuckDBConnection(
-                "DataSource=:memory:"
-            );
-
-            await connection.OpenAsync(
-                cancellationToken
-            );
-
-            var columns = await ReadColumnProfilesAsync(
-                connection,
-                tempParquetPath,
-                cancellationToken
-            );
-
-            var preview = await ReadPreviewAsync(
-                connection,
-                tempParquetPath,
-                cancellationToken
-            );
-
-            return new DatasetProfile(
-                datasetId,
-                name,
-                originalFileName,
-                rowCount,
-                columnCount,
-                columns,
-                preview
-            );
-        }
-        finally
-        {
-            TryDeleteTempFile(
-                tempParquetPath
-            );
-        }
-    }
-
-    private async Task CopyToTempAsync(
-        string storageKey,
-        string tempPath,
-        CancellationToken cancellationToken)
-    {
-        await using var source =
-            await _fileStorage.OpenReadAsync(
-                storageKey,
-                cancellationToken
-            );
-
-        await using var destination = new FileStream(
-            tempPath,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 81920,
-            FileOptions.Asynchronous
-        );
-
-        await source.CopyToAsync(
-            destination,
+                return new DatasetProfile(
+                    datasetId,
+                    name,
+                    originalFileName,
+                    rowCount,
+                    columnCount,
+                    columns,
+                    preview
+                );
+            },
             cancellationToken
         );
     }
 
-    private static async Task<IReadOnlyList<ColumnProfile>>
-        ReadColumnProfilesAsync(
-            DuckDBConnection connection,
-            string parquetPath,
-            CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<ColumnProfile>> ReadColumnProfilesAsync(
+        DuckDBConnection connection,
+        string parquetPath,
+        CancellationToken cancellationToken)
     {
         var schema = await ReadSchemaAsync(
             connection,
@@ -137,11 +87,10 @@ public sealed class DuckDbDatasetProfileReader
         return profiles;
     }
 
-    private static async Task<IReadOnlyList<SchemaColumn>>
-        ReadSchemaAsync(
-            DuckDBConnection connection,
-            string parquetPath,
-            CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<SchemaColumn>> ReadSchemaAsync(
+        DuckDBConnection connection,
+        string parquetPath,
+        CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
 
@@ -304,59 +253,6 @@ public sealed class DuckDbDatasetProfileReader
         );
     }
 
-    private static async Task<
-        IReadOnlyList<IReadOnlyDictionary<string, string?>>>
-        ReadPreviewAsync(
-            DuckDBConnection connection,
-            string parquetPath,
-            CancellationToken cancellationToken)
-    {
-        await using var command =
-            connection.CreateCommand();
-
-        command.CommandText = """
-            SELECT *
-            FROM read_parquet($parquetPath)
-            LIMIT 10;
-            """;
-
-        command.Parameters.Add(
-            new DuckDBParameter(
-                "parquetPath",
-                parquetPath
-            )
-        );
-
-        await using var reader =
-            await command.ExecuteReaderAsync(
-                cancellationToken
-            );
-
-        var rows =
-            new List<IReadOnlyDictionary<string, string?>>();
-
-        while (await reader.ReadAsync(
-                   cancellationToken))
-        {
-            var row =
-                new Dictionary<string, string?>();
-
-            for (var i = 0; i < reader.FieldCount; i++)
-            {
-                row[reader.GetName(i)] =
-                    reader.IsDBNull(i)
-                        ? null
-                        : ToInvariantString(
-                            reader.GetValue(i)
-                        );
-            }
-
-            rows.Add(row);
-        }
-
-        return rows;
-    }
-
     private static string QuoteIdentifier(
         string identifier)
     {
@@ -407,26 +303,6 @@ public sealed class DuckDbDatasetProfileReader
                 CultureInfo.InvariantCulture
             )
             : value.ToString();
-    }
-
-    private void TryDeleteTempFile(
-        string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Failed to delete temporary profile file {FilePath}.",
-                path
-            );
-        }
     }
 
     private sealed record SchemaColumn(

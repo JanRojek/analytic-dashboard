@@ -85,9 +85,37 @@ export const demoAdapter: DataAdapter = {
   async getDataset(p, d) {
     return requireDataset(readDemoState(), p, d).dataset;
   },
+  async getImportStatus(p, d) {
+    requireDataset(readDemoState(), p, d);
+    return null;
+  },
   async getProfile(p, d) {
     const item = requireDataset(readDemoState(), p, d);
     return profileRows(item.dataset, item.columns, item.rows);
+  },
+  async getDatasetRows(p, d, page, pageSize) {
+    const item = requireDataset(readDemoState(), p, d);
+
+    if (pageSize < 1 || pageSize > 100) {
+      throw new Error("Page size must be between 1 and 100.");
+    }
+
+    const normalizedPage = page <= 0 ? 1 : page;
+
+    const totalRows = item.rows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+
+    const actualPage = Math.min(normalizedPage, totalPages);
+
+    const offset = (actualPage - 1) * pageSize;
+
+    return {
+      items: item.rows.slice(offset, offset + pageSize),
+      page: actualPage,
+      pageSize,
+      totalRows,
+      totalPages,
+    };
   },
   async importCsv(p, file) {
     if (!/\.csv$/i.test(file.name))

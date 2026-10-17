@@ -22,6 +22,19 @@ export interface DatasetVersion {
   rowCount: number;
   columnCount: number;
 }
+
+export type ImportJobStatus = "Pending" | "Running" | "Completed" | "Failed";
+
+export interface ImportStatus {
+  importJobId: string;
+  datasetVersionId: string;
+  status: ImportJobStatus;
+  createdAtUtc: string;
+  startedAtUtc: string | null;
+  completedAtUtc: string | null;
+  errorMessage: string | null;
+}
+
 export interface Dataset {
   id: string;
   name: string;
@@ -37,6 +50,15 @@ export interface ColumnProfile {
   avg: number | null;
 }
 export type DataRow = Record<string, string | null>;
+
+export interface DatasetRowsPage {
+  items: DataRow[];
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+}
+
 export interface DatasetProfile {
   id: string;
   name: string;
@@ -86,7 +108,17 @@ export interface DataAdapter {
   deleteProject(projectId: string): Promise<void>;
   listDatasets(projectId: string): Promise<Dataset[]>;
   getDataset(projectId: string, datasetId: string): Promise<Dataset>;
+  getImportStatus(
+    projectId: string,
+    datasetId: string,
+  ): Promise<ImportStatus | null>;
   getProfile(projectId: string, datasetId: string): Promise<DatasetProfile>;
+  getDatasetRows(
+    projectId: string,
+    datasetId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<DatasetRowsPage>;
   importCsv(projectId: string, file: File): Promise<{ datasetId: string }>;
   deleteDataset(projectId: string, datasetId: string): Promise<void>;
   query(

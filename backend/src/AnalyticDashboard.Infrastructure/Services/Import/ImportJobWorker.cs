@@ -22,14 +22,36 @@ public sealed class ImportJobWorker : BackgroundService
     protected override async Task ExecuteAsync(
         CancellationToken stoppingToken)
     {
+        try
+        {
+            await using var recoveryScope = _scopeFactory.CreateAsyncScope();
+
+            var recoveryService = recoveryScope.ServiceProvider
+                .GetRequiredService<ImportJobRecoveryService>();
+
+            await recoveryService.RecoverInterruptedAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Unexpected failure during import jobs recovery."
+            );
+
+            throw;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await using var scope =
-                    _scopeFactory.CreateAsyncScope();
+                await using var jobScope = _scopeFactory.CreateAsyncScope();
 
-                var processor = scope.ServiceProvider
+                var processor = jobScope.ServiceProvider
                     .GetRequiredService<ImportJobProcessor>();
 
                 var processed =

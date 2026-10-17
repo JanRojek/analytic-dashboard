@@ -282,16 +282,17 @@
   border-radius: 4px;
   padding: 0;
   margin-bottom: 14px;
-  min-height: 44px;
+  min-height: 52px;
 }
 
 .dataset-metrics > div {
   flex: 1;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 9px 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
   border-right: 1px solid #e8ece5;
+  min-width: 0;
 }
 
 .dataset-metrics > div:last-child {
@@ -302,16 +303,21 @@
   display: block;
   margin: 0;
   color: #61715e;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .dataset-metrics strong {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
   line-height: 1;
   letter-spacing: 0;
   font-weight: 600;
   color: #2e4835;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .dataset-metrics strong small {
@@ -319,7 +325,15 @@
 }
 
 .metric-ready {
-  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 0;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  color: #61715e;
+  white-space: nowrap;
 }
 
 .dataset-metrics strong.has-missing {
@@ -407,16 +421,55 @@
 .data-preview-footer {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: space-between;
+  gap: 16px;
   border-top: 1px solid #e8ece4;
-  padding: 8px 12px;
+  padding: 10px 12px;
   color: #61715e;
   font-size: 10px;
 }
-.data-preview-footer > span:last-child {
-  margin-left: auto;
+
+.data-preview-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   white-space: nowrap;
 }
+
+.data-preview-note svg {
+  flex-shrink: 0;
+}
+
+.data-preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-left: auto;
+}
+
+.data-page-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.data-page-size > span {
+  font-size: 10px;
+  color: #61715e;
+}
+
+.data-page-size .mantine-Select-root {
+  width: 78px;
+}
+
+.data-preview-columns {
+  margin-left: 0;
+  white-space: nowrap;
+}
+
 .data-section-label {
   font-size: 9px;
   font-weight: 600;
@@ -711,9 +764,6 @@
   .dataset-metrics > div {
     padding: 0 19px;
   }
-  .dataset-metrics strong {
-    font-size: 22px;
-  }
   .metric-ready {
     display: none;
   }
@@ -754,10 +804,27 @@
   }
 
   .data-preview-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
     font-size: 9px;
-    gap: 5px;
   }
-  .data-preview-footer > span:last-child {
+
+  .data-preview-note {
+    white-space: normal;
+  }
+
+  .data-preview-controls {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
+
+  .data-page-size > span {
+    display: none;
+  }
+
+  .data-preview-columns {
     display: none;
   }
   .import-steps {
@@ -1076,4 +1143,11 @@
   color: #9a433b;
   font-size: 10px;
   line-height: 1.4;
+}
+
+.dataset-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }

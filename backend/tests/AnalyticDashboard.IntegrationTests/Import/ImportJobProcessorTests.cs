@@ -1,4 +1,9 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using AnalyticDashboard.Api.Contracts.Datasets;
 using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
@@ -19,6 +24,36 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
         ApiFixture fixture)
     {
         _fixture = fixture;
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web)
+        {
+            Converters =
+            {
+                new JsonStringEnumConverter()
+            }
+        };
+
+    private static HttpRequestMessage CreateGetRequest(
+        Guid projectId,
+        Guid datasetId,
+        Guid? userId = null)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/projects/{projectId}/datasets/{datasetId}/import-status"
+        );
+
+        if (userId.HasValue)
+        {
+            request.Headers.Add(
+                TestAuthHandler.UserIdHeader,
+                userId.Value.ToString()
+            );
+        }
+
+        return request;
     }
 
     [Fact]
@@ -54,8 +89,7 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
             sourceStorageKey
         );
 
-        await using (var scope =
-            _fixture.Services.CreateAsyncScope())
+        await using (var scope = _fixture.Services.CreateAsyncScope())
         {
             var dbContext = scope.ServiceProvider
                 .GetRequiredService<AppDbContext>();
@@ -70,8 +104,7 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
             );
         }
 
-        await using (var scope =
-            _fixture.Services.CreateAsyncScope())
+        await using (var scope = _fixture.Services.CreateAsyncScope())
         {
             var fileStorage = scope.ServiceProvider
                 .GetRequiredService<IFileStorage>();
@@ -193,6 +226,51 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
             Assert.True(
                 resultExists
             );
+
+            using var request = CreateGetRequest(
+                project.Id,
+                dataset.Id,
+                userId
+            );
+
+            using var response = await _fixture.Client.SendAsync(
+                request,
+                CancellationToken
+            );
+
+            Assert.Equal(
+                HttpStatusCode.OK,
+                response.StatusCode
+            );
+
+            var result = await response.Content
+                .ReadFromJsonAsync<ImportStatusResponse>(
+                    JsonOptions,
+                    CancellationToken
+                );
+
+            Assert.NotNull(result);
+
+            Assert.Equal(
+                importJob.Id,
+                result.ImportJobId
+            );
+
+            Assert.Equal(
+                version.Id,
+                result.DatasetVersionId
+            );
+
+            Assert.Equal(
+                ImportJobStatus.Completed,
+                result.Status
+            );
+
+            Assert.NotNull(result.StartedAtUtc);
+
+            Assert.NotNull(result.CompletedAtUtc);
+
+            Assert.Null(result.ErrorMessage);
         }
         finally
         {

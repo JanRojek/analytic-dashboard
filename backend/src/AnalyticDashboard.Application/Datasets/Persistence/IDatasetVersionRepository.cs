@@ -15,6 +15,11 @@ public interface IDatasetVersionRepository
         CancellationToken cancellationToken
     );
 
+    Task<DatasetVersion?> GetByIdForUpdateAsync(
+        Guid versionId,
+        CancellationToken cancellationToken
+    );
+
     Task<IReadOnlyList<DatasetVersion>> GetByIdsAsync(
         IReadOnlyCollection<Guid> versionIds,
         CancellationToken cancellationToken

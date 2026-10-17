@@ -16,8 +16,11 @@ using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Infrastructure.Storage;
 using AnalyticDashboard.Application.Analytics.QueryDataset;
 using AnalyticDashboard.Application.Dashboards.Persistence;
+using AnalyticDashboard.Application.Datasets.GetDatasetRows;
 using AnalyticDashboard.Application.Widgets.Persistence;
 using AnalyticDashboard.Infrastructure.Services.Analytics;
+using AnalyticDashboard.Infrastructure.Services.DuckDb;
+using AnalyticDashboard.Infrastructure.Services.Datasets;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -45,6 +48,10 @@ public static class DependencyInjection
 
         services.AddScoped<IDatasetProfileReader, DuckDbDatasetProfileReader>();
 
+        services.AddScoped<DuckDbParquetExecutor>();
+
+        services.AddScoped<IDatasetRowsReader, DuckDbDatasetRowsReader>();
+
         services.AddScoped<IDashboardRepository, DashboardRepository>();
 
         services.AddScoped<IWidgetRepository, WidgetRepository>();
@@ -62,6 +69,8 @@ public static class DependencyInjection
         services.AddScoped<DuckDbCsvImporter>();
 
         services.AddScoped<ImportJobProcessor>();
+
+        services.AddScoped<ImportJobRecoveryService>();
 
         services.AddScoped<IDatasetQueryReader, DuckDbDatasetQueryReader>();
 

@@ -49,6 +49,35 @@ export function useDatasetUsage(
   });
 }
 
+const IMPORT_STATUS_POLL_INTERVAL_MS = 3000;
+
+export function useImportStatus(
+  projectId: string,
+  datasetId: string,
+  enabled = true,
+) {
+  const { adapter, mode } = useSession();
+
+  return useQuery({
+    queryKey: queryKeys.datasets.importStatus(projectId, datasetId),
+    queryFn: () => adapter.getImportStatus(projectId, datasetId),
+
+    enabled: mode === "api" && enabled && Boolean(projectId && datasetId),
+
+    refetchInterval: (query) => {
+      if (query.state.error) return false;
+
+      const status = query.state.data?.status;
+
+      if (status === "Completed" || status === "Failed") {
+        return false;
+      }
+
+      return IMPORT_STATUS_POLL_INTERVAL_MS;
+    },
+  });
+}
+
 export function useDeleteDataset(projectId: string) {
   const { adapter } = useSession();
   const queryClient = useQueryClient();
@@ -82,23 +111,12 @@ export function useDeleteDataset(projectId: string) {
   });
 }
 
-export function useDataset(
-  projectId: string,
-  datasetId: string,
-  pollingStarted: number,
-) {
+export function useDataset(projectId: string, datasetId: string) {
   const { adapter } = useSession();
 
   return useQuery({
     queryKey: queryKeys.datasets.detail(projectId, datasetId),
     queryFn: () => adapter.getDataset(projectId, datasetId),
-
-    refetchInterval: (query) =>
-      !query.state.data?.currentVersion &&
-      Date.now() - pollingStarted < 60_000 &&
-      !query.state.error
-        ? 2500
-        : false,
   });
 }
 
@@ -112,6 +130,22 @@ export function useDatasetProfile(
   return useQuery({
     queryKey: queryKeys.datasets.profile(projectId, datasetId),
     queryFn: () => adapter.getProfile(projectId, datasetId),
+    enabled,
+  });
+}
+
+export function useDatasetRows(
+  projectId: string,
+  datasetId: string,
+  page: number,
+  pageSize: number,
+  enabled = true,
+) {
+  const { adapter } = useSession();
+
+  return useQuery({
+    queryKey: queryKeys.datasets.rows(projectId, datasetId, page, pageSize),
+    queryFn: () => adapter.getDatasetRows(projectId, datasetId, page, pageSize),
     enabled,
   });
 }

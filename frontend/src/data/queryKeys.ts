@@ -12,11 +12,17 @@ export const queryKeys = {
     detail: (projectId: Id, datasetId: Id) =>
       ["dataset", projectId, datasetId] as const,
 
+    importStatus: (projectId: Id, datasetId: Id) =>
+      ["import-status", projectId, datasetId] as const,
+
     usage: (projectId: Id, datasetId: Id) =>
       ["dataset-usage", projectId, datasetId] as const,
 
     profile: (projectId: Id, datasetId: Id) =>
       ["profile", projectId, datasetId] as const,
+
+    rows: (projectId: Id, datasetId: Id, page: number, pageSize: number) =>
+      ["dataset-rows", projectId, datasetId, page, pageSize] as const,
 
     preparedPreview: (projectId: Id, datasetId: Id, steps: unknown) =>
       ["prepared-preview", projectId, datasetId, steps] as const,

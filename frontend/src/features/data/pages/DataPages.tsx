@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import {
   useDataset,
   useDatasetProfile,
+  useDatasetRows,
   useDatasets,
   useDatasetUsage,
   useDeleteDataset,
+  useImportStatus,
 } from "../hooks";
 
 import { queryKeys } from "../../../data/queryKeys";
@@ -16,6 +18,8 @@ import {
   Button,
   Menu,
   Modal,
+  Pagination,
+  Select,
   TextInput,
 } from "@mantine/core";
 
@@ -39,6 +43,7 @@ import { DatasetIssuesPanel } from "../components/DatasetIssuesPanel";
 
 import type {
   ColumnProfile,
+  DataRow,
   Dataset,
   DatasetProfile,
   TransformStep,
@@ -396,13 +401,30 @@ function DatasetWorkspace({
 }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [pollingStarted, setPollingStarted] = useState(() => Date.now());
-  const dataset = useDataset(projectId, datasetId, pollingStarted);
+  const dataset = useDataset(projectId, datasetId);
+  const importStatus = useImportStatus(
+    projectId,
+    datasetId,
+    Boolean(dataset.data && !dataset.data.currentVersion),
+  );
   const profile = useDatasetProfile(
     projectId,
     datasetId,
     Boolean(dataset.data?.currentVersion),
   );
+
+  useEffect(() => {
+    if (importStatus.data?.status !== "Completed") return;
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.datasets.detail(projectId, datasetId),
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.datasets.list(projectId),
+    });
+  }, [importStatus.data?.status, queryClient, projectId, datasetId]);
+
   const [activeField, setActiveField] = useState<string | null>(null);
   const field = profile.data?.columns.find(
     (column) => column.name === activeField,
@@ -410,6 +432,19 @@ function DatasetWorkspace({
   const { mode } = useSession();
   const [steps, setSteps] = useState<TransformStep[]>(() =>
     mode === "demo" ? mockPreparation.getRecipe(datasetId) : [],
+  );
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const hasPreparedPreview = mode === "demo" && steps.length > 0;
+
+  const datasetRows = useDatasetRows(
+    projectId,
+    datasetId,
+    page,
+    pageSize,
+    Boolean(dataset.data?.currentVersion) && !hasPreparedPreview,
   );
 
   function saveSteps(next: TransformStep[]) {
@@ -471,23 +506,56 @@ function DatasetWorkspace({
           {!dataset.data.currentVersion ? (
             <div className="dataset-pending">
               <span className="empty-icon">
-                <Icon name="clock" size={30} />
+                <Icon
+                  name={
+                    importStatus.data?.status === "Failed" ? "warning" : "clock"
+                  }
+                  size={30}
+                />
               </span>
-              <h2>Your dataset isn’t ready yet.</h2>
+
+              <h2>
+                {importStatus.data?.status === "Failed"
+                  ? "The import could not be completed."
+                  : importStatus.data?.status === "Running"
+                    ? "Preparing your dataset..."
+                    : importStatus.data?.status === "Completed"
+                      ? "Your import is complete."
+                      : "Your dataset isn't ready yet."}
+              </h2>
+
               <p>
-                We’ll check for a ready dataset automatically for about a
-                minute. You can leave this page and reopen it from Data.
+                We'll check the import status automatically. You can leave this
+                page and return later.
               </p>
-              <Alert color="gray">
-                The server hasn’t provided a ready version. Detailed import
-                progress and failure messages are not available yet, so we can’t
-                tell whether it is still processing or needs attention.
+
+              <Alert
+                color={
+                  importStatus.isError || importStatus.data?.status === "Failed"
+                    ? "red"
+                    : "gray"
+                }
+                role="status"
+              >
+                {importStatus.isError
+                  ? importStatus.error.message
+                  : importStatus.data?.status === "Failed"
+                    ? (importStatus.data.errorMessage ??
+                      "Import failed. Please try again.")
+                    : importStatus.data?.status === "Running"
+                      ? "The server is processing your CSV file."
+                      : importStatus.data?.status === "Completed"
+                        ? "Import completed. Loading your dataset..."
+                        : importStatus.isFetching
+                          ? "Checking import status..."
+                          : "Waiting for the import to start."}
               </Alert>
+
               <Button
                 variant="default"
-                loading={dataset.isFetching}
+                loading={dataset.isFetching || importStatus.isFetching}
                 onClick={() => {
-                  setPollingStarted(Date.now());
+                  void importStatus.refetch();
                   void dataset.refetch();
                 }}
               >
@@ -524,10 +592,9 @@ function DatasetWorkspace({
                   </strong>
                 </div>
                 <div>
-                  <span>Current version</span>
-                  <strong>
-                    <small>v</small>
-                    {dataset.data.currentVersion.versionNumber}
+                  <span>Version</span>
+                  <strong className="dataset-version">
+                    v{dataset.data.currentVersion.versionNumber}
                     <span className="metric-ready">
                       <i />
                       Ready
@@ -550,7 +617,30 @@ function DatasetWorkspace({
 
               <div className="dataset-preview-layout">
                 <div>
-                  <DataPreview profile={preparedPreview.data ?? profile.data} />
+                  <DataPreview
+                    profile={preparedPreview.data ?? profile.data}
+                    rows={
+                      hasPreparedPreview
+                        ? (preparedPreview.data?.previewRows ??
+                          profile.data.previewRows)
+                        : (datasetRows.data?.items ?? [])
+                    }
+                    page={
+                      hasPreparedPreview ? 1 : (datasetRows.data?.page ?? page)
+                    }
+                    pageSize={pageSize}
+                    totalPages={
+                      hasPreparedPreview
+                        ? 1
+                        : (datasetRows.data?.totalPages ?? 1)
+                    }
+                    paginated={!hasPreparedPreview}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setPage(1);
+                    }}
+                  />
                 </div>
 
                 <div className="dataset-right-rail">
@@ -568,7 +658,7 @@ function DatasetWorkspace({
                     onStepsChange={saveSteps}
                   />
 
-                  {mode === "demo" && (
+                  {mode === "demo" && steps.length > 0 && (
                     <section className="dataset-apply-panel">
                       <div className="data-section-label">PREPARED DATA</div>
 
@@ -613,9 +703,23 @@ function DatasetWorkspace({
 
 function DataPreview({
   profile,
-  title = "A closer look at your data",
+  rows: sourceRows,
+  page,
+  pageSize,
+  totalPages,
+  paginated,
+  onPageChange,
+  onPageSizeChange,
+  title = "Data",
 }: {
   profile: DatasetProfile;
+  rows: DataRow[];
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  paginated: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   title?: string;
 }) {
   const [search, setSearch] = useState("");
@@ -624,7 +728,7 @@ function DataPreview({
     ascending: boolean;
   } | null>(null);
   const rows = useMemo(() => {
-    const filtered = profile.previewRows
+    const filtered = sourceRows
       .map((row, index) => ({ row, index }))
       .filter(({ row }) =>
         Object.values(row).some((value) =>
@@ -646,15 +750,15 @@ function DataPreview({
           : String(left ?? "").localeCompare(String(right ?? ""));
       return sort.ascending ? comparison : -comparison;
     });
-  }, [profile, search, sort]);
+  }, [sourceRows, profile.columns, search, sort]);
   return (
     <section className="data-preview-card">
       <div className="data-preview-toolbar">
         <div>
           <h2>{title}</h2>
           <p>
-            First {profile.previewRows.length} of{" "}
-            {number.format(profile.rowCount)} rows
+            {number.format(profile.rowCount)} rows ·{" "}
+            {number.format(profile.columnCount)} columns
           </p>
         </div>
         <TextInput
@@ -711,7 +815,9 @@ function DataPreview({
           <tbody>
             {rows.map(({ row, index }) => (
               <tr key={index}>
-                <td className="row-number">{index + 1}</td>
+                <td className="row-number">
+                  {paginated ? (page - 1) * pageSize + index + 1 : index + 1}
+                </td>
                 {profile.columns.map((column) => (
                   <td
                     key={column.name}
@@ -739,9 +845,43 @@ function DataPreview({
         )}
       </div>
       <div className="data-preview-footer">
-        <Icon name="eye" size={14} />
-        <span>Search and sorting apply to this preview only.</span>
-        <span>{profile.columnCount} columns</span>
+        <div className="data-preview-note">
+          <Icon name="eye" size={14} />
+          <span>Search and sorting apply to this page only.</span>
+        </div>
+
+        {paginated && (
+          <div className="data-preview-controls">
+            {totalPages > 1 && (
+              <Pagination
+                value={page}
+                onChange={onPageChange}
+                total={totalPages}
+                size="sm"
+              />
+            )}
+
+            <div className="data-page-size">
+              <span>Rows per page</span>
+
+              <Select
+                size="xs"
+                w={78}
+                value={String(pageSize)}
+                data={["25", "50", "100"]}
+                onChange={(value) => {
+                  if (value) {
+                    onPageSizeChange(Number(value));
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <span className="data-preview-columns">
+          {profile.columnCount} columns
+        </span>
       </div>
     </section>
   );

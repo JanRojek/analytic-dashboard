@@ -13,6 +13,15 @@ public interface IImportJobRepository
         CancellationToken cancellationToken
     );
 
+    Task<ImportJob?> GetLatestByDatasetIdAsync(
+        Guid datasetId,
+        CancellationToken cancellationToken
+    );
+
+    Task<IReadOnlyList<ImportJob>> GetRunningAsync(
+        CancellationToken cancellationToken
+    );
+
     Task SaveChangesAsync(
         CancellationToken cancellationToken
     );

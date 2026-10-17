@@ -3,10 +3,12 @@ import type {
   DataAdapter,
   Dataset,
   DatasetProfile,
+  DatasetRowsPage,
   Project,
   QueryItem,
   User,
   Widget,
+  ImportStatus,
 } from "./types";
 
 const sessionExpiryListeners = new Set<() => void>();
@@ -147,7 +149,13 @@ export const apiAdapter: DataAdapter = {
   deleteProject: (p) => request<void>(projectPath(p), { method: "DELETE" }),
   listDatasets: (p) => request<Dataset[]>(datasetPath(p)),
   getDataset: (p, d) => request<Dataset>(datasetPath(p, d)),
+  getImportStatus: (p, d) =>
+    request<ImportStatus>(`${datasetPath(p, d)}/import-status`),
   getProfile: (p, d) => request<DatasetProfile>(`${datasetPath(p, d)}/profile`),
+  getDatasetRows: (p, d, page, pageSize) =>
+    request<DatasetRowsPage>(
+      `${datasetPath(p, d)}/rows?page=${page}&pageSize=${pageSize}`,
+    ),
   async importCsv(p, file) {
     const body = new FormData();
     body.append("file", file);

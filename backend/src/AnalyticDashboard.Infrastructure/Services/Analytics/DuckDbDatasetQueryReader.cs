@@ -1,22 +1,18 @@
 ﻿using AnalyticDashboard.Application.Analytics.QueryDataset;
-using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Domain.Analytics;
+using AnalyticDashboard.Infrastructure.Services.DuckDb;
 using DuckDB.NET.Data;
-using Microsoft.Extensions.Logging;
 
 namespace AnalyticDashboard.Infrastructure.Services.Analytics;
 
 public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
 {
-    private readonly IFileStorage _fileStorage;
-    private readonly ILogger<DuckDbDatasetQueryReader> _logger;
+    private readonly DuckDbParquetExecutor _executor;
 
     public DuckDbDatasetQueryReader(
-        IFileStorage fileStorage,
-        ILogger<DuckDbDatasetQueryReader> logger)
+        DuckDbParquetExecutor executor)
     {
-        _fileStorage = fileStorage;
-        _logger = logger;
+        _executor = executor;
     }
 
     public async Task<DatasetQueryReadResult> ReadAsync(
@@ -26,106 +22,59 @@ public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
         AggregationType aggregation,
         CancellationToken cancellationToken)
     {
-        var tempParquetPath = Path.Combine(
-            Path.GetTempPath(),
-            $"analytic-dashboard-query-{Guid.NewGuid():N}.parquet"
-        );
-
-        try
-        {
-            await CopyToTempAsync(
-                storageKey,
-                tempParquetPath,
-                cancellationToken
-            );
-
-            await using var connection = new DuckDBConnection(
-                "DataSource=:memory:"
-            );
-
-            await connection.OpenAsync(
-                cancellationToken
-            );
-
-            var schema = await ReadSchemaAsync(
-                connection,
-                tempParquetPath,
-                cancellationToken
-            );
-
-            var groupBy = schema.SingleOrDefault(
-                column => column.Name == groupByColumn
-            );
-
-            if (groupBy is null)
+        return await _executor.ExecuteAsync<DatasetQueryReadResult>(
+            storageKey,
+            async (connection, parquetPath, ct) =>
             {
-                return new DatasetQueryReadResult.InvalidQuery(
-                    $"Column '{groupByColumn}' does not exist."
+                var schema = await ReadSchemaAsync(
+                    connection,
+                    parquetPath,
+                    ct
                 );
-            }
 
-            var measure = schema.SingleOrDefault(
-                column => column.Name == measureColumn
-            );
-
-            if (measure is null)
-            {
-                return new DatasetQueryReadResult.InvalidQuery(
-                    $"Column '{measureColumn}' does not exist."
+                var groupBy = schema.SingleOrDefault(
+                    column => column.Name == groupByColumn
                 );
-            }
 
-            if (aggregation != AggregationType.Count
-                && !IsNumericType(measure.DuckDbType))
-            {
-                return new DatasetQueryReadResult.InvalidQuery(
-                    $"Column '{measureColumn}' is not numeric."
+                if (groupBy is null)
+                {
+                    return new DatasetQueryReadResult.InvalidQuery(
+                        $"Column '{groupByColumn}' does not exist."
+                    );
+                }
+
+                var measure = schema.SingleOrDefault(
+                    column => column.Name == measureColumn
                 );
-            }
 
-            var rows = await ExecuteAggregationAsync(
-                connection,
-                tempParquetPath,
-                groupByColumn,
-                measureColumn,
-                aggregation,
-                cancellationToken
-            );
+                if (measure is null)
+                {
+                    return new DatasetQueryReadResult.InvalidQuery(
+                        $"Column '{measureColumn}' does not exist."
+                    );
+                }
 
-            return new DatasetQueryReadResult.Success(
-                rows
-            );
-        }
-        finally
-        {
-            TryDeleteTempFile(
-                tempParquetPath
-            );
-        }
-    }
+                if (aggregation != AggregationType.Count
+                    && !IsNumericType(measure.DuckDbType))
+                {
+                    return new DatasetQueryReadResult.InvalidQuery(
+                        $"Column '{measureColumn}' is not numeric."
+                    );
+                }
 
-    private async Task CopyToTempAsync(
-        string storageKey,
-        string tempPath,
-        CancellationToken cancellationToken)
-    {
-        await using var source =
-            await _fileStorage.OpenReadAsync(
-                storageKey,
-                cancellationToken
-            );
+                var rows = await ExecuteAggregationAsync(
+                    connection,
+                    parquetPath,
+                    groupByColumn,
+                    measureColumn,
+                    aggregation,
+                    ct
+                );
 
-        await using var destination = new FileStream(
-            tempPath,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 81920,
-            FileOptions.Asynchronous
-        );
-
-        await source.CopyToAsync(
-            destination,
+                return new DatasetQueryReadResult.Success(
+                    rows
+                );
+            },
             cancellationToken
         );
     }
@@ -269,25 +218,6 @@ public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
                    or "UHUGEINT"
                    or "FLOAT"
                    or "DOUBLE";
-    }
-
-    private void TryDeleteTempFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Failed to delete temporary analytics file {FilePath}.",
-                path
-            );
-        }
     }
 
     private sealed record SchemaColumn(

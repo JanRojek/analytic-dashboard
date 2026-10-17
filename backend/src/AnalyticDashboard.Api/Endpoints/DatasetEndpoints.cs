@@ -9,6 +9,9 @@ using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
 using AnalyticDashboard.Application.Datasets.GetDatasets;
 using AnalyticDashboard.Application.Datasets.ImportCsvDataset;
 using AnalyticDashboard.Domain.Analytics;
+using AnalyticDashboard.Application.Datasets.GetDatasetRows;
+using AnalyticDashboard.Application.Datasets.GetImportStatus;
+using AnalyticDashboard.Domain.Entities;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
@@ -262,6 +265,61 @@ public static class DatasetEndpoints
             StatusCodes.Status404NotFound
         );
 
+        datasets.MapGet("/{datasetId:guid}/import-status", async (
+            Guid projectId,
+            Guid datasetId,
+            GetImportStatusHandler handler,
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken) =>
+        {
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var query = new GetImportStatusQuery(
+                datasetId,
+                projectId,
+                ownerId
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
+            return result switch
+            {
+                GetImportStatusResult.Found found =>
+                    Results.Ok(
+                        new ImportStatusResponse(
+                            found.ImportJobId,
+                            found.DatasetVersionId,
+                            found.Status,
+                            found.CreatedAtUtc,
+                            found.StartedAtUtc,
+                            found.CompletedAtUtc,
+                            found.Status == ImportJobStatus.Failed
+                                ? "Import failed. Please try again."
+                                : null
+                        )
+                    ),
+
+                GetImportStatusResult.NotFound =>
+                    Results.NotFound(),
+
+                _ => throw new UnreachableException()
+            };
+        })
+        .WithName("GetImportStatus")
+        .Produces<ImportStatusResponse>()
+        .Produces(
+            StatusCodes.Status401Unauthorized
+        )
+        .Produces(
+            StatusCodes.Status404NotFound
+        );
+
         datasets.MapGet("/{datasetId:guid}/profile", async (
             Guid projectId,
             Guid datasetId,
@@ -319,6 +377,70 @@ public static class DatasetEndpoints
         })
         .WithName("GetDatasetProfile")
         .Produces<DatasetProfileResponse>()
+        .Produces(
+            StatusCodes.Status401Unauthorized
+        )
+        .Produces(
+            StatusCodes.Status404NotFound
+        );
+
+        datasets.MapGet("/{datasetId:guid}/rows", async (
+            Guid projectId,
+            Guid datasetId,
+            GetDatasetRowsHandler handler,
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken,
+            int page = GetDatasetRowsQuery.DefaultPage,
+            int pageSize = GetDatasetRowsQuery.DefaultPageSize) =>
+        {
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var query = new GetDatasetRowsQuery(
+                datasetId,
+                projectId,
+                ownerId,
+                page,
+                pageSize
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
+            return result switch
+            {
+                GetDatasetRowsResult.Success success =>
+                    Results.Ok(
+                        new DatasetRowsResponse(
+                            success.Items,
+                            success.Page,
+                            success.PageSize,
+                            success.TotalRows,
+                            success.TotalPages
+                        )
+                    ),
+
+                GetDatasetRowsResult.NotFound =>
+                    Results.NotFound(),
+
+                GetDatasetRowsResult.InvalidPageSize invalid =>
+                    Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["PageSize"] = [invalid.Message]
+                        }
+                    ),
+
+                _ => throw new UnreachableException()
+            };
+        })
+        .WithName("GetDatasetRows")
+        .Produces<DatasetRowsResponse>()
+        .ProducesValidationProblem()
         .Produces(
             StatusCodes.Status401Unauthorized
         )
