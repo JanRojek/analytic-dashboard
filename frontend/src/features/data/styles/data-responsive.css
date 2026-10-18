@@ -1,0 +1,150 @@
+﻿@media (min-width: 1500px) {
+  .dataset-preview-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 1150px) {
+  .data-workflow-banner {
+    gap: 17px;
+    padding: 25px 23px;
+  }
+
+  .data-workflow-step {
+    gap: 10px;
+  }
+
+  .data-workflow-step p {
+    font-size: 10px;
+  }
+
+  .dataset-preview-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .data-workflow-banner {
+    gap: 15px;
+  }
+
+  .data-workflow-step > span {
+    display: none;
+  }
+
+  .data-workflow-step strong {
+    font-size: 12px;
+  }
+
+  .data-workflow-banner > svg {
+    width: 13px;
+  }
+
+  .dataset-metrics > div {
+    padding: 0 19px;
+  }
+
+  .metric-ready {
+    display: none;
+  }
+
+  .field-inspector-title {
+    grid-column: 1;
+    margin-top: 15px;
+  }
+}
+
+@media (max-width: 560px) {
+  .data-workflow-banner {
+    display: none;
+  }
+
+  .data-list-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .data-list-heading .mantine-TextInput-root {
+    width: 100%;
+  }
+
+  .dataset-metrics {
+    grid-template-columns: 1fr 1fr;
+    padding: 17px 0;
+    row-gap: 22px;
+  }
+
+  .dataset-metrics > div:nth-child(2) {
+    border: 0;
+  }
+
+  .dataset-metrics > div > span {
+    font-size: 10px;
+  }
+
+  .data-preview-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .data-preview-toolbar .mantine-TextInput-root {
+    width: 100%;
+  }
+
+  .data-preview-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 9px;
+  }
+
+  .data-preview-note {
+    white-space: normal;
+  }
+
+  .data-preview-controls {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
+
+  .data-page-size > span {
+    display: none;
+  }
+
+  .data-preview-columns {
+    display: none;
+  }
+
+  .import-steps {
+    gap: 10px;
+  }
+
+  .import-steps > span {
+    font-size: 10px;
+  }
+
+  .import-steps i {
+    width: 18px;
+  }
+
+  .sample-data-button {
+    padding: 12px;
+  }
+
+  .sample-data-button small {
+    font-size: 10px;
+  }
+
+  .data-footnote {
+    font-size: 10px;
+    line-height: 1.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-dropzone {
+    transition: none;
+  }
+}

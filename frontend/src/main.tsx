@@ -8,8 +8,18 @@ import {
 } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "./session/SessionProvider";
+
 import "@mantine/core/styles.css";
 import "./styles/global.css";
+
+import "./features/data/styles/data-main.css";
+import "./features/data/styles/data-list.css";
+import "./features/data/styles/dataset-workspace.css";
+import "./features/data/styles/data-preview.css";
+import "./features/data/styles/import-dialog.css";
+import "./features/data/styles/data-responsive.css";
+import "./features/data/styles/data-panels.css";
+
 import App from "./App";
 
 const ink: MantineColorsTuple = [

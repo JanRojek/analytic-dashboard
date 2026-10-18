@@ -38,10 +38,10 @@ const ConfirmEmailPage = lazy(
 );
 
 const DataPage = lazy(async () => ({
-  default: (await import("./features/data/pages/DataPages")).DataPage,
+  default: (await import("./features/data/pages/DataPage")).DataPage,
 }));
 const DatasetPage = lazy(async () => ({
-  default: (await import("./features/data/pages/DataPages")).DatasetPage,
+  default: (await import("./features/data/pages/DatasetPage")).DatasetPage,
 }));
 const ExplorePage = lazy(async () => ({
   default: (await import("./features/analytics/pages/AnalyticsPages"))

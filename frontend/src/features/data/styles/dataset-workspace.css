@@ -1,0 +1,142 @@
+﻿.data-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #61715e;
+  text-decoration: none;
+  font-size: 12px;
+  margin: 0 0 25px;
+}
+
+.data-back-link:hover {
+  color: #28634f;
+}
+
+.dataset-page .page-heading {
+  margin-bottom: 27px;
+}
+
+.page-content.dataset-page {
+  max-width: none;
+  margin: 0;
+  padding: 24px 28px 28px;
+}
+
+.dataset-page .data-back-link {
+  margin-bottom: 14px;
+}
+
+.dataset-page .page-heading {
+  margin-bottom: 16px;
+}
+
+.dataset-page .page-heading h1 {
+  font-size: 24px;
+}
+
+.dataset-page .page-heading p {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.dataset-metrics {
+  display: flex;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid #e3e8e1;
+  border-radius: 4px;
+  padding: 0;
+  margin-bottom: 14px;
+  min-height: 52px;
+}
+
+.dataset-metrics > div {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-right: 1px solid #e8ece5;
+  min-width: 0;
+}
+
+.dataset-metrics > div:last-child {
+  border-right: 0;
+}
+
+.dataset-metrics > div > span {
+  display: block;
+  margin: 0;
+  color: #61715e;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dataset-metrics strong {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0;
+  font-weight: 600;
+  color: #2e4835;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dataset-metrics strong small {
+  font-size: 10px;
+}
+
+.metric-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 0;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  color: #61715e;
+  white-space: nowrap;
+}
+
+.dataset-metrics strong.has-missing {
+  color: #61715e;
+}
+
+.dataset-preview-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+  align-items: start;
+}
+
+.dataset-pending {
+  max-width: 560px;
+  margin: 60px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  text-align: center;
+}
+
+.dataset-pending h2 {
+  font-size: 21px;
+  margin: 8px 0 0;
+}
+
+.dataset-pending p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #61715e;
+  margin: 0;
+}
+
+.dataset-pending .mantine-Alert-root {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 12px 0;
+  text-align: left;
+}

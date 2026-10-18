@@ -7,8 +7,6 @@ import { useSession } from "../../../session/SessionContext";
 import { createSampleFile, parseCsv } from "../../../mocks/csv";
 import { Icon } from "../../../components/Icon";
 
-import "../styles/data.css";
-
 export function ImportDataDialog({
   projectId,
   opened,
