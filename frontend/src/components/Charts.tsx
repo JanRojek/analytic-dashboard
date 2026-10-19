@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Aggregation, QueryItem, WidgetType } from "../data/types";
-import "../styles/analytics.css";
 
 const palette = [
   "#28634f",

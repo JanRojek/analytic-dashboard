@@ -1,0 +1,144 @@
+﻿.analytics-page {
+  --analytics-border: #e3e7e0;
+  --analytics-muted: #748077;
+}
+
+.analytics-page h2,
+.dashboard-workspace h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.analytics-note {
+  margin: 11px 0 0;
+  color: #666f69;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.analytics-section-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 18px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid #dce3d9;
+  border-radius: 50%;
+  color: #56765e;
+  font-size: 10px;
+}
+
+.analytics-dot {
+  margin: 0 8px;
+  color: #696f6b;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #5e9274;
+}
+
+.analytics-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.analytics-dialog p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.analytics-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.analytics-storage-error {
+  padding: 12px 18px;
+  background: #fff5e8;
+  color: #916321;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.chart-type-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.chart-type-picker button {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  min-height: 66px;
+  background: #fff;
+  border: 1px solid #e0e5dd;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #647069;
+  font: inherit;
+  font-size: 11px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.chart-type-picker button:hover {
+  border-color: #a6b6a7;
+  background: #f7f9f5;
+}
+
+.chart-type-picker button[aria-pressed="true"] {
+  background: #eef4ed;
+  color: #28634f;
+  border-color: #789c82;
+}
+
+.chart-type-picker button:focus-visible {
+  outline: 3px solid #9fb7a5;
+  outline-offset: 2px;
+}
+
+.query-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.query-fields .mantine-InputWrapper-description {
+  font-size: 10px;
+  margin-bottom: 8px;
+}
+
+.query-fields .mantine-InputWrapper-label,
+.chart-title-field .mantine-InputWrapper-label {
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+
+.query-field-divider {
+  height: 1px;
+  background: #edf0e9;
+  margin: 1px 0;
+}

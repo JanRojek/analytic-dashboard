@@ -20,6 +20,13 @@ import "./features/data/styles/import-dialog.css";
 import "./features/data/styles/data-responsive.css";
 import "./features/data/styles/data-panels.css";
 
+import "./features/analytics/styles/analytics-common.css";
+import "./features/analytics/styles/analytics-explore.css";
+import "./features/analytics/styles/analytics-charts.css";
+import "./features/analytics/styles/analytics-dashboards.css";
+import "./features/analytics/styles/analytics-workspace.css";
+import "./features/analytics/styles/analytics-responsive.css";
+
 import App from "./App";
 
 const ink: MantineColorsTuple = [

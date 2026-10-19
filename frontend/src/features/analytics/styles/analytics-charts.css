@@ -1,0 +1,278 @@
+﻿.chart-cartesian svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 330px;
+  overflow: visible;
+}
+
+.chart-cartesian.compact svg {
+  max-height: 150px;
+}
+
+.chart-tick {
+  fill: #657366;
+  font-size: 10px;
+  font-family: inherit;
+}
+
+.chart-cartesian rect {
+  transition: opacity 0.15s;
+}
+
+.chart-cartesian rect:hover {
+  opacity: 0.8;
+}
+
+.chart-footnote {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 10px;
+  color: #667069;
+}
+
+.chart-kpi {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 175px;
+  padding: 20px 10px;
+}
+
+.chart-kpi strong {
+  font-size: clamp(34px, 4vw, 54px);
+  font-weight: 550;
+  line-height: 1.2;
+  letter-spacing: -0.065em;
+  color: #294737;
+}
+
+.chart-kpi > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+  color: #657068;
+  font-size: 10px;
+}
+
+.chart-kpi > span > i {
+  width: 5px;
+  height: 5px;
+  background: #94b19b;
+  border-radius: 50%;
+}
+
+.kpi-composition {
+  display: flex;
+  gap: 3px;
+  height: 5px;
+  width: 100%;
+  margin-top: 28px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.chart-kpi.compact {
+  min-height: 95px;
+  padding: 8px;
+}
+
+.chart-kpi.compact strong {
+  font-size: 32px;
+}
+
+.chart-kpi.compact > span {
+  font-size: 8px;
+  margin-top: 8px;
+}
+
+.chart-donut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  min-height: 220px;
+}
+
+.chart-donut svg {
+  display: block;
+  width: 54%;
+  max-width: 250px;
+  flex-shrink: 1;
+}
+
+.donut-total {
+  fill: #304b3b;
+  font-size: 27px;
+  font-weight: 550;
+  letter-spacing: -1px;
+  font-family: inherit;
+}
+
+.donut-caption {
+  fill: #657366;
+  font-size: 10px;
+  font-family: inherit;
+}
+
+.chart-donut.compact {
+  min-height: 100px;
+}
+
+.chart-donut.compact svg {
+  width: 115px;
+  height: 115px;
+}
+
+.chart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 43%;
+  min-width: 110px;
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0;
+  font-size: 10px;
+}
+
+.chart-legend li > i {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.chart-legend li > span {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1;
+  color: #627065;
+}
+
+.chart-legend li > strong {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: #4b6051;
+}
+
+.chart-no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #626e65;
+  font-size: 12px;
+  line-height: 1.8;
+  text-align: center;
+  min-height: 180px;
+  padding: 25px;
+}
+
+.results-table {
+  max-height: 400px;
+  overflow: auto;
+  width: 100%;
+}
+
+.results-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.results-table th,
+.results-table td {
+  text-align: left;
+  padding: 12px 15px;
+  border-bottom: 1px solid #e9ede6;
+}
+
+.results-table th {
+  font-weight: 550;
+  color: #667068;
+  background: #f7f9f5;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.results-table th:last-child,
+.results-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-group-kpis {
+  padding: 10px 4px 16px;
+}
+
+.group-kpi-label {
+  display: block;
+  color: #63715e;
+  font-size: 11px;
+  margin-bottom: 14px;
+}
+
+.chart-group-kpis dl {
+  margin: 0;
+  max-height: 205px;
+  overflow: auto;
+}
+
+.chart-group-kpis dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid #edf0e7;
+}
+
+.chart-group-kpis dt {
+  color: #61735e;
+  font-size: 12px;
+}
+
+.chart-group-kpis dd {
+  margin: 0;
+  font-size: 25px;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #294737;
+}
+
+.chart-group-kpis.compact {
+  padding: 0 3px;
+}
+
+.chart-group-kpis.compact .group-kpi-label,
+.chart-group-kpis.compact dt,
+.group-kpi-more {
+  font-size: 9px;
+}
+
+.chart-group-kpis.compact .group-kpi-label {
+  margin-bottom: 4px;
+}
+
+.chart-group-kpis.compact dd {
+  font-size: 16px;
+}
+
+.chart-group-kpis.compact dl > div {
+  padding: 6px 0;
+}
+
+.group-kpi-more {
+  display: block;
+  margin-top: 8px;
+  color: #63715e;
+}

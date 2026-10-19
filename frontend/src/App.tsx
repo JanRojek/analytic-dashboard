@@ -44,19 +44,20 @@ const DatasetPage = lazy(async () => ({
   default: (await import("./features/data/pages/DatasetPage")).DatasetPage,
 }));
 const ExplorePage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages"))
-    .ExplorePage,
+  default: (await import("./features/analytics/pages/ExplorePage")).ExplorePage,
 }));
 const DashboardsPage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages"))
+  default: (await import("./features/analytics/pages/DashboardsPage"))
     .DashboardsPage,
 }));
+
 const DashboardEditorPage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages"))
+  default: (await import("./features/analytics/pages/DashboardEditorPage"))
     .DashboardEditorPage,
 }));
+
 const DashboardViewPage = lazy(async () => ({
-  default: (await import("./features/analytics/pages/AnalyticsPages"))
+  default: (await import("./features/analytics/pages/DashboardViewPage"))
     .DashboardViewPage,
 }));
 

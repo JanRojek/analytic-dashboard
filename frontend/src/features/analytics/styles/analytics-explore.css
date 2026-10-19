@@ -1,0 +1,156 @@
+﻿.explore-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  border: 1px solid #e0e5dc;
+  border-radius: 9px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.explore-controls {
+  padding: 25px 23px;
+  background: #fafbf8;
+  border-right: 1px solid #e3e7df;
+}
+
+.explore-controls > .analytics-section-label:not(:first-child) {
+  margin-top: 34px;
+}
+
+.explore-controls > .mantine-Button-root {
+  margin-top: 26px;
+}
+
+.dataset-source-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 10px;
+  color: #687169;
+}
+
+.explore-result {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.explore-result-toolbar {
+  padding: 26px 30px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.explore-result-toolbar h2 {
+  margin: 8px 0 0;
+  font-size: 17px;
+}
+
+.explore-result-toolbar .eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+.explore-chart-area {
+  padding: 24px 27px 10px;
+  min-height: 310px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+}
+
+.explore-chart-area > .chart-cartesian {
+  width: 100%;
+}
+
+.explore-chart-area .chart-kpi {
+  min-height: 260px;
+}
+
+.query-stale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  color: #8e672d;
+  background: #fcf6e9;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.explore-result-footer {
+  padding: 18px 30px;
+  color: #647068;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.explore-result-footer .status-dot {
+  margin-right: 6px;
+}
+
+.explore-style {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(150px, 1fr);
+  gap: 30px;
+  padding: 24px 30px;
+  border-top: 1px solid #e6eae2;
+}
+
+.explore-style .analytics-section-label {
+  margin-bottom: 13px;
+}
+
+.chart-title-field {
+  padding-top: 3px;
+}
+
+.chart-title-field .mantine-InputWrapper-label {
+  margin-bottom: 16px;
+}
+
+.explore-next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 24px;
+  padding: 22px 25px;
+  background: #eff3ed;
+  border: 1px solid #e4e9df;
+  border-radius: 7px;
+}
+
+.explore-next > div {
+  display: flex;
+  gap: 17px;
+  align-items: center;
+}
+
+.explore-next > div > svg {
+  color: #567260;
+  flex-shrink: 0;
+}
+
+.explore-next strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.explore-next p {
+  font-size: 11px;
+  color: #67716a;
+  margin: 5px 0 0;
+}
+
+.explore-next > .mantine-Button-root {
+  flex-shrink: 0;
+}
