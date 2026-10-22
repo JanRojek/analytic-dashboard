@@ -173,9 +173,9 @@
   line-height: 1.2;
   cursor: pointer;
   transition:
-    background-color 150ms,
-    border-color 150ms,
-    color 150ms;
+          background-color 150ms,
+          border-color 150ms,
+          color 150ms;
 }
 
 .chart-gallery-item > svg {
@@ -195,11 +195,6 @@
   outline-offset: 2px;
 }
 
-.canvas-inspector {
-  border-left: 1px solid #e1e6db;
-  padding: 0;
-  background: #fcfdfa;
-}
 
 .canvas-panel-heading {
   display: flex;
@@ -232,9 +227,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-
-  scroll-behavior: auto;
-  overflow-anchor: none;
 }
 
 .canvas-size-label {
@@ -318,7 +310,7 @@
   gap: 18px;
 }
 
-/* First RGL canvas prototype; presentation keeps the original CSS Grid. */
+/* Editing uses RGL; presentation keeps the existing CSS Grid. */
 .dashboard-canvas {
   min-width: 0;
   min-height: 280px;
@@ -380,8 +372,8 @@ body.aperture-canvas-interacting * {
   border-radius: 5px;
   background: #fff;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+          border-color 0.15s,
+          box-shadow 0.15s;
 }
 
 .is-editing .canvas-chart {
@@ -834,9 +826,4 @@ body.aperture-canvas-interacting * {
   color: #5b7353;
   background: #f1f5ec;
   font-size: 12px;
-}
-
-/* TEMP: test stabilności auto-scroll */
-.is-editing .dashboard-canvas > .react-grid-layout {
-  min-height: 2500px;
 }

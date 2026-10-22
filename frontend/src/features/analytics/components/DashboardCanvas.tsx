@@ -50,17 +50,17 @@ function overlap(a: LayoutItem, b: LayoutItem): boolean {
   if (a.i === b.i) return false;
 
   return (
-    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+      a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
   );
 }
 
 function hasCollision(layout: Layout, activeId?: string): boolean {
   const candidates = activeId
-    ? layout.filter((item) => item.i === activeId)
-    : layout;
+      ? layout.filter((item) => item.i === activeId)
+      : layout;
 
   return candidates.some((item) =>
-    layout.some((other) => overlap(item, other)),
+      layout.some((other) => overlap(item, other)),
   );
 }
 
@@ -112,7 +112,7 @@ export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
   }, []);
 
   const items = Children.toArray(children).filter(
-    (child): child is ReactElement => isValidElement(child),
+      (child): child is ReactElement => isValidElement(child),
   );
   const ids = items.map((child) => String(child.key));
   const layout = reconcileLayout(committedLayout, ids);
@@ -143,56 +143,56 @@ export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
   }
 
   return (
-    <div className="dashboard-canvas" ref={containerRef}>
-      {mounted && (
-        <ReactGridLayout
-          key={gridRevision}
-          width={width}
-          layout={layout}
-          gridConfig={{ cols: COLUMNS, rowHeight: 22, margin: [12, 12] }}
-          positionStrategy={transformStrategy}
-          dragConfig={{
-            enabled: true,
-            bounded: false,
-            threshold: 3,
-            cancel:
-              'button, a, input, select, textarea, [contenteditable="true"], .react-resizable-handle',
-          }}
-          resizeConfig={{
-            enabled: true,
-            handles: ["n", "e", "s", "w", "nw", "ne", "sw", "se"],
-          }}
-          compactor={isResizing ? resizeCompactor : dragCompactor}
-          onDragStart={(currentLayout, _oldItem, item) => {
-            startInteraction(currentLayout, item);
-          }}
-          onDrag={(nextLayout, _oldItem, item, _placeholder, _event, node) => {
-            const id = item?.i ?? activeWidgetId.current;
-            node?.classList.toggle(INVALID_CLASS, hasCollision(nextLayout, id));
-          }}
-          onDragStop={(
-            nextLayout,
-            _oldItem,
-            _item,
-            _placeholder,
-            _event,
-            node,
-          ) => {
-            node?.classList.remove(INVALID_CLASS);
-            finishInteraction(nextLayout);
-          }}
-          onResizeStart={(currentLayout, _oldItem, item) => {
-            startInteraction(currentLayout, item);
-            setIsResizing(true);
-          }}
-          onResizeStop={(nextLayout) => {
-            finishInteraction(nextLayout);
-            setIsResizing(false);
-          }}
-        >
-          {items}
-        </ReactGridLayout>
-      )}
-    </div>
+      <div className="dashboard-canvas" ref={containerRef}>
+        {mounted && (
+            <ReactGridLayout
+                key={gridRevision}
+                width={width}
+                layout={layout}
+                gridConfig={{ cols: COLUMNS, rowHeight: 22, margin: [12, 12] }}
+                positionStrategy={transformStrategy}
+                dragConfig={{
+                  enabled: true,
+                  bounded: false,
+                  threshold: 3,
+                  cancel:
+                      'button, a, input, select, textarea, [contenteditable="true"], .react-resizable-handle',
+                }}
+                resizeConfig={{
+                  enabled: true,
+                  handles: ["n", "e", "s", "w", "nw", "ne", "sw", "se"],
+                }}
+                compactor={isResizing ? resizeCompactor : dragCompactor}
+                onDragStart={(currentLayout, _oldItem, item) => {
+                  startInteraction(currentLayout, item);
+                }}
+                onDrag={(nextLayout, _oldItem, item, _placeholder, _event, node) => {
+                  const id = item?.i ?? activeWidgetId.current;
+                  node?.classList.toggle(INVALID_CLASS, hasCollision(nextLayout, id));
+                }}
+                onDragStop={(
+                    nextLayout,
+                    _oldItem,
+                    _item,
+                    _placeholder,
+                    _event,
+                    node,
+                ) => {
+                  node?.classList.remove(INVALID_CLASS);
+                  finishInteraction(nextLayout);
+                }}
+                onResizeStart={(currentLayout, _oldItem, item) => {
+                  startInteraction(currentLayout, item);
+                  setIsResizing(true);
+                }}
+                onResizeStop={(nextLayout) => {
+                  finishInteraction(nextLayout);
+                  setIsResizing(false);
+                }}
+            >
+              {items}
+            </ReactGridLayout>
+        )}
+      </div>
   );
 }
