@@ -102,28 +102,20 @@
   flex-shrink: 0;
 }
 
+.canvas-save-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 10px;
+  color: #657060;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .canvas-demo-label {
   color: #646f5c;
   font-size: 10px;
   margin-right: 7px;
-}
-
-.canvas-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 22px;
-  min-height: 42px;
-  background: #fafbf7;
-  border-bottom: 1px solid #e2e7dc;
-}
-
-.canvas-toolbar > div {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #657060;
-  font-size: 10px;
 }
 
 .save-indicator {
@@ -139,20 +131,74 @@
 
 .canvas-work-area {
   display: grid;
-  grid-template-columns: 185px minmax(420px, 1fr) 252px;
-  min-height: calc(100vh - 113px);
+  grid-template-columns: minmax(0, 1fr) 252px;
+  min-height: calc(100vh - 69px);
 }
 
-.canvas-outline,
-.canvas-inspector {
-  background: #fcfcfa;
+/* Chart library: a compact row that can grow with chartTypes. */
+.chart-gallery {
+  padding: 17px 16px 16px;
+  border-bottom: 1px solid #e4e9df;
 }
 
-.canvas-outline {
-  border-right: 1px solid #e1e6db;
-  padding: 24px 13px;
+.chart-gallery > .inspector-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: #395c45;
+}
+
+.chart-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.chart-gallery-item {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 66px;
+  padding: 9px 2px 8px;
+  border: 1px solid #e1e8dc;
+  border-radius: 7px;
+  background: #fff;
+  color: #536e58;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms;
+}
+
+.chart-gallery-item > svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.chart-gallery-item:hover {
+  background: #eef4eb;
+  border-color: #a6bea4;
+  color: #2c664d;
+}
+
+.chart-gallery-item:focus-visible {
+  outline: 2px solid #357a5d;
+  outline-offset: 2px;
+}
+
+.canvas-inspector {
+  border-left: 1px solid #e1e6db;
+  padding: 0;
+  background: #fcfdfa;
 }
 
 .canvas-panel-heading {
@@ -175,103 +221,20 @@
   color: #676f61;
 }
 
-.canvas-panel-hint {
-  color: #686f64;
-  margin: 8px 8px 22px;
-  font-size: 11px;
-}
-
-.outline-items {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.outline-items > button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 11px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  cursor: pointer;
-  color: #62705b;
-  font: inherit;
-  font-size: 11px;
-  text-align: left;
-  transition: background 0.15s;
-}
-
-.outline-items > button:hover {
-  background: #f0f3eb;
-}
-
-.outline-items > button.selected {
-  color: #3c6846;
-  background: #ebf1e5;
-  border-color: #dce6d2;
-}
-
-.outline-items > button > svg {
-  flex-shrink: 0;
-}
-
-.outline-items > button > span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.outline-items > button > small {
-  color: #646f5c;
-  font-size: 9px;
-}
-
-.outline-add {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 10px;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 11px;
-  color: #626f5b;
-  cursor: pointer;
-  text-align: left;
-  margin-top: 9px;
-}
-
-.outline-add:hover {
-  color: #28634f;
-}
-
-.canvas-outline-bottom {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: auto;
-  padding: 28px 6px 0;
-  color: #676f5f;
-}
-
-.canvas-outline-bottom > svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.canvas-outline-bottom > p {
-  margin: 0;
-  font-size: 10px;
-  line-height: 1.8;
-}
-
 .canvas-stage {
   padding: 27px 32px 30px;
   min-width: 0;
+}
+
+.is-editing .canvas-stage {
+  height: calc(100vh - 69px);
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+
+  scroll-behavior: auto;
+  overflow-anchor: none;
 }
 
 .canvas-size-label {
@@ -298,6 +261,11 @@
   min-height: 650px;
   padding: 38px 32px 22px;
   box-shadow: 0 2px 7px #25342b03;
+}
+
+.is-editing .dashboard-paper {
+  padding-top: 24px;
+  min-height: max(650px, calc(100vh + 160px));
 }
 
 .dashboard-paper-heading > .eyebrow {
@@ -350,6 +318,60 @@
   gap: 18px;
 }
 
+/* First RGL canvas prototype; presentation keeps the original CSS Grid. */
+.dashboard-canvas {
+  min-width: 0;
+  min-height: 280px;
+}
+
+.dashboard-canvas .canvas-chart.react-grid-item {
+  position: absolute;
+  overflow: hidden;
+}
+
+.dashboard-canvas .react-grid-item.react-grid-placeholder {
+  background: #90b59a;
+  border: 1px dashed #50765b;
+  border-radius: 5px;
+  opacity: 0.25;
+}
+
+/* In edit mode, dragging a chart must not select chart labels. */
+.dashboard-canvas .canvas-chart {
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dashboard-canvas .draft-chart-placeholder {
+  flex: 1;
+}
+
+/* Also protect adjacent page content while a drag/resize is in progress. */
+body.aperture-canvas-interacting,
+body.aperture-canvas-interacting * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Temporary overlap is only a preview, never an accepted placement. */
+.dashboard-canvas .canvas-chart.react-grid-item.aperture-placement-invalid {
+  border-color: #cb6262;
+  box-shadow: 0 0 0 2px #cb626255;
+}
+
+/* Resize handles are visible only on the selected widget. */
+.dashboard-canvas .canvas-chart.react-grid-item > .react-resizable-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dashboard-canvas .canvas-chart.react-grid-item.is-selected > .react-resizable-handle {
+  opacity: 0.85;
+  pointer-events: auto;
+}
+
 .canvas-chart {
   position: relative;
   min-width: 0;
@@ -373,6 +395,21 @@
 .canvas-chart.is-selected {
   border-color: #789977;
   box-shadow: 0 0 0 1px #789977;
+}
+
+.draft-chart-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 165px;
+  padding: 20px;
+  border: 1px dashed #cfd9ca;
+  border-radius: 5px;
+  color: #6e8068;
+  text-align: center;
+  font-size: 11px;
 }
 
 .canvas-chart-heading {
@@ -446,26 +483,56 @@
   max-height: 280px;
 }
 
+/* The editor uses the tile height; Preview keeps its original chart sizing. */
+.dashboard-canvas .canvas-chart .chart-cartesian {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  justify-content: stretch;
+}
+
+.dashboard-canvas .canvas-chart .chart-cartesian > svg {
+  display: block;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  max-height: none;
+}
+
+.dashboard-canvas .canvas-chart .chart-footnote {
+  flex-shrink: 0;
+}
+
+.dashboard-canvas .canvas-chart .chart-donut,
+.dashboard-canvas .canvas-chart .chart-kpi,
+.dashboard-canvas .canvas-chart .chart-group-kpis,
+.dashboard-canvas .canvas-chart .chart-no-data,
+.dashboard-canvas .canvas-chart .widget-loading {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.dashboard-canvas .canvas-chart .chart-donut {
+  overflow: hidden;
+}
+
+.dashboard-canvas .canvas-chart .chart-donut > svg {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  max-height: 100%;
+}
+
+.dashboard-canvas .canvas-chart .chart-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .canvas-chart .error-state {
   position: relative;
   z-index: 2;
-}
-
-.dashboard-paper-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 31px;
-  padding-top: 18px;
-  border-top: 1px solid #edf0e6;
-  color: #676d61;
-  font-size: 10px;
-}
-
-.dashboard-paper-footer > span:first-child {
-  font-size: 11px;
-  font-weight: 550;
-  letter-spacing: -0.03em;
 }
 
 .canvas-stage-hint {
@@ -486,27 +553,32 @@
 
 .canvas-inspector {
   border-left: 1px solid #e1e6db;
-  padding: 24px 0;
+  padding: 0;
+  background: #fcfdfa;
 }
 
 .canvas-inspector > .canvas-panel-heading {
-  padding: 0 20px 23px;
-  border-bottom: 1px solid #e9ede2;
+  padding: 14px 17px;
+  border-bottom: 1px solid #e4e9df;
+  background: #f4f7f1;
+  font-size: 12px;
+  font-weight: 650;
+  color: #395c45;
 }
 
 .inspector-section {
-  padding: 22px 19px;
-  border-bottom: 1px solid #e9ede2;
+  padding: 17px;
+  border-bottom: 1px solid #e9ede5;
 }
 
 .inspector-section > .mantine-TextInput-root {
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 .inspector-label {
   display: block;
   font-size: 11px;
-  font-weight: 550;
+  font-weight: 650;
   color: #617352;
   margin-bottom: 12px;
 }
@@ -537,7 +609,7 @@
 }
 
 .inspector-section .query-fields {
-  gap: 17px;
+  gap: 13px;
 }
 
 .inspector-section .query-fields .mantine-InputWrapper-description {
@@ -550,15 +622,63 @@
 
 .inspector-section .analytics-note {
   font-size: 10px;
-  color: #697161;
-  margin-top: 18px;
+  color: #6b7867;
+  margin-top: 13px;
+  line-height: 1.55;
+}
+
+/* Changing chart type is a secondary action below the library. */
+.inspector-visualization-details {
+  border: 1px solid #e1e8dc;
+  border-radius: 7px;
+  background: #fbfcf9;
+  overflow: hidden;
+}
+
+.inspector-visualization-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  color: #4d6752;
+  font-size: 11px;
+  font-weight: 550;
+  cursor: pointer;
+  list-style: none;
+}
+
+.inspector-visualization-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.inspector-visualization-details > summary:hover {
+  background: #f0f5ed;
+}
+
+.inspector-visualization-details > summary:focus-visible {
+  outline: 2px solid #357a5d;
+  outline-offset: -2px;
+}
+
+.inspector-visualization-details[open] > summary > svg {
+  transform: rotate(90deg);
+}
+
+.inspector-visualization-picker {
+  padding: 2px 9px 10px;
+}
+
+.inspector-visualization-picker .chart-type-picker button {
+  min-height: 52px;
 }
 
 .inspector-reorder {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 18px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
 }
 
 .inspector-reorder > span {
@@ -570,6 +690,7 @@
 .inspector-reorder .mantine-Button-root {
   font-size: 9px;
   padding: 0 5px;
+  border-radius: 5px;
 }
 
 .inspector-dataset {
@@ -690,10 +811,6 @@
   font-size: 11px;
 }
 
-.is-viewing .dashboard-paper-footer {
-  font-size: 10px;
-}
-
 .new-chart-fields .query-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -717,4 +834,9 @@
   color: #5b7353;
   background: #f1f5ec;
   font-size: 12px;
+}
+
+/* TEMP: test stabilności auto-scroll */
+.is-editing .dashboard-canvas > .react-grid-layout {
+  min-height: 2500px;
 }

@@ -25,27 +25,44 @@ export function Chart({
   title = "Query results",
   compact = false,
   aggregation = "Sum",
+  fillHeight = false,
 }: {
   type: WidgetType;
   items: QueryItem[];
   title?: string;
   compact?: boolean;
   aggregation?: Aggregation;
+  fillHeight?: boolean;
 }) {
   const id = useId();
   const plot = useRef<HTMLDivElement>(null);
-  const [plotWidth, setPlotWidth] = useState(640);
+  const [plotSize, setPlotSize] = useState({ width: 640, height: 260 });
   const valid = items.filter((item) => Number.isFinite(item.value));
   const hasValues = valid.length > 0;
   useEffect(() => {
     if (!plot.current) return;
     const observer = new ResizeObserver((entries) => {
-      const width = Math.round(entries[0].contentRect.width);
-      if (width > 0) setPlotWidth(width);
+      const { width, height } = entries[0].contentRect;
+      const nextWidth = Math.round(width);
+      const chartHeight = plot.current
+        ?.querySelector("svg")
+        ?.getBoundingClientRect().height;
+      const nextHeight = Math.round(chartHeight ?? height);
+      if (nextWidth <= 0) return;
+
+      setPlotSize((current) =>
+        current.width === nextWidth &&
+        (!fillHeight || current.height === nextHeight)
+          ? current
+          : {
+              width: nextWidth,
+              height: fillHeight ? nextHeight : current.height,
+            },
+      );
     });
     observer.observe(plot.current);
     return () => observer.disconnect();
-  }, [type, hasValues]);
+  }, [type, hasValues, fillHeight]);
   if (!valid.length)
     return (
       <div className="chart-no-data">
@@ -216,8 +233,12 @@ export function Chart({
     );
   }
   const shown = valid.slice(0, 24);
-  const width = Math.max(compact ? 120 : 260, plotWidth);
-  const height = compact ? 115 : Math.max(225, Math.min(290, width * 0.6));
+  const width = Math.max(compact ? 120 : 260, plotSize.width);
+  const height = compact
+    ? 115
+    : fillHeight
+      ? Math.max(100, plotSize.height)
+      : Math.max(225, Math.min(290, width * 0.6));
   const left = compact ? 6 : 46,
     right = 14,
     top = 20,

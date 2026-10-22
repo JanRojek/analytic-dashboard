@@ -12,9 +12,12 @@ import { useNavigate } from "react-router-dom";
 import { Brand } from "../../../components/Brand";
 import { EmptyState, ErrorState } from "../../../components/Feedback";
 import { Icon } from "../../../components/Icon";
-
-import type { Dashboard, Widget, WidgetInput } from "../../../data/types";
-
+import type {
+  Dashboard,
+  Widget,
+  WidgetInput,
+  WidgetType,
+} from "../../../data/types";
 import {
   editorScope,
   persistEditorDraft,
@@ -22,57 +25,108 @@ import {
   saveEditor,
   type EditorDocument,
 } from "../../../mocks/editor";
-
 import { useSession } from "../../../session/SessionContext";
-import { useDatasets } from "../../data/hooks";
 import { useDeleteWidget } from "../../dashboards/hooks";
 
 import { chartTypes, queryCaption } from "../chartConfig";
 import { orderedWidgets } from "../dashboardUtils";
-
+import { createDraftWidget, type DraftWidget } from "../draftWidgets";
+import { DashboardCanvas } from "./DashboardCanvas";
+import { ChartGallery } from "./ChartGallery";
 import { ChartTypePicker } from "./ChartTypePicker";
+import { DraftChartInspector } from "./DraftChartInspector";
 import { InspectorQuery } from "./InspectorQuery";
-import { NewChartDialog } from "./NewChartDialog";
 import { WidgetChart } from "./WidgetChart";
 import { WidgetResults } from "./WidgetResults";
+
+type DashboardWorkspaceProps = {
+  dashboard: Dashboard;
+  sourceWidgets: Widget[];
+  editing: boolean;
+};
+
+function readDraftWidgets(key: string): DraftWidget[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    // A damaged/old browser draft must not break the whole editor.
+    return parsed.filter(
+      (draft): draft is DraftWidget =>
+        typeof draft === "object" &&
+        draft !== null &&
+        typeof draft.id === "string" &&
+        typeof draft.title === "string" &&
+        chartTypes.some((type) => type.value === draft.type),
+    );
+  } catch {
+    return [];
+  }
+}
 
 export function DashboardWorkspace({
   dashboard,
   sourceWidgets,
   editing,
-}: {
-  dashboard: Dashboard;
-  sourceWidgets: Widget[];
-  editing: boolean;
-}) {
+}: DashboardWorkspaceProps) {
   const { mode, session } = useSession();
   const navigate = useNavigate();
   const scope = editorScope(mode, session?.user.id || "", dashboard.projectId);
+  const draftKey = `aperture:widget-drafts:${scope}:${dashboard.id}`;
+
   const [initial] = useState(() => readEditor(scope, dashboard.id, editing));
   const [document, setDocument] = useState(initial.document);
   const [dirty, setDirty] = useState(initial.dirty);
   const [selectedId, setSelectedId] = useState(sourceWidgets[0]?.id || "");
-  const [addOpen, setAddOpen] = useState(false);
+  const [draftWidgets, setDraftWidgets] = useState<DraftWidget[]>(() =>
+    readDraftWidgets(draftKey),
+  );
+
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [showTable, setShowTable] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
-  const [showTable, setShowTable] = useState(false);
+
   const widgets = orderedWidgets(sourceWidgets, document);
-  const selected =
-    widgets.find((widget) => widget.id === selectedId) || widgets[0];
-  const datasets = useDatasets(dashboard.projectId, editing);
+  const visibleDrafts = editing ? draftWidgets : [];
+  const chartCount = widgets.length + visibleDrafts.length;
+
+  const selectedDraft = draftWidgets.find((draft) => draft.id === selectedId);
+  const selected = selectedDraft
+    ? undefined
+    : widgets.find((widget) => widget.id === selectedId) || widgets[0];
+
+  const remove = useDeleteWidget(dashboard.projectId);
+
   useEffect(() => {
     if (!dirty || !editing) return;
+
     const guard = (event: BeforeUnloadEvent) => {
       event.preventDefault();
     };
+
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [dirty, editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draftWidgets));
+    } catch {
+      setSaveError("Your browser could not save chart drafts.");
+    }
+  }, [draftKey, draftWidgets, editing]);
+
   function update(next: EditorDocument) {
     setDocument(next);
     setDirty(true);
     setSaveMessage("");
+
     try {
       persistEditorDraft(scope, dashboard.id, next);
       setSaveError("");
@@ -82,7 +136,8 @@ export function DashboardWorkspace({
       );
     }
   }
-  function persist() {
+
+  function persist(): boolean {
     if (
       widgets.some(
         (widget) =>
@@ -96,6 +151,7 @@ export function DashboardWorkspace({
       );
       return false;
     }
+
     try {
       const saved = saveEditor(scope, dashboard.id, document);
       setDocument(saved);
@@ -110,35 +166,75 @@ export function DashboardWorkspace({
       return false;
     }
   }
+
   function leave(path: string) {
     if (
       dirty &&
       !window.confirm(
         "Leave with unsaved layout changes? Your draft will stay in this browser, but the presentation shows your last saved layout.",
       )
-    )
+    ) {
       return;
+    }
+
     navigate(path);
   }
-  function changeWidget(patch: Partial<WidgetInput>) {
-    if (selected)
-      update({
-        ...document,
-        overrides: {
-          ...document.overrides,
-          [selected.id]: { ...document.overrides[selected.id], ...patch },
-        },
-      });
+
+  function selectChart(id: string) {
+    setSelectedId(id);
+    setShowTable(false);
   }
+
+  function addDraft(type: WidgetType) {
+    const draft = createDraftWidget(type);
+    setDraftWidgets((current) => [...current, draft]);
+    selectChart(draft.id);
+  }
+
+  function changeDraft(id: string, patch: Partial<DraftWidget>) {
+    setDraftWidgets((current) =>
+      current.map((draft) =>
+        draft.id === id ? { ...draft, ...patch } : draft,
+      ),
+    );
+  }
+
+  function discardDraft(id: string) {
+    setDraftWidgets((current) => current.filter((draft) => draft.id !== id));
+    selectChart(widgets[0]?.id || "");
+  }
+
+  function changeWidget(patch: Partial<WidgetInput>) {
+    if (!selected) return;
+
+    update({
+      ...document,
+      overrides: {
+        ...document.overrides,
+        [selected.id]: { ...document.overrides[selected.id], ...patch },
+      },
+    });
+  }
+
   function move(direction: -1 | 1) {
     if (!selected) return;
+
     const ids = widgets.map((widget) => widget.id);
     const index = ids.indexOf(selected.id);
-    if (index + direction < 0 || index + direction >= ids.length) return;
-    [ids[index], ids[index + direction]] = [ids[index + direction], ids[index]];
+    const targetIndex = index + direction;
+
+    if (targetIndex < 0 || targetIndex >= ids.length) return;
+
+    [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
     update({ ...document, order: ids });
   }
-  const remove = useDeleteWidget(dashboard.projectId);
+
+  const saveStatus = dirty
+    ? "Layout draft kept locally"
+    : draftWidgets.length > 0 && editing
+      ? `${draftWidgets.length} chart draft${draftWidgets.length === 1 ? "" : "s"} kept locally`
+      : saveMessage || "Saved in this browser";
+
   return (
     <div
       className={`dashboard-workspace ${editing ? "is-editing" : "is-viewing"}`}
@@ -153,12 +249,14 @@ export function DashboardWorkspace({
               !window.confirm(
                 "Leave this editor? Your unsaved draft will remain in this browser.",
               )
-            )
+            ) {
               event.preventDefault();
+            }
           }}
         >
           <Brand />
           <span className="canvas-header-divider" />
+
           <button
             className="canvas-back"
             onClick={() => leave(`/projects/${dashboard.projectId}/dashboards`)}
@@ -167,6 +265,7 @@ export function DashboardWorkspace({
             <span>Dashboards</span>
           </button>
         </div>
+
         <div className="canvas-document-name">
           <Icon name="dashboard" size={17} />
           <strong>{dashboard.name}</strong>
@@ -174,25 +273,38 @@ export function DashboardWorkspace({
             {editing ? "Editor" : "Presentation"}
           </span>
         </div>
+
         <div className="canvas-actions">
           {mode === "demo" && <span className="canvas-demo-label">Demo</span>}
+
           {editing ? (
             <>
+              <span className="canvas-save-status" role="status">
+                <span
+                  className={
+                    dirty ? "save-indicator unsaved" : "save-indicator"
+                  }
+                />
+                {saveStatus}
+              </span>
+
               <Tooltip label="View your saved dashboard">
                 <Button
                   variant="default"
                   size="sm"
                   leftSection={<Icon name="eye" size={16} />}
                   onClick={() => {
-                    if (!dirty || persist())
+                    if (!dirty || persist()) {
                       navigate(
                         `/projects/${dashboard.projectId}/dashboards/${dashboard.id}/view`,
                       );
+                    }
                   }}
                 >
                   Preview
                 </Button>
               </Tooltip>
+
               <Button
                 size="sm"
                 leftSection={<Icon name="check" size={16} />}
@@ -216,105 +328,54 @@ export function DashboardWorkspace({
           )}
         </div>
       </header>
-      {editing && (
-        <div className="canvas-toolbar">
-          <div>
-            <span
-              className={dirty ? "save-indicator unsaved" : "save-indicator"}
-            />
-            <span role="status">
-              {dirty
-                ? "Unsaved changes · draft kept locally"
-                : saveMessage || "Layout and edits saved in this browser"}
-            </span>
-          </div>
-          <Button
-            size="xs"
-            variant="subtle"
-            leftSection={<Icon name="plus" size={15} />}
-            onClick={() => setAddOpen(true)}
-          >
-            Add chart
-          </Button>
-        </div>
-      )}
+
       {saveError && (
         <div className="analytics-storage-error" role="alert">
           {saveError}
         </div>
       )}
+
       <div className="canvas-work-area">
-        {editing && (
-          <aside className="canvas-outline">
-            <div className="canvas-panel-heading">
-              Outline <span>{widgets.length}</span>
-            </div>
-            <p className="canvas-panel-hint">Your dashboard at a glance</p>
-            <div className="outline-items">
-              {widgets.map((widget, index) => (
-                <button
-                  key={widget.id}
-                  className={selected?.id === widget.id ? "selected" : ""}
-                  onClick={() => {
-                    setSelectedId(widget.id);
-                    setShowTable(false);
-                  }}
-                  aria-pressed={selected?.id === widget.id}
-                >
-                  <Icon
-                    name={
-                      chartTypes.find((type) => type.value === widget.type)
-                        ?.icon || "chart"
-                    }
-                    size={16}
-                  />
-                  <span>{widget.title}</span>
-                  <small>{index + 1}</small>
-                </button>
-              ))}
-            </div>
-            <button className="outline-add" onClick={() => setAddOpen(true)}>
-              <Icon name="plus" size={16} />
-              Add a chart
-            </button>
-            <div className="canvas-outline-bottom">
-              <Icon name="help" size={17} />
-              <p>Select a chart to adjust its question, style and position.</p>
-            </div>
-          </aside>
-        )}
         <main className="canvas-stage">
           <div className="canvas-size-label">
             {editing ? "DASHBOARD CANVAS" : "PROJECT DASHBOARD"}
             <span>
-              {widgets.length} {widgets.length === 1 ? "chart" : "charts"}
+              {chartCount} {chartCount === 1 ? "chart" : "charts"}
             </span>
           </div>
+
           <div className="dashboard-paper">
-            <div className="dashboard-paper-heading">
-              <span className="eyebrow">AN OVERVIEW THAT MATTERS</span>
-              <h1>{dashboard.name}</h1>
-              <p>
-                {editing
-                  ? "Bring your findings into focus."
-                  : "A clear view of your latest data."}
-              </p>
-              <div className="dashboard-paper-meta">
-                <span>
-                  <i className="status-dot" />
-                  Current dataset versions
-                </span>
-                <span>
-                  {mode === "demo" ? "Demo workspace" : "Personal workspace"}
-                </span>
+            {!editing && (
+              <div className="dashboard-paper-heading">
+                <span className="eyebrow">AN OVERVIEW THAT MATTERS</span>
+                <h1>{dashboard.name}</h1>
+                <p>A clear view of your latest data.</p>
+
+                <div className="dashboard-paper-meta">
+                  <span>
+                    <i className="status-dot" />
+                    Current dataset versions
+                  </span>
+                  <span>
+                    {mode === "demo" ? "Demo workspace" : "Personal workspace"}
+                  </span>
+                </div>
               </div>
-            </div>
-            {widgets.length ? (
-              <div className="canvas-chart-grid">
+            )}
+
+            {chartCount > 0 ? (
+              <DashboardCanvas editing={editing}>
                 {widgets.map((widget) => (
                   <section
                     key={widget.id}
-                    className={`canvas-chart ${document.widths[widget.id] === "full" ? "full-width" : ""} ${editing && selected?.id === widget.id ? "is-selected" : ""} ${widget.type === "Kpi" ? "is-kpi" : ""}`}
+                    className={[
+                      "canvas-chart",
+                      document.widths[widget.id] === "full" && "full-width",
+                      editing && selected?.id === widget.id && "is-selected",
+                      widget.type === "Kpi" && "is-kpi",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     onClick={(event) => {
                       if (
                         editing &&
@@ -322,8 +383,7 @@ export function DashboardWorkspace({
                           "button, a, input, select",
                         )
                       ) {
-                        setSelectedId(widget.id);
-                        setShowTable(false);
+                        selectChart(widget.id);
                       }
                     }}
                   >
@@ -332,23 +392,20 @@ export function DashboardWorkspace({
                         <h2>{widget.title}</h2>
                         <p>{queryCaption(widget)}</p>
                       </div>
-                      {editing && (
+
+                      {editing ? (
                         <Tooltip label={`Configure ${widget.title}`}>
                           <ActionIcon
                             variant={
                               selected?.id === widget.id ? "light" : "subtle"
                             }
                             aria-label={`Configure ${widget.title}`}
-                            onClick={() => {
-                              setSelectedId(widget.id);
-                              setShowTable(false);
-                            }}
+                            onClick={() => selectChart(widget.id)}
                           >
                             <Icon name="settings" size={16} />
                           </ActionIcon>
                         </Tooltip>
-                      )}
-                      {!editing && (
+                      ) : (
                         <Tooltip label="Inspect results">
                           <ActionIcon
                             variant="subtle"
@@ -363,54 +420,96 @@ export function DashboardWorkspace({
                         </Tooltip>
                       )}
                     </div>
+
                     <WidgetChart
                       widget={widget}
                       projectId={dashboard.projectId}
+                      fillHeight={editing}
                     />
                   </section>
                 ))}
-              </div>
+
+                {visibleDrafts.map((draft) => {
+                  const chartType = chartTypes.find(
+                    (type) => type.value === draft.type,
+                  );
+
+                  return (
+                    <section
+                      key={draft.id}
+                      className={`canvas-chart ${selectedDraft?.id === draft.id ? "is-selected" : ""}`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Configure ${draft.title || chartType?.label || "new"} chart draft`}
+                      onClick={() => selectChart(draft.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          selectChart(draft.id);
+                        }
+                      }}
+                    >
+                      <div className="canvas-chart-heading">
+                        <div>
+                          <h2>
+                            {draft.title ||
+                              `${chartType?.label || "New"} chart`}
+                          </h2>
+                          <p>Draft · not configured</p>
+                        </div>
+                      </div>
+
+                      <div className="draft-chart-placeholder">
+                        <Icon name={chartType?.icon || "chart"} size={28} />
+                        <span>Configure this chart in the right panel.</span>
+                      </div>
+                    </section>
+                  );
+                })}
+              </DashboardCanvas>
             ) : (
               <EmptyState
                 icon="chart"
                 title="What would you like to understand?"
-                description="Add a chart from your project data. Build a story by bringing your findings together."
-                action={
-                  editing && (
-                    <Button
-                      leftSection={<Icon name="plus" />}
-                      onClick={() => setAddOpen(true)}
-                    >
-                      Add your first chart
-                    </Button>
-                  )
+                description={
+                  editing
+                    ? "Choose a visualization from the right panel to add it to your dashboard."
+                    : "This dashboard does not have any charts yet."
                 }
               />
             )}
-            <footer className="dashboard-paper-footer">
-              <span>Aperture</span>
-              <span>
-                {editing
-                  ? "Designed for a clearer perspective"
-                  : "Your data. A clearer perspective."}
-              </span>
-            </footer>
           </div>
+
           {editing && (
             <p className="canvas-stage-hint">
               <Icon name="shield" size={14} />
-              New charts are saved to your{" "}
-              {mode === "demo" ? "demo workspace" : "account"}. Layout and chart
-              edits stay in this browser.
+              Chart positions and sizes are experimental and will reset on
+              refresh. Other editor drafts stay in this browser.
             </p>
           )}
         </main>
+
         {editing && (
           <aside className="canvas-inspector">
-            <div className="canvas-panel-heading">
-              Chart properties <Icon name="settings" size={16} />
-            </div>
-            {selected ? (
+            <ChartGallery onAdd={addDraft} />
+
+            <div className="canvas-panel-heading">Chart properties</div>
+
+            {selectedDraft ? (
+              <DraftChartInspector
+                key={selectedDraft.id}
+                dashboard={dashboard}
+                draft={selectedDraft}
+                onChange={(patch) => changeDraft(selectedDraft.id, patch)}
+                onDiscard={() => discardDraft(selectedDraft.id)}
+                onCreated={(widgetId) => {
+                  setDraftWidgets((current) =>
+                    current.filter((draft) => draft.id !== selectedDraft.id),
+                  );
+                  selectChart(widgetId);
+                }}
+              />
+            ) : selected ? (
               <>
                 <div className="inspector-section">
                   <TextInput
@@ -421,12 +520,21 @@ export function DashboardWorkspace({
                       changeWidget({ title: event.currentTarget.value })
                     }
                   />
-                  <span className="inspector-label">Visualization</span>
-                  <ChartTypePicker
-                    value={selected.type}
-                    onChange={(type) => changeWidget({ type })}
-                  />
+
+                  <details className="inspector-visualization-details">
+                    <summary>
+                      Change visualization
+                      <Icon name="chevron" size={14} />
+                    </summary>
+                    <div className="inspector-visualization-picker">
+                      <ChartTypePicker
+                        value={selected.type}
+                        onChange={(type) => changeWidget({ type })}
+                      />
+                    </div>
+                  </details>
                 </div>
+
                 <div className="inspector-section">
                   <span className="inspector-label">Layout</span>
                   <SegmentedControl
@@ -447,26 +555,32 @@ export function DashboardWorkspace({
                       { value: "full", label: "Full width" },
                     ]}
                   />
-                  <div className="inspector-reorder">
-                    <span>Position</span>
-                    <Button
-                      variant="default"
-                      size="compact-xs"
-                      disabled={widgets[0].id === selected.id}
-                      onClick={() => move(-1)}
-                    >
-                      Move earlier
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="compact-xs"
-                      disabled={widgets[widgets.length - 1].id === selected.id}
-                      onClick={() => move(1)}
-                    >
-                      Move later
-                    </Button>
-                  </div>
+
+                  {widgets.length > 1 && (
+                    <div className="inspector-reorder">
+                      <span>Position</span>
+                      <Button
+                        variant="default"
+                        size="compact-xs"
+                        disabled={widgets[0]?.id === selected.id}
+                        onClick={() => move(-1)}
+                      >
+                        Move earlier
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="compact-xs"
+                        disabled={
+                          widgets[widgets.length - 1]?.id === selected.id
+                        }
+                        onClick={() => move(1)}
+                      >
+                        Move later
+                      </Button>
+                    </div>
+                  )}
                 </div>
+
                 <InspectorQuery
                   key={selected.id}
                   widget={selected}
@@ -478,6 +592,7 @@ export function DashboardWorkspace({
                     )
                   }
                 />
+
                 <div className="inspector-section">
                   <Button
                     fullWidth
@@ -488,6 +603,7 @@ export function DashboardWorkspace({
                   >
                     Inspect results
                   </Button>
+
                   <Button
                     fullWidth
                     variant="subtle"
@@ -508,25 +624,13 @@ export function DashboardWorkspace({
               <div className="inspector-empty">
                 <Icon name="settings" size={28} />
                 <h3>A little room for possibility</h3>
-                <p>Add a chart, then make it your own here.</p>
+                <p>Choose a visualization above to begin.</p>
               </div>
             )}
           </aside>
         )}
       </div>
-      <NewChartDialog
-        opened={addOpen}
-        onClose={() => setAddOpen(false)}
-        dashboard={dashboard}
-        datasets={datasets.data || []}
-        datasetsLoading={datasets.isPending}
-        datasetsError={datasets.error}
-        retryDatasets={() => datasets.refetch()}
-        onCreated={(id) => {
-          setSelectedId(id);
-          setAddOpen(false);
-        }}
-      />
+
       <Modal
         opened={deleteOpen}
         onClose={remove.isPending ? () => {} : () => setDeleteOpen(false)}
@@ -538,7 +642,9 @@ export function DashboardWorkspace({
             <strong>{selected?.title}</strong> will be permanently removed from
             this dashboard. Your source dataset will stay available.
           </p>
+
           {remove.isError && <ErrorState error={remove.error} />}
+
           <div className="analytics-dialog-actions">
             <Button
               variant="default"
@@ -547,6 +653,7 @@ export function DashboardWorkspace({
             >
               Keep chart
             </Button>
+
             <Button
               color="red"
               loading={remove.isPending}
@@ -569,6 +676,7 @@ export function DashboardWorkspace({
           </div>
         </div>
       </Modal>
+
       <Modal
         opened={showTable && Boolean(selected)}
         onClose={() => setShowTable(false)}

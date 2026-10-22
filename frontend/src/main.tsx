@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "./session/SessionProvider";
 
 import "@mantine/core/styles.css";
-import "./styles/global.css";
+import "./global.css";
 
 import "./features/data/styles/data-main.css";
 import "./features/data/styles/data-list.css";

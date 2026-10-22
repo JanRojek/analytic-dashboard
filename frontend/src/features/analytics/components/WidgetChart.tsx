@@ -8,10 +8,12 @@ export function WidgetChart({
   widget,
   projectId,
   compact = false,
+  fillHeight = false,
 }: {
   widget: Widget;
   projectId: string;
   compact?: boolean;
+  fillHeight?: boolean;
 }) {
   const config = {
     groupByColumn: widget.groupByColumn,
@@ -41,6 +43,7 @@ export function WidgetChart({
       items={data.data}
       title={widget.title}
       compact={compact}
+      fillHeight={fillHeight}
       aggregation={widget.aggregation}
     />
   );

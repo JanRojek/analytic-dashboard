@@ -1,6 +1,11 @@
 ﻿@media (min-width: 1600px) {
+  .is-editing .dashboard-paper,
+  .is-editing .canvas-size-label {
+    max-width: none;
+  }
+
   .canvas-work-area {
-    grid-template-columns: 205px minmax(420px, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 280px;
   }
 
   .canvas-stage {
@@ -21,7 +26,7 @@
 
 @media (max-width: 1200px) {
   .canvas-work-area {
-    grid-template-columns: 155px minmax(380px, 1fr) 220px;
+    grid-template-columns: minmax(0, 1fr) 220px;
   }
 
   .canvas-stage {
@@ -45,7 +50,7 @@
   }
 
   .inspector-section {
-    padding: 20px 14px;
+    padding: 17px 14px;
   }
 
   .canvas-chart .chart-donut {
@@ -79,12 +84,16 @@
 }
 
 @media (max-width: 980px) {
-  .canvas-work-area {
-    grid-template-columns: minmax(390px, 1fr) 220px;
+  .chart-gallery {
+    padding-inline: 12px;
   }
 
-  .canvas-outline {
-    display: none;
+  .inspector-section {
+    padding-inline: 12px;
+  }
+
+  .canvas-work-area {
+    grid-template-columns: minmax(390px, 1fr) 220px;
   }
 
   .explore-style {
@@ -126,6 +135,17 @@
 }
 
 @media (max-width: 700px) {
+  .canvas-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .canvas-save-status {
+    width: 100%;
+    margin-right: 0;
+    justify-content: flex-end;
+  }
+
   .explore-layout {
     grid-template-columns: 1fr;
   }
@@ -249,18 +269,6 @@
 
   .canvas-chart .chart-legend {
     width: 45%;
-  }
-
-  .canvas-toolbar {
-    padding: 8px 15px;
-  }
-
-  .canvas-toolbar > div {
-    font-size: 8px;
-  }
-
-  .canvas-toolbar .mantine-Button-root {
-    font-size: 10px;
   }
 
   .is-viewing .canvas-stage {
