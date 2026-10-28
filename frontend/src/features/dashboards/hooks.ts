@@ -1,7 +1,11 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
-import type { WidgetInput } from "../../data/types";
+import type {
+  CreateWidgetInput,
+  DashboardWidgetUpdate,
+  WidgetLayoutChange,
+} from "../../data/types";
 
 export function useDashboards(projectId: string, enabled = true) {
   const { adapter } = useSession();
@@ -60,7 +64,7 @@ export function useCreateWidget(projectId: string) {
       input,
     }: {
       dashboardId: string;
-      input: WidgetInput;
+      input: CreateWidgetInput;
     }) => adapter.createWidget(projectId, dashboardId, input),
 
     onSuccess: async (_, { dashboardId }) => {
@@ -99,6 +103,58 @@ export function useDeleteWidget(projectId: string) {
       dashboardId: string;
       widgetId: string;
     }) => adapter.deleteWidget(projectId, dashboardId, widgetId),
+
+    onSuccess: async (_, { dashboardId }) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
+      });
+    },
+  });
+}
+
+export function useUpdateDashboardLayout(projectId: string) {
+  const { adapter } = useSession();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      dashboardId,
+      changes,
+    }: {
+      dashboardId: string;
+      changes: WidgetLayoutChange[];
+    }) =>
+        adapter.updateDashboardLayout(
+            projectId,
+            dashboardId,
+            changes,
+        ),
+
+    onSuccess: async (_, { dashboardId }) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
+      });
+    },
+  });
+}
+
+export function useUpdateDashboardWidgets(projectId: string) {
+  const { adapter } = useSession();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      dashboardId,
+      updates,
+    }: {
+      dashboardId: string;
+      updates: DashboardWidgetUpdate[];
+    }) =>
+        adapter.updateDashboardWidgets(
+            projectId,
+            dashboardId,
+            updates,
+        ),
 
     onSuccess: async (_, { dashboardId }) => {
       await queryClient.invalidateQueries({

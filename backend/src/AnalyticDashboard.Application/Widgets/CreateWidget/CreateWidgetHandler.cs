@@ -56,7 +56,8 @@ public sealed class CreateWidgetHandler
             command.Title,
             command.GroupByColumn,
             command.MeasureColumn,
-            command.Aggregation
+            command.Aggregation,
+            command.Layout
         );
 
         await _widgetRepository.AddAsync(

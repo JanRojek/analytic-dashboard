@@ -94,7 +94,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     );
   }
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+
+  return (await response.json()) as T;
 }
 
 const json = (body: unknown, method = "POST"): RequestInit => ({
@@ -187,6 +188,24 @@ export const apiAdapter: DataAdapter = {
   deleteDashboard: (p, d) =>
     request<void>(dashboardPath(p, d), { method: "DELETE" }),
   listWidgets: (p, d) => request<Widget[]>(widgetsPath(p, d)),
+  updateDashboardLayout: (p, d, changes) =>
+      request<void>(
+          `${dashboardPath(p, d)}/layout`,
+          json(
+              {
+                widgets: changes.map((change) => ({
+                  widgetId: change.widgetId,
+                  layout: change.newLayout,
+                })),
+              },
+              "PUT",
+          ),
+      ),
+  updateDashboardWidgets: (p, d, updates) =>
+      request<void>(
+          widgetsPath(p, d),
+          json({ widgets: updates }, "PUT"),
+      ),
   async createWidget(p, d, input) {
     const result = await request<{ id: string }>(
       widgetsPath(p, d),

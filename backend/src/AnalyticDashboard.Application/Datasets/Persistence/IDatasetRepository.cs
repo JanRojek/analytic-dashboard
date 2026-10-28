@@ -36,4 +36,11 @@ public interface IDatasetRepository
         Guid versionId,
         CancellationToken cancellationToken
     );
+
+    Task<HashSet<Guid>> GetExistingDatasetIdsAsync(
+        IReadOnlyCollection<Guid> datasetIds,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken
+    );
 }

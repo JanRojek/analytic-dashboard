@@ -1,4 +1,10 @@
 import type { DataMode, QueryConfig, WidgetInput } from "../data/types";
+import {
+  DASHBOARD_GRID_COLUMNS,
+  DASHBOARD_GRID_LEGACY_COLUMNS,
+  upgradeLegacyGridGeometry,
+  type DashboardGridGeometry,
+} from "../data/dashboardGrid";
 
 // The API can create widgets, but cannot update their configuration or layout yet.
 // These browser-only overrides are deliberately kept out of the API adapter.
@@ -6,6 +12,8 @@ export interface EditorDocument {
   order: string[];
   widths: Record<string, "half" | "full">;
   overrides: Record<string, Partial<WidgetInput>>;
+  gridLayout?: DashboardGridGeometry;
+  gridColumns?: number;
   savedAt?: string;
 }
 export interface ExplorationDraft extends QueryConfig {
@@ -20,6 +28,8 @@ const emptyDocument = (): EditorDocument => ({
   order: [],
   widths: {},
   overrides: {},
+  gridLayout: {},
+  gridColumns: DASHBOARD_GRID_COLUMNS,
 });
 function readStored(key: string): unknown {
   try {
@@ -33,6 +43,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 const widgetTypes = new Set(["Kpi", "BarChart", "LineChart", "PieChart"]);
 const aggregations = new Set(["Sum", "Average", "Min", "Max", "Count"]);
+function readGridLayout(value: unknown, cols: number): DashboardGridGeometry {
+  if (!isRecord(value)) return {};
+
+  const geometry: DashboardGridGeometry = {};
+  for (const [id, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) continue;
+    const { x, y, w, h } = raw;
+    if (
+      [x, y, w, h].every(
+        (n) => typeof n === "number" && Number.isSafeInteger(n),
+      ) &&
+      (x as number) >= 0 &&
+      (y as number) >= 0 &&
+      (w as number) >= 1 &&
+      (h as number) >= 1 &&
+      (x as number) + (w as number) <= cols &&
+      (y as number) < 100000 &&
+      (h as number) < 100000
+    ) {
+      geometry[id] = {
+        x: x as number,
+        y: y as number,
+        w: w as number,
+        h: h as number,
+      };
+    }
+  }
+  return geometry;
+}
 function parseDocument(value: unknown): EditorDocument | null {
   if (
     !isRecord(value) ||
@@ -48,6 +87,21 @@ function parseDocument(value: unknown): EditorDocument | null {
     )
   )
     return null;
+  // Older documents did not store gridColumns and used 12 columns.
+  // Future/unknown versions are rejected instead of silently corrupting layout.
+  if (
+    value.gridColumns !== undefined &&
+    value.gridColumns !== DASHBOARD_GRID_LEGACY_COLUMNS &&
+    value.gridColumns !== DASHBOARD_GRID_COLUMNS
+  ) return null;
+  const sourceColumns = value.gridColumns === DASHBOARD_GRID_COLUMNS
+    ? DASHBOARD_GRID_COLUMNS
+    : DASHBOARD_GRID_LEGACY_COLUMNS;
+  const sourceGrid = readGridLayout(value.gridLayout, sourceColumns);
+  const gridLayout = sourceColumns === DASHBOARD_GRID_LEGACY_COLUMNS
+    ? upgradeLegacyGridGeometry(sourceGrid)
+    : sourceGrid;
+
   const overrides: EditorDocument["overrides"] = {};
   for (const [id, patch] of Object.entries(value.overrides)) {
     if (!isRecord(patch)) return null;
@@ -83,6 +137,8 @@ function parseDocument(value: unknown): EditorDocument | null {
     order: [...new Set(value.order)],
     widths: value.widths as EditorDocument["widths"],
     overrides,
+    gridLayout,
+    gridColumns: DASHBOARD_GRID_COLUMNS,
     ...(typeof value.savedAt === "string" ? { savedAt: value.savedAt } : {}),
   };
 }

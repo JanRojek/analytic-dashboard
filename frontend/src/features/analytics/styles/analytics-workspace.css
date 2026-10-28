@@ -135,7 +135,6 @@
   min-height: calc(100vh - 69px);
 }
 
-/* Chart library: a compact row that can grow with chartTypes. */
 .chart-gallery {
   padding: 17px 16px 16px;
   border-bottom: 1px solid #e4e9df;
@@ -256,7 +255,7 @@
 }
 
 .is-editing .dashboard-paper {
-  padding-top: 24px;
+  padding: 12px;
   min-height: max(650px, calc(100vh + 160px));
 }
 
@@ -304,13 +303,6 @@
   height: 4px;
 }
 
-.canvas-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-/* Editing uses RGL; presentation keeps the existing CSS Grid. */
 .dashboard-canvas {
   min-width: 0;
   min-height: 280px;
@@ -328,7 +320,6 @@
   opacity: 0.25;
 }
 
-/* In edit mode, dragging a chart must not select chart labels. */
 .dashboard-canvas .canvas-chart {
   display: flex;
   flex-direction: column;
@@ -340,20 +331,17 @@
   flex: 1;
 }
 
-/* Also protect adjacent page content while a drag/resize is in progress. */
 body.aperture-canvas-interacting,
 body.aperture-canvas-interacting * {
   user-select: none !important;
   -webkit-user-select: none !important;
 }
 
-/* Temporary overlap is only a preview, never an accepted placement. */
 .dashboard-canvas .canvas-chart.react-grid-item.aperture-placement-invalid {
   border-color: #cb6262;
   box-shadow: 0 0 0 2px #cb626255;
 }
 
-/* Resize handles are visible only on the selected widget. */
 .dashboard-canvas .canvas-chart.react-grid-item > .react-resizable-handle {
   opacity: 0;
   pointer-events: none;
@@ -378,10 +366,6 @@ body.aperture-canvas-interacting * {
 
 .is-editing .canvas-chart {
   cursor: pointer;
-}
-
-.canvas-chart.full-width {
-  grid-column: 1 / -1;
 }
 
 .canvas-chart.is-selected {
@@ -475,7 +459,6 @@ body.aperture-canvas-interacting * {
   max-height: 280px;
 }
 
-/* The editor uses the tile height; Preview keeps its original chart sizing. */
 .dashboard-canvas .canvas-chart .chart-cartesian {
   flex: 1 1 auto;
   min-height: 0;
@@ -619,7 +602,6 @@ body.aperture-canvas-interacting * {
   line-height: 1.55;
 }
 
-/* Changing chart type is a secondary action below the library. */
 .inspector-visualization-details {
   border: 1px solid #e1e8dc;
   border-radius: 7px;
@@ -663,26 +645,6 @@ body.aperture-canvas-interacting * {
 
 .inspector-visualization-picker .chart-type-picker button {
   min-height: 52px;
-}
-
-.inspector-reorder {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 13px;
-}
-
-.inspector-reorder > span {
-  margin-right: auto;
-  font-size: 10px;
-  color: #617057;
-}
-
-.inspector-reorder .mantine-Button-root {
-  font-size: 9px;
-  padding: 0 5px;
-  border-radius: 5px;
 }
 
 .inspector-dataset {
@@ -775,10 +737,6 @@ body.aperture-canvas-interacting * {
   margin-bottom: 30px;
 }
 
-.is-viewing .canvas-chart {
-  padding: 26px;
-}
-
 .is-viewing .canvas-chart-heading h2 {
   font-size: 15px;
 }
@@ -787,16 +745,14 @@ body.aperture-canvas-interacting * {
   font-size: 10px;
 }
 
-.is-viewing .canvas-chart .chart-cartesian {
-  min-height: 240px;
+.is-viewing .dashboard-canvas .canvas-chart {
+  padding: 20px 18px 13px;
 }
 
-.is-viewing .canvas-chart .chart-kpi {
-  min-height: 210px;
-}
-
-.is-viewing .canvas-chart .chart-donut {
-  min-height: 245px;
+.is-viewing .dashboard-canvas .canvas-chart .chart-cartesian,
+.is-viewing .dashboard-canvas .canvas-chart .chart-donut,
+.is-viewing .dashboard-canvas .canvas-chart .chart-kpi {
+  min-height: 0;
 }
 
 .is-viewing .canvas-chart .chart-legend li {

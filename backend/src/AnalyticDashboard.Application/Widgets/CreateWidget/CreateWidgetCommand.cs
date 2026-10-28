@@ -1,5 +1,6 @@
 using AnalyticDashboard.Domain.Analytics;
 using AnalyticDashboard.Domain.Entities;
+using AnalyticDashboard.Domain.ValueObjects;
 
 namespace AnalyticDashboard.Application.Widgets.CreateWidget;
 
@@ -12,5 +13,6 @@ public sealed record CreateWidgetCommand(
     string Title,
     string GroupByColumn,
     string MeasureColumn,
-    AggregationType Aggregation
+    AggregationType Aggregation,
+    WidgetLayout Layout
 );

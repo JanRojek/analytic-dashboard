@@ -16,6 +16,13 @@ public interface IWidgetRepository
         CancellationToken cancellationToken
     );
 
+    Task<IReadOnlyList<Widget>> GetAllForUpdateAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken
+    );
+
     Task<Widget?> GetByIdAndDashboardProjectOwnerAsync(
         Guid widgetId,
         Guid dashboardId,

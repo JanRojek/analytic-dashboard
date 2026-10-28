@@ -12,5 +12,13 @@ public sealed record GetWidgetsResponse(
     string GroupByColumn,
     string MeasureColumn,
     AggregationType Aggregation,
+    WidgetLayoutResponse Layout,
     DateTime CreatedAtUtc
+);
+
+public sealed record WidgetLayoutResponse(
+    int X,
+    int Y,
+    int Width,
+    int Height
 );

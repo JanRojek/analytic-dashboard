@@ -32,6 +32,12 @@ public sealed class GetWidgetsHandler
             widget.GroupByColumn,
             widget.MeasureColumn,
             widget.Aggregation,
+            new WidgetLayoutResponse(
+                widget.Layout.X,
+                widget.Layout.Y,
+                widget.Layout.Width,
+                widget.Layout.Height
+            ),
             widget.CreatedAtUtc
         )).ToList();
     }

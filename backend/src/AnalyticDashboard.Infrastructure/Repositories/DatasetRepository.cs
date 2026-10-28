@@ -130,4 +130,23 @@ public sealed class DatasetRepository : IDatasetRepository
 
         return true;
     }
+
+    public async Task<HashSet<Guid>> GetExistingDatasetIdsAsync(
+        IReadOnlyCollection<Guid> datasetIds,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var ids = await _dbContext.Datasets
+            .Where(dataset =>
+                datasetIds.Contains(dataset.Id)
+                && dataset.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dataset.ProjectId
+                    && project.OwnerId == ownerId))
+            .Select(dataset => dataset.Id)
+            .ToListAsync(cancellationToken);
+
+        return ids.ToHashSet();
+    }
 }

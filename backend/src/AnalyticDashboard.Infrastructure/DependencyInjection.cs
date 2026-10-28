@@ -15,6 +15,7 @@ using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Storage;
 using AnalyticDashboard.Infrastructure.Storage;
 using AnalyticDashboard.Application.Analytics.QueryDataset;
+using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Application.Dashboards.Persistence;
 using AnalyticDashboard.Application.Datasets.GetDatasetRows;
 using AnalyticDashboard.Application.Widgets.Persistence;
@@ -35,6 +36,11 @@ public static class DependencyInjection
 
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(connectionString));
+
+        services.AddScoped<IUnitOfWork>(
+            serviceProvider =>
+                serviceProvider.GetRequiredService<AppDbContext>()
+        );
 
         services.AddScoped<IDatasetRepository, DatasetRepository>();
 

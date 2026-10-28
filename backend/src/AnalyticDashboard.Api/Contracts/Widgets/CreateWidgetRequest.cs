@@ -8,5 +8,6 @@ public sealed record CreateWidgetRequest(
     string Title,
     string GroupByColumn,
     string MeasureColumn,
-    string Aggregation
+    string Aggregation,
+    WidgetLayoutRequest? Layout
 );

@@ -310,7 +310,8 @@ public sealed class GetWidgetDataEndpointTests : IClassFixture<ApiFixture>
                     "Sales by country",
                     "Country",
                     "Amount",
-                    "Sum"
+                    "Sum",
+                    new WidgetLayoutRequest(0, 0, 12, 20)
                 ),
                 userId
             );
@@ -328,6 +329,45 @@ public sealed class GetWidgetDataEndpointTests : IClassFixture<ApiFixture>
             var widgetId = await ReadIdAsync(
                 createWidgetResponse
             );
+
+            using var getWidgetsRequest = CreateRequest(
+                HttpMethod.Get,
+                $"/projects/{project.Id}/dashboards/{dashboardId}/widgets",
+                userId
+            );
+
+            using var getWidgetsResponse = await _fixture.Client.SendAsync(
+                getWidgetsRequest,
+                CancellationToken
+            );
+
+            Assert.Equal(
+                HttpStatusCode.OK,
+                getWidgetsResponse.StatusCode
+            );
+
+            using var widgetsDocument = JsonDocument.Parse(
+                await getWidgetsResponse.Content
+                    .ReadAsStringAsync(
+                        CancellationToken
+                    )
+            );
+
+            var savedWidget = widgetsDocument.RootElement
+                .EnumerateArray()
+                .Single(widget =>
+                    widget.GetProperty("id").GetGuid() == widgetId
+                );
+
+            var layout = savedWidget.GetProperty("layout");
+
+            Assert.Equal(0, layout.GetProperty("x").GetInt32());
+
+            Assert.Equal(0, layout.GetProperty("y").GetInt32());
+
+            Assert.Equal(12, layout.GetProperty("width").GetInt32());
+
+            Assert.Equal(20, layout.GetProperty("height").GetInt32());
 
             using var getDataRequest = CreateRequest(
                 HttpMethod.Get,

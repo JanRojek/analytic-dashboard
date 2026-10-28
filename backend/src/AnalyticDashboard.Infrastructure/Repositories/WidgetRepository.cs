@@ -45,6 +45,26 @@ public sealed class WidgetRepository : IWidgetRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Widget>> GetAllForUpdateAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Widgets
+            .Where(widget =>
+                widget.DashboardId == dashboardId
+                && _dbContext.Dashboards.Any(dashboard =>
+                    dashboard.Id == widget.DashboardId
+                    && dashboard.ProjectId == projectId
+                    && _dbContext.Projects.Any(project =>
+                        project.Id == dashboard.ProjectId
+                        && project.OwnerId == ownerId)))
+            .OrderBy(widget => widget.CreatedAtUtc)
+            .ThenBy(widget => widget.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Widget?> GetByIdAndDashboardProjectOwnerAsync(
         Guid widgetId,
         Guid dashboardId,

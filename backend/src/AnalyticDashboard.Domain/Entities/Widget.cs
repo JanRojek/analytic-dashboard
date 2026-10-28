@@ -1,4 +1,5 @@
 using AnalyticDashboard.Domain.Analytics;
+using AnalyticDashboard.Domain.ValueObjects;
 
 namespace AnalyticDashboard.Domain.Entities;
 
@@ -20,6 +21,8 @@ public sealed class Widget
 
     public AggregationType Aggregation { get; private set; }
 
+    public WidgetLayout Layout { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public const int MaxTitleLength = 200;
@@ -35,13 +38,54 @@ public sealed class Widget
         string title,
         string groupByColumn,
         string measureColumn,
-        AggregationType aggregation)
+        AggregationType aggregation,
+        WidgetLayout layout)
     {
         if (dashboardId == Guid.Empty)
         {
             throw new ArgumentException("DashboardId cannot be empty.");
         }
 
+        ValidateConfiguration(datasetId, type, title, groupByColumn, measureColumn, aggregation);
+
+        ArgumentNullException.ThrowIfNull(layout);
+
+        Id = Guid.NewGuid();
+        DashboardId = dashboardId;
+        DatasetId = datasetId;
+        Type = type;
+        Title = NormalizeTitle(title);
+        GroupByColumn = NormalizeColumnName(groupByColumn, nameof(GroupByColumn), MaxGroupByColumnLength);
+        MeasureColumn = NormalizeColumnName(measureColumn, nameof(MeasureColumn), MaxMeasureColumnLength);
+        Aggregation = aggregation;
+        Layout = layout;
+        CreatedAtUtc = DateTime.UtcNow;
+    }
+
+    private Widget()
+    {
+        Title = null!;
+
+        GroupByColumn = null!;
+
+        MeasureColumn = null!;
+
+        Layout = null!;
+    }
+
+    public void Rename(string title)
+    {
+        Title = NormalizeTitle(title);
+    }
+
+    public static void ValidateConfiguration(
+        Guid datasetId,
+        WidgetType type,
+        string title,
+        string groupByColumn,
+        string measureColumn,
+        AggregationType aggregation)
+    {
         if (datasetId == Guid.Empty)
         {
             throw new ArgumentException("DatasetId cannot be empty.");
@@ -65,28 +109,9 @@ public sealed class Widget
             );
         }
 
-        Id = Guid.NewGuid();
-        DashboardId = dashboardId;
-        DatasetId = datasetId;
-        Type = type;
-        Title = NormalizeTitle(title);
-        GroupByColumn = NormalizeColumnName(
-            groupByColumn,
-            nameof(GroupByColumn),
-            MaxGroupByColumnLength
-        );
-        MeasureColumn = NormalizeColumnName(
-            measureColumn,
-            nameof(MeasureColumn),
-            MaxMeasureColumnLength
-        );
-        Aggregation = aggregation;
-        CreatedAtUtc = DateTime.UtcNow;
-    }
-
-    public void Rename(string title)
-    {
-        Title = NormalizeTitle(title);
+        NormalizeTitle(title);
+        NormalizeColumnName(groupByColumn, nameof(GroupByColumn), MaxGroupByColumnLength);
+        NormalizeColumnName(measureColumn, nameof(MeasureColumn), MaxMeasureColumnLength);
     }
 
     private static string NormalizeTitle(string title)
@@ -132,5 +157,30 @@ public sealed class Widget
         }
 
         return columnName;
+    }
+
+    public void UpdateLayout(WidgetLayout newLayout)
+    {
+        ArgumentNullException.ThrowIfNull(newLayout);
+
+        Layout = newLayout;
+    }
+
+    public void UpdateConfiguration(
+        Guid datasetId,
+        WidgetType type,
+        string title,
+        string groupByColumn,
+        string measureColumn,
+        AggregationType aggregation)
+    {
+        ValidateConfiguration(datasetId, type, title, groupByColumn, measureColumn, aggregation);
+
+        DatasetId = datasetId;
+        Type = type;
+        Title = NormalizeTitle(title);
+        GroupByColumn = NormalizeColumnName(groupByColumn, nameof(GroupByColumn), MaxGroupByColumnLength);
+        MeasureColumn = NormalizeColumnName(measureColumn, nameof(MeasureColumn), MaxMeasureColumnLength);
+        Aggregation = aggregation;
     }
 }

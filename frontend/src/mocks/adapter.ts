@@ -229,4 +229,145 @@ export const demoAdapter: DataAdapter = {
     const data = requireDataset(state, p, widget.datasetId);
     return queryRows(data.columns, data.rows, widget);
   },
+
+  async updateDashboardLayout(p, d, changes) {
+    mutateDemoState((state) => {
+      requireDashboard(state, p, d);
+
+      const widgets = state.widgets.filter(
+          (widget) => widget.dashboardId === d,
+      );
+
+      const layoutsById = new Map(
+          changes.map((change) => [
+            change.widgetId,
+            change.newLayout,
+          ]),
+      );
+
+      if (
+          layoutsById.size !== changes.length ||
+          layoutsById.size !== widgets.length ||
+          widgets.some((widget) => !layoutsById.has(widget.id))
+      ) {
+        throw new Error(
+            "Provided widget IDs do not match the dashboard widgets.",
+        );
+      }
+
+      for (const widget of widgets) {
+        widget.layout = layoutsById.get(widget.id)!;
+      }
+    });
+  },
+
+  async updateDashboardWidgets(p, d, updates) {
+    mutateDemoState((state) => {
+      requireDashboard(state, p, d);
+
+      const widgets = state.widgets.filter(
+          (widget) => widget.dashboardId === d,
+      );
+
+      const updatesById = new Map(
+          updates.map((update) => [update.widgetId, update]),
+      );
+
+      if (
+          updatesById.size !== updates.length ||
+          updatesById.size !== widgets.length ||
+          widgets.some((widget) => !updatesById.has(widget.id))
+      ) {
+        throw new Error(
+            "Provided widget IDs do not match the dashboard widgets.",
+        );
+      }
+
+      const validated = updates.map((update) => {
+        const title = normalizedName(update.title, 200);
+        const groupByColumn = update.groupByColumn.trim();
+        const measureColumn = update.measureColumn.trim();
+
+        if (
+            !groupByColumn ||
+            !measureColumn ||
+            [...groupByColumn].length > 255 ||
+            [...measureColumn].length > 255
+        ) {
+          throw new Error("Invalid widget column configuration.");
+        }
+
+        if (
+            !["Kpi", "BarChart", "LineChart", "PieChart"].includes(
+                update.type,
+            )
+        ) {
+          throw new Error("Unsupported widget type.");
+        }
+
+        const { x, y, width, height } = update.layout;
+
+        if (
+            ![x, y, width, height].every(Number.isInteger) ||
+            x < 0 ||
+            y < 0 ||
+            width < 6 ||
+            height < 14 ||
+            x + width > 24
+        ) {
+          throw new Error("Invalid widget layout.");
+        }
+
+        const dataset = requireDataset(state, p, update.datasetId);
+
+        queryRows(dataset.columns, dataset.rows, {
+          groupByColumn,
+          measureColumn,
+          aggregation: update.aggregation,
+        });
+
+        return {
+          ...update,
+          title,
+          groupByColumn,
+          measureColumn,
+        };
+      });
+
+      for (let i = 0; i < validated.length; i++) {
+        for (let j = i + 1; j < validated.length; j++) {
+          const a = validated[i].layout;
+          const b = validated[j].layout;
+
+          const intersects =
+              a.x < b.x + b.width &&
+              b.x < a.x + a.width &&
+              a.y < b.y + b.height &&
+              b.y < a.y + a.height;
+
+          if (intersects) {
+            throw new Error("Widget layouts must not overlap.");
+          }
+        }
+      }
+
+      const validatedById = new Map(
+          validated.map((update) => [update.widgetId, update]),
+      );
+
+      for (const widget of widgets) {
+        const update = validatedById.get(widget.id)!;
+
+        Object.assign(widget, {
+          datasetId: update.datasetId,
+          type: update.type,
+          title: update.title,
+          groupByColumn: update.groupByColumn,
+          measureColumn: update.measureColumn,
+          aggregation: update.aggregation,
+          layout: { ...update.layout },
+        });
+      }
+    });
+  },
 };

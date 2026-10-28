@@ -88,11 +88,35 @@ export interface WidgetInput extends QueryConfig {
   type: WidgetType;
   title: string;
 }
+
 export interface Widget extends WidgetInput {
   id: string;
   dashboardId: string;
   createdAtUtc: string;
+  layout: WidgetLayout;
 }
+
+export interface WidgetLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface WidgetLayoutChange {
+  widgetId: string;
+  newLayout: WidgetLayout;
+}
+
+export interface CreateWidgetInput extends WidgetInput {
+  layout: WidgetLayout;
+}
+
+export interface DashboardWidgetUpdate extends WidgetInput {
+  widgetId: string;
+  layout: WidgetLayout;
+}
+
 export interface TransformStep {
   id: string;
   kind: "trim" | "fill" | "drop-empty" | "deduplicate";
@@ -132,9 +156,9 @@ export interface DataAdapter {
   deleteDashboard(projectId: string, dashboardId: string): Promise<void>;
   listWidgets(projectId: string, dashboardId: string): Promise<Widget[]>;
   createWidget(
-    projectId: string,
-    dashboardId: string,
-    input: WidgetInput,
+      projectId: string,
+      dashboardId: string,
+      input: CreateWidgetInput,
   ): Promise<Widget>;
   deleteWidget(
     projectId: string,
@@ -146,4 +170,14 @@ export interface DataAdapter {
     dashboardId: string,
     widgetId: string,
   ): Promise<QueryItem[]>;
+  updateDashboardLayout(
+      projectId: string,
+      dashboardId: string,
+      changes: WidgetLayoutChange[],
+  ): Promise<void>;
+  updateDashboardWidgets(
+      projectId: string,
+      dashboardId: string,
+      updates: DashboardWidgetUpdate[],
+  ): Promise<void>;
 }

@@ -14,6 +14,7 @@ export interface StoredDataset {
   columns: string[];
   rows: DataRow[];
 }
+
 export interface DemoState {
   version: 1;
   projects: Project[];
@@ -22,6 +23,7 @@ export interface DemoState {
   widgets: Widget[];
   recipes: Record<string, TransformStep[]>;
 }
+
 export const demoUser: User = {
   id: "demo-user",
   displayName: "Alex Morgan",
@@ -33,7 +35,9 @@ export function createSeed(): DemoState {
   const retailRows: DataRow[] = Array.from({ length: 240 }, (_, index) => {
     const month = Math.floor(index / 40) + 1;
     return {
-      order_date: `2026-${String(month).padStart(2, "0")}-${String((index % 28) + 1).padStart(2, "0")}`,
+      order_date: `2026-${String(month).padStart(2, "0")}-${String(
+        (index % 28) + 1,
+      ).padStart(2, "0")}`,
       month: `2026-${String(month).padStart(2, "0")}`,
       region:
         index % 37 === 0
@@ -47,6 +51,7 @@ export function createSeed(): DemoState {
       orders: String(6 + (index % 31)),
     };
   });
+
   const customerRows: DataRow[] = Array.from({ length: 120 }, (_, index) => ({
     month: `2026-${String(Math.floor(index / 20) + 1).padStart(2, "0")}`,
     channel: ["Email", "Live chat", "Phone"][index % 3],
@@ -56,6 +61,7 @@ export function createSeed(): DemoState {
     ),
     tickets: String(8 + (index % 20)),
   }));
+
   const retail: Dataset = {
     id: "d-retail",
     name: "Retail sales · H1 2026",
@@ -68,6 +74,7 @@ export function createSeed(): DemoState {
       columnCount: 6,
     },
   };
+
   const customer: Dataset = {
     id: "d-customer",
     name: "Customer support · H1 2026",
@@ -80,7 +87,9 @@ export function createSeed(): DemoState {
       columnCount: 5,
     },
   };
+
   const createdAtUtc = "2026-09-17T11:30:00Z";
+
   return {
     version: 1,
     projects: [
@@ -140,6 +149,7 @@ export function createSeed(): DemoState {
         groupByColumn: "month",
         measureColumn: "revenue",
         aggregation: "Sum",
+        layout: { x: 0, y: 0, width: 12, height: 20 },
         createdAtUtc,
       },
       {
@@ -151,6 +161,7 @@ export function createSeed(): DemoState {
         groupByColumn: "month",
         measureColumn: "revenue",
         aggregation: "Sum",
+        layout: { x: 12, y: 0, width: 12, height: 20 },
         createdAtUtc,
       },
       {
@@ -162,6 +173,7 @@ export function createSeed(): DemoState {
         groupByColumn: "category",
         measureColumn: "revenue",
         aggregation: "Sum",
+        layout: { x: 0, y: 20, width: 12, height: 20 },
         createdAtUtc,
       },
       {
@@ -173,6 +185,7 @@ export function createSeed(): DemoState {
         groupByColumn: "region",
         measureColumn: "revenue",
         aggregation: "Sum",
+        layout: { x: 12, y: 20, width: 12, height: 20 },
         createdAtUtc,
       },
     ],

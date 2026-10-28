@@ -1,5 +1,6 @@
-﻿import {
+import {
   Children,
+  cloneElement,
   isValidElement,
   useEffect,
   useRef,
@@ -9,6 +10,14 @@
 } from "react";
 
 import { transformStrategy } from "react-grid-layout/core";
+import {
+  DASHBOARD_GRID_COLUMNS,
+  DASHBOARD_GRID_ROW_HEIGHT,
+  DASHBOARD_GRID_GAP,
+  DASHBOARD_GRID_PADDING,
+  resolveGridGeometry,
+  type DashboardGridGeometry,
+} from "../../../data/dashboardGrid";
 
 import ReactGridLayout, {
   getCompactor,
@@ -20,9 +29,8 @@ import ReactGridLayout, {
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-const COLUMNS = 12;
-const DEFAULT_WIDTH = 6;
-const DEFAULT_HEIGHT = 10;
+const MIN_WIDTH = 6;
+const MIN_HEIGHT = 14;
 const INTERACTION_CLASS = "aperture-canvas-interacting";
 const INVALID_CLASS = "aperture-placement-invalid";
 
@@ -32,6 +40,8 @@ const resizeCompactor = getCompactor(null, false, true);
 type DashboardCanvasProps = {
   editing: boolean;
   children: ReactNode;
+  geometry: DashboardGridGeometry;
+  onGeometryCommit?: (geometry: DashboardGridGeometry) => void;
 };
 
 function stopTextSelectionLock() {
@@ -42,8 +52,10 @@ function startTextSelectionLock() {
   document.body.classList.add(INTERACTION_CLASS);
 }
 
-function copyLayout(layout: Layout): Layout {
-  return layout.map((item) => ({ ...item }));
+function toGeometry(layout: Layout): DashboardGridGeometry {
+  return Object.fromEntries(
+      layout.map(({ i, x, y, w, h }) => [i, { x, y, w, h }]),
+  );
 }
 
 function overlap(a: LayoutItem, b: LayoutItem): boolean {
@@ -64,38 +76,26 @@ function hasCollision(layout: Layout, activeId?: string): boolean {
   );
 }
 
-function reconcileLayout(previous: Layout, ids: string[]): Layout {
-  const idSet = new Set(ids);
-  const existing = previous.filter((item) => idSet.has(item.i));
-  const byId = new Map(existing.map((item) => [item.i, item]));
+function reconcileLayout(geometry: DashboardGridGeometry, ids: string[]): Layout {
+  const resolved = resolveGridGeometry(geometry, ids);
 
-  // New charts go below existing charts; deleting an item never fills gaps.
-  const nextRow = Math.max(0, ...existing.map((item) => item.y + item.h));
-  let added = 0;
-
-  return ids.map((id): LayoutItem => {
-    const known = byId.get(id);
-    if (known) return known;
-
-    const index = added++;
-    return {
-      i: id,
-      x: (index % 2) * DEFAULT_WIDTH,
-      y: nextRow + Math.floor(index / 2) * DEFAULT_HEIGHT,
-      w: DEFAULT_WIDTH,
-      h: DEFAULT_HEIGHT,
-      minW: 3,
-      minH: 7,
-    };
-  });
+  return ids.map((id): LayoutItem => ({
+    i: id,
+    ...resolved[id],
+    minW: MIN_WIDTH,
+    minH: MIN_HEIGHT,
+  }));
 }
 
-export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
+export function DashboardCanvas({
+  editing,
+  children,
+  geometry,
+  onGeometryCommit,
+}: DashboardCanvasProps) {
   const { containerRef, width, mounted } = useContainerWidth();
-  const [committedLayout, setCommittedLayout] = useState<Layout>([]);
   const [isResizing, setIsResizing] = useState(false);
   const [gridRevision, setGridRevision] = useState(0);
-  const beforeInteraction = useRef<Layout>([]);
   const activeWidgetId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -111,14 +111,22 @@ export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
     };
   }, []);
 
-  const items = Children.toArray(children).filter(
-      (child): child is ReactElement => isValidElement(child),
-  );
+  // React.Children.toArray normalizes keys. Use the stable widget IDs instead,
+  // so coordinates survive remounts and the draft -> widget transition.
+  const items = Children.toArray(children)
+      .filter(
+          (child): child is ReactElement<{ "data-layout-id"?: string }> =>
+              isValidElement(child),
+      )
+      .map((child) =>
+          cloneElement(child, {
+            key: child.props["data-layout-id"] ?? child.key,
+          }),
+      );
   const ids = items.map((child) => String(child.key));
-  const layout = reconcileLayout(committedLayout, ids);
+  const layout = reconcileLayout(geometry, ids);
 
-  function startInteraction(currentLayout: Layout, item: LayoutItem | null) {
-    beforeInteraction.current = copyLayout(currentLayout);
+  function startInteraction(item: LayoutItem | null) {
     activeWidgetId.current = item?.i;
     startTextSelectionLock();
   }
@@ -128,18 +136,11 @@ export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
     activeWidgetId.current = undefined;
 
     if (hasCollision(nextLayout)) {
-      // RGL keeps transient positions internally. Remount only after a rejected
-      // gesture to make it restore the last valid layout unambiguously.
-      setCommittedLayout(copyLayout(beforeInteraction.current));
+      // Discard the invalid transient layout by remounting from saved geometry.
       setGridRevision((revision) => revision + 1);
     } else {
-      setCommittedLayout(copyLayout(nextLayout));
+      onGeometryCommit?.(toGeometry(nextLayout));
     }
-  }
-
-  // Presentation still uses the old grid while we validate editor UX.
-  if (!editing) {
-    return <div className="canvas-chart-grid">{children}</div>;
   }
 
   return (
@@ -149,24 +150,30 @@ export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
                 key={gridRevision}
                 width={width}
                 layout={layout}
-                gridConfig={{ cols: COLUMNS, rowHeight: 22, margin: [12, 12] }}
+                gridConfig={{
+                  cols: DASHBOARD_GRID_COLUMNS,
+                  rowHeight: DASHBOARD_GRID_ROW_HEIGHT,
+                  margin: [DASHBOARD_GRID_GAP, DASHBOARD_GRID_GAP],
+                  containerPadding: [DASHBOARD_GRID_PADDING, DASHBOARD_GRID_PADDING],
+                }}
                 positionStrategy={transformStrategy}
                 dragConfig={{
-                  enabled: true,
+                  enabled: editing,
                   bounded: false,
                   threshold: 3,
                   cancel:
                       'button, a, input, select, textarea, [contenteditable="true"], .react-resizable-handle',
                 }}
                 resizeConfig={{
-                  enabled: true,
+                  enabled: editing,
                   handles: ["n", "e", "s", "w", "nw", "ne", "sw", "se"],
                 }}
                 compactor={isResizing ? resizeCompactor : dragCompactor}
-                onDragStart={(currentLayout, _oldItem, item) => {
-                  startInteraction(currentLayout, item);
+                onDragStart={(_currentLayout, _oldItem, item) => {
+                  if (editing) startInteraction(item);
                 }}
                 onDrag={(nextLayout, _oldItem, item, _placeholder, _event, node) => {
+                  if (!editing) return;
                   const id = item?.i ?? activeWidgetId.current;
                   node?.classList.toggle(INVALID_CLASS, hasCollision(nextLayout, id));
                 }}
@@ -179,15 +186,16 @@ export function DashboardCanvas({ editing, children }: DashboardCanvasProps) {
                     node,
                 ) => {
                   node?.classList.remove(INVALID_CLASS);
-                  finishInteraction(nextLayout);
+                  if (editing) finishInteraction(nextLayout);
                 }}
-                onResizeStart={(currentLayout, _oldItem, item) => {
-                  startInteraction(currentLayout, item);
+                onResizeStart={(_currentLayout, _oldItem, item) => {
+                  if (!editing) return;
+                  startInteraction(item);
                   setIsResizing(true);
                 }}
                 onResizeStop={(nextLayout) => {
-                  finishInteraction(nextLayout);
-                  setIsResizing(false);
+                  if (editing) finishInteraction(nextLayout);
+                  if (editing) setIsResizing(false);
                 }}
             >
               {items}

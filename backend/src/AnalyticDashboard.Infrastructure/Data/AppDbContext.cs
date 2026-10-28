@@ -1,3 +1,4 @@
+using AnalyticDashboard.Application.Common.Persistence;
 using Microsoft.EntityFrameworkCore;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Identity;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace AnalyticDashboard.Infrastructure.Data;
 
-public class AppDbContext : IdentityUserContext<ApplicationUser, Guid>
+public class AppDbContext : IdentityUserContext<ApplicationUser, Guid>, IUnitOfWork
 {
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<Dataset> Datasets => Set<Dataset>();
@@ -15,10 +16,10 @@ public class AppDbContext : IdentityUserContext<ApplicationUser, Guid>
     public DbSet<Dashboard> Dashboards => Set<Dashboard>();
     public DbSet<Widget> Widgets => Set<Widget>();
 
-    public AppDbContext(DbContextOptions<AppDbContext> options)
-        : base(options)
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

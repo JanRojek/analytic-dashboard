@@ -38,6 +38,17 @@ public sealed class WidgetConfiguration : IEntityTypeConfiguration<Widget>
             .IsRequired()
             .HasConversion<string>();
 
+        builder.ComplexProperty(widget => widget.Layout, layout =>
+        {
+            layout.Property(value => value.X);
+
+            layout.Property(value => value.Y);
+
+            layout.Property(value => value.Width);
+
+            layout.Property(value => value.Height);
+        });
+
         builder.Property(widget => widget.CreatedAtUtc)
             .IsRequired();
 

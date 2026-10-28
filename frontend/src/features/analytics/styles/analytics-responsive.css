@@ -37,10 +37,6 @@
     padding: 30px 22px 20px;
   }
 
-  .canvas-chart-grid {
-    gap: 12px;
-  }
-
   .canvas-chart {
     padding: 17px 12px 10px;
   }
@@ -259,10 +255,6 @@
     padding: 25px 15px 20px;
   }
 
-  .canvas-chart-grid {
-    grid-template-columns: 1fr;
-  }
-
   .canvas-chart .chart-donut {
     flex-direction: row;
   }
@@ -281,18 +273,6 @@
 
   .is-viewing .dashboard-paper-heading h1 {
     font-size: 27px;
-  }
-
-  .is-viewing .canvas-chart {
-    padding: 20px 15px;
-  }
-
-  .is-viewing .canvas-chart .chart-cartesian {
-    min-height: 180px;
-  }
-
-  .is-viewing .canvas-chart .chart-donut {
-    min-height: 210px;
   }
 }
 

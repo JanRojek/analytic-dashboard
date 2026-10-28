@@ -1,8 +1,13 @@
-﻿import { useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Button, Select, TextInput } from "@mantine/core";
 
 import { ErrorState } from "../../../components/Feedback";
-import type { Dashboard, QueryConfig, WidgetInput } from "../../../data/types";
+import type {
+  CreateWidgetInput,
+  Dashboard,
+  QueryConfig,
+  WidgetLayout,
+} from "../../../data/types";
 import { useSession } from "../../../session/SessionContext";
 import { useDatasetProfile, useDatasets } from "../../data/hooks";
 import { useCreateWidget } from "../../dashboards/hooks";
@@ -14,6 +19,7 @@ import { QueryFields } from "./QueryFields";
 type DraftChartInspectorProps = {
   dashboard: Dashboard;
   draft: DraftWidget;
+  layout: WidgetLayout;
   onChange: (patch: Partial<DraftWidget>) => void;
   onDiscard: () => void;
   onCreated: (widgetId: string) => void;
@@ -22,20 +28,21 @@ type DraftChartInspectorProps = {
 export function DraftChartInspector({
   dashboard,
   draft,
+  layout,
   onChange,
   onDiscard,
   onCreated,
 }: DraftChartInspectorProps) {
   const { adapter } = useSession();
+  const createWidget = useCreateWidget(dashboard.projectId);
   const datasets = useDatasets(dashboard.projectId);
   const profile = useDatasetProfile(
     dashboard.projectId,
     draft.datasetId ?? "",
     Boolean(draft.datasetId),
   );
-  const createWidget = useCreateWidget(dashboard.projectId);
 
-  // Suggestions are shown without making a draft complete prematurely.
+  // Suggestions must not make an incomplete draft appear complete.
   const suggested = profile.data ? defaults(profile.data) : null;
   const query: QueryConfig | null = suggested
     ? {
@@ -61,19 +68,20 @@ export function DraftChartInspector({
         throw new Error("Choose a dataset, group and measure first.");
       }
 
-      const input: WidgetInput = {
+      const input: CreateWidgetInput = {
         datasetId: draft.datasetId,
         type: draft.type,
         title: draft.title.trim() || queryCaption(query),
         ...query,
+        layout,
       };
 
-      // Keep the same query validation as the existing NewChartForm.
       const result = await adapter.query(
         dashboard.projectId,
         draft.datasetId,
         query,
       );
+
       if (!result.length) {
         throw new Error(
           "This question returned no values. Try another measure.",
@@ -125,7 +133,6 @@ export function DraftChartInspector({
             onChange={(datasetId) => {
               if (!datasetId || datasetId === draft.datasetId) return;
 
-              // Fields from the previous dataset must not leak into the next.
               onChange({
                 datasetId,
                 groupByColumn: null,
