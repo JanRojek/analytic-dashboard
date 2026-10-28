@@ -4,7 +4,6 @@ import { queryKeys } from "../../data/queryKeys";
 import type {
   CreateWidgetInput,
   DashboardWidgetUpdate,
-  WidgetLayoutChange,
 } from "../../data/types";
 
 export function useDashboards(projectId: string, enabled = true) {
@@ -103,32 +102,6 @@ export function useDeleteWidget(projectId: string) {
       dashboardId: string;
       widgetId: string;
     }) => adapter.deleteWidget(projectId, dashboardId, widgetId),
-
-    onSuccess: async (_, { dashboardId }) => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
-      });
-    },
-  });
-}
-
-export function useUpdateDashboardLayout(projectId: string) {
-  const { adapter } = useSession();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      dashboardId,
-      changes,
-    }: {
-      dashboardId: string;
-      changes: WidgetLayoutChange[];
-    }) =>
-        adapter.updateDashboardLayout(
-            projectId,
-            dashboardId,
-            changes,
-        ),
 
     onSuccess: async (_, { dashboardId }) => {
       await queryClient.invalidateQueries({

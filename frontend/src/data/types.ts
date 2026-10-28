@@ -103,11 +103,6 @@ export interface WidgetLayout {
   height: number;
 }
 
-export interface WidgetLayoutChange {
-  widgetId: string;
-  newLayout: WidgetLayout;
-}
-
 export interface CreateWidgetInput extends WidgetInput {
   layout: WidgetLayout;
 }
@@ -170,11 +165,6 @@ export interface DataAdapter {
     dashboardId: string,
     widgetId: string,
   ): Promise<QueryItem[]>;
-  updateDashboardLayout(
-      projectId: string,
-      dashboardId: string,
-      changes: WidgetLayoutChange[],
-  ): Promise<void>;
   updateDashboardWidgets(
       projectId: string,
       dashboardId: string,

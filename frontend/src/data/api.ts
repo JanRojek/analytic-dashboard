@@ -188,19 +188,6 @@ export const apiAdapter: DataAdapter = {
   deleteDashboard: (p, d) =>
     request<void>(dashboardPath(p, d), { method: "DELETE" }),
   listWidgets: (p, d) => request<Widget[]>(widgetsPath(p, d)),
-  updateDashboardLayout: (p, d, changes) =>
-      request<void>(
-          `${dashboardPath(p, d)}/layout`,
-          json(
-              {
-                widgets: changes.map((change) => ({
-                  widgetId: change.widgetId,
-                  layout: change.newLayout,
-                })),
-              },
-              "PUT",
-          ),
-      ),
   updateDashboardWidgets: (p, d, updates) =>
       request<void>(
           widgetsPath(p, d),

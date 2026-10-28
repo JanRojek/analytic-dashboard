@@ -230,37 +230,6 @@ export const demoAdapter: DataAdapter = {
     return queryRows(data.columns, data.rows, widget);
   },
 
-  async updateDashboardLayout(p, d, changes) {
-    mutateDemoState((state) => {
-      requireDashboard(state, p, d);
-
-      const widgets = state.widgets.filter(
-          (widget) => widget.dashboardId === d,
-      );
-
-      const layoutsById = new Map(
-          changes.map((change) => [
-            change.widgetId,
-            change.newLayout,
-          ]),
-      );
-
-      if (
-          layoutsById.size !== changes.length ||
-          layoutsById.size !== widgets.length ||
-          widgets.some((widget) => !layoutsById.has(widget.id))
-      ) {
-        throw new Error(
-            "Provided widget IDs do not match the dashboard widgets.",
-        );
-      }
-
-      for (const widget of widgets) {
-        widget.layout = layoutsById.get(widget.id)!;
-      }
-    });
-  },
-
   async updateDashboardWidgets(p, d, updates) {
     mutateDemoState((state) => {
       requireDashboard(state, p, d);

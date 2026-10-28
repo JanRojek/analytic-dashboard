@@ -526,4 +526,200 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await AssertUnchangedAsync(dashboard.DashboardId, before);
     }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldReturnNotFound_WhenDashboardDoesNotExist()
+    {
+        var userId = Guid.NewGuid();
+
+        using var request = CreatePutRequest(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new UpdateDashboardWidgetsRequest([]),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldReturnBadRequest_AndPreserveAllWidgets_WhenWidgetCollectionIsNull()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(null),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldReturnBadRequest_AndPreserveAllWidgets_WhenUpdateIsNull()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(
+            [
+                null,
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Second changed",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ]),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Theory]
+    [InlineData(-1, 30, 12, 20)]
+    [InlineData(0, -1, 12, 20)]
+    [InlineData(0, 30, 5, 20)]
+    [InlineData(0, 30, 12, 13)]
+    [InlineData(13, 30, 12, 20)]
+    public async Task UpdateDashboardWidgets_ShouldReturnBadRequest_AndPreserveAllWidgets_WhenGeometryIsInvalid(
+        int x,
+        int y,
+        int width,
+        int height)
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "First changed",
+                    new WidgetLayoutRequest(x, y, width, height)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Second changed",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ]),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldReturnConflict_AndPreserveAllWidgets_WhenCoordinatesApproachIntMaxValue()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "First changed",
+                    new WidgetLayoutRequest(0, int.MaxValue - 10, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Second changed",
+                    new WidgetLayoutRequest(6, int.MaxValue - 5, 12, 20)
+                )
+            ]),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldReturnNoContent_WhenDashboardIsEmptyAndUpdateIsEmpty()
+    {
+        var userId = Guid.NewGuid();
+        var project = new Project(userId, "Empty dashboard project");
+        var dashboard = new Dashboard(project.Id, "Empty dashboard");
+
+        await using (var scope = _fixture.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.AddRange(project, dashboard);
+            await dbContext.SaveChangesAsync(CancellationToken);
+        }
+
+        using var request = CreatePutRequest(
+            project.Id,
+            dashboard.Id,
+            new UpdateDashboardWidgetsRequest([]),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        await using var verificationScope = _fixture.Services.CreateAsyncScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var widgetCount = await verificationContext.Widgets.CountAsync(
+            widget => widget.DashboardId == dashboard.Id,
+            CancellationToken
+        );
+
+        Assert.Equal(0, widgetCount);
+    }
 }
