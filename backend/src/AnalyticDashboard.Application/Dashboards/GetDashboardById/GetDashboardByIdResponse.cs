@@ -4,5 +4,6 @@ public sealed record GetDashboardByIdResponse(
     Guid Id,
     Guid ProjectId,
     string Name,
+    long Revision,
     DateTime CreatedAtUtc
 );

@@ -8,6 +8,8 @@ public sealed class Dashboard
 
     public string Name { get; private set; }
 
+    public long Revision { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public const int MaxNameLength = 100;
@@ -24,6 +26,7 @@ public sealed class Dashboard
         Id = Guid.NewGuid();
         ProjectId = projectId;
         Name = NormalizeName(name);
+        Revision = 0;
         CreatedAtUtc = DateTime.UtcNow;
     }
 
@@ -51,5 +54,10 @@ public sealed class Dashboard
         }
 
         return name;
+    }
+
+    public void AdvanceRevision()
+    {
+        Revision = checked(Revision + 1);
     }
 }

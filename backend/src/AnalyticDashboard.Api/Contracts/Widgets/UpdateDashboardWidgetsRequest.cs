@@ -3,7 +3,8 @@ using AnalyticDashboard.Domain.Entities;
 namespace AnalyticDashboard.Api.Contracts.Widgets;
 
 public sealed record UpdateDashboardWidgetsRequest(
-    IReadOnlyList<DashboardWidgetUpdateRequest?>? Widgets
+    IReadOnlyList<DashboardWidgetUpdateRequest?>? Widgets,
+    long? ExpectedRevision
 );
 
 public sealed record DashboardWidgetUpdateRequest(

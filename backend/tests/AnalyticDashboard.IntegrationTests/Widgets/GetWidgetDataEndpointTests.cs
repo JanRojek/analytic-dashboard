@@ -298,21 +298,26 @@ public sealed class GetWidgetDataEndpointTests : IClassFixture<ApiFixture>
                 createDashboardResponse
             );
 
-            var widgetType = Enum.GetValues<WidgetType>()
-                .First();
+            var widgetType = Enum.GetValues<WidgetType>().First();
+
+            var widgetId = Guid.NewGuid();
 
             using var createWidgetRequest = CreateJsonRequest(
-                HttpMethod.Post,
+                HttpMethod.Put,
                 $"/projects/{project.Id}/dashboards/{dashboardId}/widgets",
-                new CreateWidgetRequest(
-                    datasetId,
-                    widgetType,
-                    "Sales by country",
-                    "Country",
-                    "Amount",
-                    "Sum",
-                    new WidgetLayoutRequest(0, 0, 12, 20)
-                ),
+                new UpdateDashboardWidgetsRequest(
+                [
+                    new DashboardWidgetUpdateRequest(
+                        widgetId,
+                        datasetId,
+                        widgetType,
+                        "Sales by country",
+                        "Country",
+                        "Amount",
+                        "Sum",
+                        new WidgetLayoutRequest(0, 0, 12, 20)
+                    )
+                ], 0),
                 userId
             );
 
@@ -321,13 +326,11 @@ public sealed class GetWidgetDataEndpointTests : IClassFixture<ApiFixture>
                 CancellationToken
             );
 
-            Assert.Equal(
-                HttpStatusCode.Created,
-                createWidgetResponse.StatusCode
-            );
+            Assert.Equal(HttpStatusCode.OK, createWidgetResponse.StatusCode);
 
-            var widgetId = await ReadIdAsync(
-                createWidgetResponse
+            Assert.Equal(
+                HttpStatusCode.OK,
+                createWidgetResponse.StatusCode
             );
 
             using var getWidgetsRequest = CreateRequest(

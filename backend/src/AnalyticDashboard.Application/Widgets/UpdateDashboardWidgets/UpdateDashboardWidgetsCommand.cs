@@ -8,7 +8,8 @@ public sealed record UpdateDashboardWidgetsCommand(
     Guid ProjectId,
     Guid DashboardId,
     Guid OwnerId,
-    IReadOnlyList<DashboardWidgetUpdate> Widgets
+    IReadOnlyList<DashboardWidgetUpdate> Widgets,
+    long ExpectedRevision
 );
 
 public sealed record DashboardWidgetUpdate(

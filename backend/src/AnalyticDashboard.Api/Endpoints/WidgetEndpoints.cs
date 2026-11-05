@@ -2,8 +2,6 @@
 using System.Security.Claims;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Widgets;
-using AnalyticDashboard.Application.Widgets.CreateWidget;
-using AnalyticDashboard.Application.Widgets.DeleteWidget;
 using AnalyticDashboard.Application.Widgets.GetWidgetData;
 using AnalyticDashboard.Application.Widgets.GetWidgets;
 using AnalyticDashboard.Application.Widgets.UpdateDashboardWidgets;
@@ -27,153 +25,6 @@ public static class WidgetEndpoints
             .ProducesProblem(
                 StatusCodes.Status500InternalServerError
             );
-
-        widgets.MapPost("", async (
-            Guid projectId,
-            Guid dashboardId,
-            CreateWidgetRequest request,
-            CreateWidgetHandler handler,
-            ClaimsPrincipal user,
-            CancellationToken cancellationToken) =>
-        {
-            if (!user.TryGetUserId(out var ownerId))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    title: "Unauthorized",
-                    detail: "The authenticated user identifier is missing or invalid."
-                );
-            }
-
-            if (request.DatasetId == Guid.Empty)
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "DatasetId cannot be empty."
-                );
-            }
-
-            if (!Enum.IsDefined(request.Type))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "The widget type is not supported."
-                );
-            }
-
-            if (!Enum.TryParse<AggregationType>(
-                    request.Aggregation,
-                    ignoreCase: true,
-                    out var aggregation)
-                || !Enum.IsDefined(aggregation))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "Aggregation must be one of: Sum, Average, Min, Max, Count."
-                );
-            }
-
-            if (string.IsNullOrWhiteSpace(request.Title))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "Widget title cannot be empty."
-                );
-            }
-
-            if (string.IsNullOrWhiteSpace(request.GroupByColumn))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "Group by column cannot be empty."
-                );
-            }
-
-            if (string.IsNullOrWhiteSpace(request.MeasureColumn))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "Measure column cannot be empty."
-                );
-            }
-
-            if (request.Layout == null)
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget configuration",
-                    detail: "Widget layout cannot be null."
-                );
-            }
-
-            WidgetLayout layout;
-
-            try
-            {
-                layout = new WidgetLayout(
-                    request.Layout.X,
-                    request.Layout.Y,
-                    request.Layout.Width,
-                    request.Layout.Height
-                );
-            }
-            catch (ArgumentOutOfRangeException ex)
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid widget layout",
-                    detail: ex.Message
-                );
-            }
-
-            var command = new CreateWidgetCommand(
-                projectId,
-                ownerId,
-                dashboardId,
-                request.DatasetId,
-                request.Type,
-                request.Title,
-                request.GroupByColumn,
-                request.MeasureColumn,
-                aggregation,
-                layout
-            );
-
-            var result = await handler.HandleAsync(
-                command,
-                cancellationToken
-            );
-
-            if (result is null)
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status404NotFound,
-                    title: "Widget resources not found",
-                    detail: "The dashboard or dataset does not exist or is not accessible by the current user."
-                );
-            }
-
-            return Results.Created(
-                $"/projects/{projectId}/dashboards/{dashboardId}/widgets/{result.Id}",
-                result
-            );
-        })
-        .WithName("CreateWidget")
-        .Produces<CreateWidgetResponse>(
-            StatusCodes.Status201Created
-        )
-        .ProducesProblem(
-            StatusCodes.Status400BadRequest
-        )
-        .ProducesProblem(
-            StatusCodes.Status404NotFound
-        );
 
         widgets.MapGet("", async (
             Guid projectId,
@@ -206,54 +57,6 @@ public static class WidgetEndpoints
         })
         .WithName("GetWidgets")
         .Produces<IReadOnlyList<GetWidgetsResponse>>();
-
-        widgets.MapDelete("/{widgetId:guid}", async (
-            Guid projectId,
-            Guid dashboardId,
-            Guid widgetId,
-            DeleteWidgetHandler handler,
-            ClaimsPrincipal user,
-            CancellationToken cancellationToken) =>
-        {
-            if (!user.TryGetUserId(out var ownerId))
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    title: "Unauthorized",
-                    detail: "The authenticated user identifier is missing or invalid."
-                );
-            }
-
-            var command = new DeleteWidgetCommand(
-                widgetId,
-                dashboardId,
-                projectId,
-                ownerId
-            );
-
-            var success = await handler.HandleAsync(
-                command,
-                cancellationToken
-            );
-
-            if (!success)
-            {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status404NotFound,
-                    title: "Widget not found",
-                    detail: "The widget does not exist or is not accessible by the current user."
-                );
-            }
-
-            return Results.NoContent();
-        })
-        .WithName("DeleteWidget")
-        .Produces(
-            StatusCodes.Status204NoContent
-        )
-        .ProducesProblem(
-            StatusCodes.Status404NotFound
-        );
 
         widgets.MapGet("/{widgetId:guid}/data", async (
             Guid projectId,
@@ -444,11 +247,21 @@ public static class WidgetEndpoints
                 }
             }
 
+            if (request.ExpectedRevision is not { } expectedRevision || expectedRevision < 0)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid dashboard revision value",
+                    detail: "Revision is null or negative."
+                );
+            }
+
             var command = new UpdateDashboardWidgetsCommand(
                 projectId,
                 dashboardId,
                 ownerId,
-                dashboardWidgetUpdates
+                dashboardWidgetUpdates,
+                expectedRevision
             );
 
             var result = await handler.HandleAsync(
@@ -458,8 +271,8 @@ public static class WidgetEndpoints
 
             return result switch
             {
-                UpdateDashboardWidgetsResult.Success =>
-                    Results.NoContent(),
+                UpdateDashboardWidgetsResult.Success success =>
+                    Results.Ok(new UpdateDashboardWidgetsResponse(success.CurrentRevision)),
 
                 UpdateDashboardWidgetsResult.DashboardNotFound =>
                     Results.Problem(
@@ -472,7 +285,7 @@ public static class WidgetEndpoints
                     Results.Problem(
                         statusCode: StatusCodes.Status400BadRequest,
                         title: "Invalid widget set.",
-                        detail: "Provided widget IDs do not match the dashboard widgets."
+                        detail: "Widget IDs must be non-empty and unique."
                     ),
 
                 UpdateDashboardWidgetsResult.InvalidConfiguration =>
@@ -489,6 +302,19 @@ public static class WidgetEndpoints
                         detail: "One or more datasets do not exist or are not accessible."
                     ),
 
+                UpdateDashboardWidgetsResult.RevisionConflict conflict =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Dashboard revision conflict.",
+                        detail: "The dashboard has been modified since it was last loaded. " +
+                                "The latest version must be retrieved before saving again.",
+                        extensions: new Dictionary<string, object?>
+                        {
+                            ["expectedRevision"] = conflict.ExpectedRevision,
+                            ["currentRevision"] = conflict.CurrentRevision
+                        }
+                    ),
+
                 UpdateDashboardWidgetsResult.LayoutCollision =>
                     Results.Problem(
                         statusCode: StatusCodes.Status409Conflict,
@@ -500,7 +326,7 @@ public static class WidgetEndpoints
             };
         })
         .WithName("UpdateDashboardWidgets")
-        .Produces(StatusCodes.Status204NoContent)
+        .Produces<UpdateDashboardWidgetsResponse>()
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status404NotFound);

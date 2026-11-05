@@ -2,7 +2,7 @@ namespace AnalyticDashboard.Application.Widgets.UpdateDashboardWidgets;
 
 public abstract record UpdateDashboardWidgetsResult
 {
-    public sealed record Success : UpdateDashboardWidgetsResult;
+    public sealed record Success(long CurrentRevision) : UpdateDashboardWidgetsResult;
 
     public sealed record DashboardNotFound : UpdateDashboardWidgetsResult;
 
@@ -12,6 +12,8 @@ public abstract record UpdateDashboardWidgetsResult
         : UpdateDashboardWidgetsResult;
 
     public sealed record DatasetNotFound(Guid DatasetId) : UpdateDashboardWidgetsResult;
+
+    public sealed record RevisionConflict(long ExpectedRevision, long CurrentRevision) : UpdateDashboardWidgetsResult;
 
     public sealed record LayoutCollision(IReadOnlyList<WidgetCollision> Collisions) : UpdateDashboardWidgetsResult;
 }

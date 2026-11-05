@@ -4,6 +4,7 @@ using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using AnalyticDashboard.Application.Common.Exceptions;
 
 namespace AnalyticDashboard.Infrastructure.Data;
 
@@ -39,5 +40,18 @@ public class AppDbContext : IdentityUserContext<ApplicationUser, Guid>, IUnitOfW
         );
 
         modelBuilder.HasPostgresExtension("citext");
+    }
+
+    async Task<int> IUnitOfWork.SaveChangesAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new OptimisticConcurrencyException(ex.Message, ex);
+        }
     }
 }

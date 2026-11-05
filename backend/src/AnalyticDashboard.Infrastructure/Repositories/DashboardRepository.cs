@@ -43,6 +43,23 @@ public sealed class DashboardRepository : IDashboardRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Dashboard?> GetForUpdateByIdAndProjectOwnerAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Dashboards
+            .Where(dashboard =>
+                dashboard.Id == dashboardId
+                && dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId))
+            .AsTracking()
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<Dashboard?> GetByIdAndProjectOwnerAsync(
         Guid dashboardId,
         Guid projectId,
@@ -76,5 +93,22 @@ public sealed class DashboardRepository : IDashboardRepository
             .ExecuteDeleteAsync(cancellationToken);
 
         return affectedRows == 1;
+    }
+
+    public async Task<long?> GetDashboardCurrentRevisionAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Dashboards
+            .Where(dashboard =>
+                dashboard.Id == dashboardId
+                && dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId))
+            .Select(dashboard => (long?)dashboard.Revision)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 }

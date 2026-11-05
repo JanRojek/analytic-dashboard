@@ -4,10 +4,7 @@ namespace AnalyticDashboard.Application.Widgets.Persistence;
 
 public interface IWidgetRepository
 {
-    Task AddAsync(
-        Widget widget,
-        CancellationToken cancellationToken
-    );
+    void StageAdd(Widget widget);
 
     Task<IReadOnlyList<Widget>> GetAllByDashboardProjectOwnerAsync(
         Guid dashboardId,
@@ -31,11 +28,5 @@ public interface IWidgetRepository
         CancellationToken cancellationToken
     );
 
-    Task<bool> DeleteByIdAndDashboardProjectOwnerAsync(
-        Guid widgetId,
-        Guid dashboardId,
-        Guid projectId,
-        Guid ownerId,
-        CancellationToken cancellationToken
-    );
+    void StageRemove(Widget widget);
 }

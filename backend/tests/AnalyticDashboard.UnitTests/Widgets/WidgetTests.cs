@@ -48,4 +48,6 @@ public sealed class WidgetTests
         Assert.Equal(originalMeasureColumn, widget.MeasureColumn);
         Assert.Equal(originalAggregation, widget.Aggregation);
     }
+
+
 }

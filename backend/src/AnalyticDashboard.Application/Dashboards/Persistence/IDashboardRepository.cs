@@ -15,6 +15,13 @@ public interface IDashboardRepository
         CancellationToken cancellationToken
     );
 
+    Task<Dashboard?> GetForUpdateByIdAndProjectOwnerAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken
+    );
+
     Task<Dashboard?> GetByIdAndProjectOwnerAsync(
         Guid dashboardId,
         Guid projectId,
@@ -23,6 +30,13 @@ public interface IDashboardRepository
     );
 
     Task<bool> DeleteByIdAndProjectOwnerAsync(
+        Guid dashboardId,
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken
+    );
+
+    Task<long?> GetDashboardCurrentRevisionAsync(
         Guid dashboardId,
         Guid projectId,
         Guid ownerId,

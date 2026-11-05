@@ -39,7 +39,8 @@ public sealed class Widget
         string groupByColumn,
         string measureColumn,
         AggregationType aggregation,
-        WidgetLayout layout)
+        WidgetLayout layout,
+        Guid? id = null)
     {
         if (dashboardId == Guid.Empty)
         {
@@ -50,7 +51,15 @@ public sealed class Widget
 
         ArgumentNullException.ThrowIfNull(layout);
 
-        Id = Guid.NewGuid();
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Widget ID cannot be empty.",
+                nameof(id)
+            );
+        }
+
+        Id = id ?? Guid.NewGuid();
         DashboardId = dashboardId;
         DatasetId = datasetId;
         Type = type;

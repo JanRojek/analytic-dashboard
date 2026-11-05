@@ -28,5 +28,9 @@ public sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboard>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(dashboard => dashboard.ProjectId);
+
+        builder.Property(dashboard => dashboard.Revision)
+            .IsRequired()
+            .IsConcurrencyToken();
     }
 }

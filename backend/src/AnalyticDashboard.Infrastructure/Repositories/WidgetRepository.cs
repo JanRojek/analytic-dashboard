@@ -14,14 +14,9 @@ public sealed class WidgetRepository : IWidgetRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Widget widget, CancellationToken cancellationToken)
+    public void StageAdd(Widget widget)
     {
-        await _dbContext.Widgets.AddAsync(
-            widget,
-            cancellationToken
-        );
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        _dbContext.Widgets.Add(widget);
     }
 
     public async Task<IReadOnlyList<Widget>> GetAllByDashboardProjectOwnerAsync(
@@ -86,25 +81,8 @@ public sealed class WidgetRepository : IWidgetRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<bool> DeleteByIdAndDashboardProjectOwnerAsync(
-        Guid widgetId,
-        Guid dashboardId,
-        Guid projectId,
-        Guid ownerId,
-        CancellationToken cancellationToken)
+    public void StageRemove(Widget widget)
     {
-        var affectedRows = await _dbContext.Widgets
-            .Where(widget =>
-                widget.Id == widgetId
-                && widget.DashboardId == dashboardId
-                && _dbContext.Dashboards.Any(dashboard =>
-                    dashboard.Id == widget.DashboardId
-                    && dashboard.ProjectId == projectId
-                    && _dbContext.Projects.Any(project =>
-                        project.Id == dashboard.ProjectId
-                        && project.OwnerId == ownerId)))
-            .ExecuteDeleteAsync(cancellationToken);
-
-        return affectedRows == 1;
+        _dbContext.Widgets.Remove(widget);
     }
 }

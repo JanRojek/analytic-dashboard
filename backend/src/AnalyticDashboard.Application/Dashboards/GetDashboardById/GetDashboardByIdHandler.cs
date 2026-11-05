@@ -31,6 +31,7 @@ public class GetDashboardByIdHandler
             dashboard.Id,
             dashboard.ProjectId,
             dashboard.Name,
+            dashboard.Revision,
             dashboard.CreatedAtUtc
         );
     }

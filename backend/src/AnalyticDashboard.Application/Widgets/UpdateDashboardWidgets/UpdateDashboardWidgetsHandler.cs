@@ -1,3 +1,5 @@
+
+using AnalyticDashboard.Application.Common.Exceptions;
 using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Application.Dashboards.Persistence;
 using AnalyticDashboard.Application.Datasets.Persistence;
@@ -30,7 +32,7 @@ public sealed class UpdateDashboardWidgetsHandler
         UpdateDashboardWidgetsCommand command,
         CancellationToken cancellationToken)
     {
-        var dashboard = await _dashboardRepository.GetByIdAndProjectOwnerAsync(
+        var dashboard = await _dashboardRepository.GetForUpdateByIdAndProjectOwnerAsync(
             command.DashboardId,
             command.ProjectId,
             command.OwnerId,
@@ -42,17 +44,18 @@ public sealed class UpdateDashboardWidgetsHandler
             return new UpdateDashboardWidgetsResult.DashboardNotFound();
         }
 
-        var widgetsById = (await _widgetRepository.GetAllForUpdateAsync(
-            command.DashboardId,
-            command.ProjectId,
-            command.OwnerId,
-            cancellationToken
-        )).ToDictionary(widget => widget.Id);
+        if (command.ExpectedRevision != dashboard.Revision)
+        {
+            return new UpdateDashboardWidgetsResult.RevisionConflict(
+                command.ExpectedRevision,
+                dashboard.Revision
+            );
+        }
 
-        if (!HaveSameWidgetIds(widgetsById, command.Widgets))
+        if (!HasValidUniqueWidgetIds(command.Widgets))
         {
             return new UpdateDashboardWidgetsResult.InvalidWidgetSet(
-                "Provided widget IDs do not match the dashboard widgets."
+                "Widget IDs must be non-empty and unique."
             );
         }
 
@@ -67,7 +70,9 @@ public sealed class UpdateDashboardWidgetsHandler
 
                 if (Intersects(firstUpdate.Layout, secondUpdate.Layout))
                 {
-                    widgetCollisions.Add(new WidgetCollision(firstUpdate.WidgetId, secondUpdate.WidgetId));
+                    widgetCollisions.Add(
+                        new WidgetCollision(firstUpdate.WidgetId, secondUpdate.WidgetId)
+                    );
                 }
             }
         }
@@ -113,7 +118,9 @@ public sealed class UpdateDashboardWidgetsHandler
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidEntityNameException)
             {
-                configurationErrors.Add(new WidgetConfigurationError(change.WidgetId, ex.Message));
+                configurationErrors.Add(
+                    new WidgetConfigurationError(change.WidgetId, ex.Message)
+                );
             }
         }
 
@@ -122,9 +129,52 @@ public sealed class UpdateDashboardWidgetsHandler
             return new UpdateDashboardWidgetsResult.InvalidConfiguration(configurationErrors);
         }
 
-        foreach (var change in command.Widgets)
+        var existingWidgets = await _widgetRepository.GetAllForUpdateAsync(
+            command.DashboardId,
+            command.ProjectId,
+            command.OwnerId,
+            cancellationToken
+        );
+
+        var existingWidgetsById = existingWidgets
+            .ToDictionary(widget => widget.Id);
+
+        var submittedWidgetIds = command.Widgets
+            .Select(change => change.WidgetId)
+            .ToHashSet();
+
+        var widgetsToCreate = command.Widgets
+            .Where(change => !existingWidgetsById.ContainsKey(change.WidgetId))
+            .ToList();
+
+        var widgetsToUpdate = command.Widgets
+            .Where(change => existingWidgetsById.ContainsKey(change.WidgetId))
+            .ToList();
+
+        var widgetsToDelete = existingWidgets
+            .Where(widget => !submittedWidgetIds.Contains(widget.Id))
+            .ToList();
+
+        foreach (var change in widgetsToCreate)
         {
-            var widget = widgetsById[change.WidgetId];
+            var newWidget = new Widget(
+                command.DashboardId,
+                change.DatasetId,
+                change.Type,
+                change.Title,
+                change.GroupByColumn,
+                change.MeasureColumn,
+                change.Aggregation,
+                change.Layout,
+                change.WidgetId
+            );
+
+            _widgetRepository.StageAdd(newWidget);
+        }
+
+        foreach (var change in widgetsToUpdate)
+        {
+            var widget = existingWidgetsById[change.WidgetId];
 
             widget.UpdateLayout(change.Layout);
             widget.UpdateConfiguration(
@@ -137,30 +187,48 @@ public sealed class UpdateDashboardWidgetsHandler
             );
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return new UpdateDashboardWidgetsResult.Success();
-    }
-
-    private static bool HaveSameWidgetIds(
-        Dictionary<Guid, Widget> widgetsById,
-        IReadOnlyList<DashboardWidgetUpdate> changes)
-    {
-        if (widgetsById.Count != changes.Count)
-            return false;
-
-        var seenIds = new HashSet<Guid>();
-
-        foreach (var change in changes)
+        foreach (var change in widgetsToDelete)
         {
-            if (!widgetsById.ContainsKey(change.WidgetId) ||
-                !seenIds.Add(change.WidgetId))
-            {
-                return false;
-            }
+            _widgetRepository.StageRemove(change);
         }
 
-        return true;
+        dashboard.AdvanceRevision();
+
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (OptimisticConcurrencyException)
+        {
+            var currentRevision = await _dashboardRepository.GetDashboardCurrentRevisionAsync(
+                command.DashboardId,
+                command.ProjectId,
+                command.OwnerId,
+                cancellationToken
+            );
+
+            if (currentRevision is null)
+            {
+                return new UpdateDashboardWidgetsResult.DashboardNotFound();
+            }
+
+            return new UpdateDashboardWidgetsResult.RevisionConflict(
+                command.ExpectedRevision,
+                currentRevision.Value
+            );
+        }
+
+        return new UpdateDashboardWidgetsResult.Success(dashboard.Revision);
+    }
+
+    private static bool HasValidUniqueWidgetIds(
+        IReadOnlyList<DashboardWidgetUpdate> changes)
+    {
+        var seen = new HashSet<Guid>(changes.Count);
+
+        return changes
+            .Select(change => change.WidgetId)
+            .All(widgetId => widgetId != Guid.Empty && seen.Add(widgetId));
     }
 
     private static bool Intersects(

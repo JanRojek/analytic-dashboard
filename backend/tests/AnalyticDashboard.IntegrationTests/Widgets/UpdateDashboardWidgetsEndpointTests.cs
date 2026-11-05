@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AnalyticDashboard.Api.Contracts.Widgets;
 using AnalyticDashboard.Domain.Analytics;
 using AnalyticDashboard.Domain.Entities;
@@ -7,6 +8,8 @@ using AnalyticDashboard.Domain.ValueObjects;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using AnalyticDashboard.Application.Common.Exceptions;
+using AnalyticDashboard.Application.Common.Persistence;
 
 namespace AnalyticDashboard.IntegrationTests.Widgets;
 
@@ -108,7 +111,24 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                 "Second updated",
                 new WidgetLayoutRequest(12, 30, 12, 20)
             )
-        ]);
+        ], 0);
+    }
+
+    private static async Task<long> ReadResponseRevisionAsync(HttpResponseMessage response)
+    {
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return json.GetProperty("revision").GetInt64();
+    }
+
+    private async Task<long> ReadDashboardRevisionAsync(Guid dashboardId)
+    {
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        return await dbContext.Dashboards
+            .Where(dashboard => dashboard.Id == dashboardId)
+            .Select(dashboard => dashboard.Revision)
+            .SingleAsync(CancellationToken);
     }
 
     private async Task<SeededDashboard> SeedDashboardAsync(Guid ownerId)
@@ -245,7 +265,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                 measureColumn: "Orders",
                 aggregation: updatedAggregation
             )
-        ]);
+        ], 0);
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -259,7 +279,9 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             CancellationToken
         );
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadResponseRevisionAsync(response));
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
 
         var saved = await ReadSnapshotsAsync(dashboard.DashboardId);
         Assert.Equal(2, saved.Count);
@@ -311,7 +333,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                 invalidTitle,
                 new WidgetLayoutRequest(12, 30, 12, 20)
             )
-        ]);
+        ], 0);
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -350,7 +372,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                 "Second changed",
                 new WidgetLayoutRequest(6, 30, 12, 20)
             )
-        ]);
+        ], 0);
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -372,7 +394,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
     [InlineData("Missing")]
     [InlineData("Unknown")]
     [InlineData("Duplicate")]
-    public async Task UpdateDashboardWidgets_ShouldReturnBadRequest_AndPreserveAllWidgets_WhenIdsDoNotMatch(
+    public async Task UpdateDashboardWidgets_ShouldSynchronizeWidgetIds_AndRejectDuplicates(
         string scenario)
     {
         var userId = Guid.NewGuid();
@@ -412,7 +434,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         using var request = CreatePutRequest(
             dashboard.ProjectId,
             dashboard.DashboardId,
-            new UpdateDashboardWidgetsRequest(updates),
+            new UpdateDashboardWidgetsRequest(updates, 0),
             userId
         );
 
@@ -421,8 +443,27 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             CancellationToken
         );
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        await AssertUnchangedAsync(dashboard.DashboardId, before);
+        if (scenario == "Duplicate")
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            await AssertUnchangedAsync(dashboard.DashboardId, before);
+            Assert.Equal(0L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+            return;
+        }
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadResponseRevisionAsync(response));
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+
+        var saved = await ReadSnapshotsAsync(dashboard.DashboardId);
+        Assert.Equal(scenario == "Missing" ? 1 : 2, saved.Count);
+        Assert.Equal("First updated", saved[dashboard.FirstWidgetId].Title);
+        Assert.False(saved.ContainsKey(dashboard.SecondWidgetId));
+
+        if (scenario == "Unknown")
+        {
+            Assert.Equal("Second updated", saved[secondWidgetId].Title);
+        }
     }
 
     [Fact]
@@ -446,7 +487,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                 "Second changed",
                 new WidgetLayoutRequest(12, 30, 12, 20)
             )
-        ]);
+        ], 0);
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -509,7 +550,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                 "Second changed",
                 new WidgetLayoutRequest(12, 30, 12, 20)
             )
-        ]);
+        ], 0);
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -535,7 +576,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         using var request = CreatePutRequest(
             Guid.NewGuid(),
             Guid.NewGuid(),
-            new UpdateDashboardWidgetsRequest([]),
+            new UpdateDashboardWidgetsRequest([], 0),
             userId
         );
 
@@ -557,7 +598,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         using var request = CreatePutRequest(
             dashboard.ProjectId,
             dashboard.DashboardId,
-            new UpdateDashboardWidgetsRequest(null),
+            new UpdateDashboardWidgetsRequest(null, 0),
             userId
         );
 
@@ -589,7 +630,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                     "Second changed",
                     new WidgetLayoutRequest(12, 30, 12, 20)
                 )
-            ]),
+            ], 0),
             userId
         );
 
@@ -635,7 +676,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                     "Second changed",
                     new WidgetLayoutRequest(12, 30, 12, 20)
                 )
-            ]),
+            ], 0),
             userId
         );
 
@@ -672,7 +713,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                     "Second changed",
                     new WidgetLayoutRequest(6, int.MaxValue - 5, 12, 20)
                 )
-            ]),
+            ], 0),
             userId
         );
 
@@ -686,7 +727,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
     }
 
     [Fact]
-    public async Task UpdateDashboardWidgets_ShouldReturnNoContent_WhenDashboardIsEmptyAndUpdateIsEmpty()
+    public async Task UpdateDashboardWidgets_ShouldReturnOk_WhenDashboardIsEmptyAndUpdateIsEmpty()
     {
         var userId = Guid.NewGuid();
         var project = new Project(userId, "Empty dashboard project");
@@ -702,7 +743,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         using var request = CreatePutRequest(
             project.Id,
             dashboard.Id,
-            new UpdateDashboardWidgetsRequest([]),
+            new UpdateDashboardWidgetsRequest([], 0),
             userId
         );
 
@@ -711,7 +752,9 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             CancellationToken
         );
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadResponseRevisionAsync(response));
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.Id));
 
         await using var verificationScope = _fixture.Services.CreateAsyncScope();
         var verificationContext = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -721,5 +764,322 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         );
 
         Assert.Equal(0, widgetCount);
+    }
+
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldSynchronizeCreateUpdateDelete_WhenRequestIsValid()
+    {
+        var userId = Guid.NewGuid();
+        var newWidgetId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        var updatedType = Enum.GetValues<WidgetType>()[^1];
+        var updatedAggregation = Enum.GetValues<AggregationType>()[^1];
+
+        var requestBody = new UpdateDashboardWidgetsRequest(
+        [
+            CreateUpdate(
+                dashboard.FirstWidgetId,
+                dashboard.DatasetId,
+                "ChangedTitle",
+                new WidgetLayoutRequest(2, 30, 12, 25),
+                type: updatedType,
+                groupByColumn: "Region",
+                measureColumn: "Revenue",
+                aggregation: updatedAggregation
+            ),
+            CreateUpdate(
+                newWidgetId,
+                dashboard.AlternateDatasetId,
+                "Orders by product 2",
+                new WidgetLayoutRequest(14, 30, 10, 24),
+                type: updatedType,
+                groupByColumn: "Product",
+                measureColumn: "Orders",
+                aggregation: updatedAggregation
+            )
+        ], 0);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            requestBody,
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadResponseRevisionAsync(response));
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+
+        var saved = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        Assert.Equal(2, saved.Count);
+
+        Assert.True(saved.ContainsKey(dashboard.FirstWidgetId));
+        Assert.False(saved.ContainsKey(dashboard.SecondWidgetId));
+        Assert.True(saved.ContainsKey(newWidgetId));
+
+        var updatedWidget = saved[dashboard.FirstWidgetId];
+
+        Assert.Equal("ChangedTitle", updatedWidget.Title);
+        Assert.Equal(dashboard.DatasetId, updatedWidget.DatasetId);
+        Assert.Equal(updatedType, updatedWidget.Type);
+        Assert.Equal("Region", updatedWidget.GroupByColumn);
+        Assert.Equal("Revenue", updatedWidget.MeasureColumn);
+        Assert.Equal(updatedAggregation, updatedWidget.Aggregation);
+        Assert.Equal(
+            (2, 30, 12, 25),
+            (updatedWidget.X, updatedWidget.Y, updatedWidget.Width, updatedWidget.Height)
+        );
+
+        Assert.Equal(
+            before[dashboard.FirstWidgetId].CreatedAtUtc,
+            updatedWidget.CreatedAtUtc
+        );
+
+        var createdWidget = saved[newWidgetId];
+
+        Assert.Equal(newWidgetId, createdWidget.Id);
+        Assert.Equal(dashboard.DashboardId, createdWidget.DashboardId);
+        Assert.Equal(dashboard.AlternateDatasetId, createdWidget.DatasetId);
+        Assert.Equal("Orders by product 2", createdWidget.Title);
+        Assert.Equal(updatedType, createdWidget.Type);
+        Assert.Equal("Product", createdWidget.GroupByColumn);
+        Assert.Equal("Orders", createdWidget.MeasureColumn);
+        Assert.Equal(updatedAggregation, createdWidget.Aggregation);
+        Assert.Equal(
+            (14, 30, 10, 24),
+            (createdWidget.X, createdWidget.Y, createdWidget.Width, createdWidget.Height)
+        );
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldReturnRevisionConflict_AndPreserveCommittedState_WhenRevisionIsStale()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+
+        using (var firstRequest = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            ValidUpdateRequest(dashboard),
+            userId))
+        using (var firstResponse = await _fixture.Client.SendAsync(firstRequest, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+            Assert.Equal(1L, await ReadResponseRevisionAsync(firstResponse));
+        }
+
+        var committed = await ReadSnapshotsAsync(dashboard.DashboardId);
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+
+        var newWidgetId = Guid.NewGuid();
+        var staleRequestBody = new UpdateDashboardWidgetsRequest(
+        [
+            CreateUpdate(
+                dashboard.FirstWidgetId,
+                dashboard.DatasetId,
+                "Stale update must not win",
+                new WidgetLayoutRequest(0, 40, 12, 20)
+            ),
+            CreateUpdate(
+                newWidgetId,
+                dashboard.DatasetId,
+                "Stale create must not happen",
+                new WidgetLayoutRequest(12, 40, 12, 20)
+            )
+        ], 0);
+
+        using var staleRequest = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            staleRequestBody,
+            userId
+        );
+        using var staleResponse = await _fixture.Client.SendAsync(staleRequest, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+        var problem = await staleResponse.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(0L, problem.GetProperty("expectedRevision").GetInt64());
+        Assert.Equal(1L, problem.GetProperty("currentRevision").GetInt64());
+
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        await AssertUnchangedAsync(dashboard.DashboardId, committed);
+        Assert.False((await ReadSnapshotsAsync(dashboard.DashboardId)).ContainsKey(newWidgetId));
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldRejectWholeMixedRequest_WhenNewWidgetHasUnknownDataset()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        var newWidgetId = Guid.NewGuid();
+
+        var requestBody = new UpdateDashboardWidgetsRequest(
+        [
+            CreateUpdate(
+                dashboard.FirstWidgetId,
+                dashboard.DatasetId,
+                "Should not update",
+                new WidgetLayoutRequest(0, 30, 12, 20)
+            ),
+            CreateUpdate(
+                newWidgetId,
+                Guid.NewGuid(),
+                "Should not be created",
+                new WidgetLayoutRequest(12, 30, 12, 20)
+            )
+        ], 0);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            requestBody,
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldAcceptExactlyOneOfTwoCompetingRequests_WhenRevisionIsSame()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+
+        var firstBody = new UpdateDashboardWidgetsRequest(
+        [
+            CreateUpdate(dashboard.FirstWidgetId, dashboard.DatasetId,
+                "Winner A first", new WidgetLayoutRequest(0, 30, 12, 20)),
+            CreateUpdate(dashboard.SecondWidgetId, dashboard.DatasetId,
+                "Winner A second", new WidgetLayoutRequest(12, 30, 12, 20))
+        ], 0);
+
+        var secondBody = new UpdateDashboardWidgetsRequest(
+        [
+            CreateUpdate(dashboard.FirstWidgetId, dashboard.DatasetId,
+                "Winner B first", new WidgetLayoutRequest(0, 40, 12, 20)),
+            CreateUpdate(dashboard.SecondWidgetId, dashboard.DatasetId,
+                "Winner B second", new WidgetLayoutRequest(12, 40, 12, 20))
+        ], 0);
+
+        using var firstRequest = CreatePutRequest(
+            dashboard.ProjectId, dashboard.DashboardId, firstBody, userId);
+        using var secondRequest = CreatePutRequest(
+            dashboard.ProjectId, dashboard.DashboardId, secondBody, userId);
+
+        var sendFirst = _fixture.Client.SendAsync(firstRequest, CancellationToken);
+        var sendSecond = _fixture.Client.SendAsync(secondRequest, CancellationToken);
+        var responses = await Task.WhenAll(sendFirst, sendSecond);
+
+        using var firstResponse = responses[0];
+        using var secondResponse = responses[1];
+
+        var statuses = new[] { firstResponse.StatusCode, secondResponse.StatusCode };
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.OK));
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.Conflict));
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+
+        var saved = await ReadSnapshotsAsync(dashboard.DashboardId);
+        Assert.Equal(2, saved.Count);
+
+        var firstWon = firstResponse.StatusCode == HttpStatusCode.OK;
+        Assert.Equal(firstWon ? "Winner A first" : "Winner B first",
+            saved[dashboard.FirstWidgetId].Title);
+        Assert.Equal(firstWon ? "Winner A second" : "Winner B second",
+            saved[dashboard.SecondWidgetId].Title);
+        Assert.Equal(firstWon ? 30 : 40, saved[dashboard.FirstWidgetId].Y);
+        Assert.Equal(firstWon ? 30 : 40, saved[dashboard.SecondWidgetId].Y);
+    }
+
+    [Fact]
+    public async Task UnitOfWork_ShouldRollbackStagedCreateAndDelete_WhenRevisionChangesBeforeSave()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        var newWidgetId = Guid.NewGuid();
+
+        await using var winningScope = _fixture.Services.CreateAsyncScope();
+        await using var losingScope = _fixture.Services.CreateAsyncScope();
+
+        var winningDb = winningScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var losingDb = losingScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var winningDashboard = await winningDb.Dashboards
+            .SingleAsync(item => item.Id == dashboard.DashboardId, CancellationToken);
+        var losingDashboard = await losingDb.Dashboards
+            .SingleAsync(item => item.Id == dashboard.DashboardId, CancellationToken);
+        var widgetToDelete = await losingDb.Widgets
+            .SingleAsync(widget => widget.Id == dashboard.SecondWidgetId, CancellationToken);
+
+        losingDb.Widgets.Remove(widgetToDelete);
+        losingDb.Widgets.Add(new Widget(
+            dashboard.DashboardId,
+            dashboard.DatasetId,
+            Enum.GetValues<WidgetType>()[0],
+            "Must be rolled back",
+            "Country",
+            "Amount",
+            Enum.GetValues<AggregationType>()[0],
+            new WidgetLayout(12, 0, 12, 20),
+            newWidgetId
+        ));
+        losingDashboard.AdvanceRevision();
+
+        winningDashboard.AdvanceRevision();
+        await winningDb.SaveChangesAsync(CancellationToken);
+
+        var unitOfWork = (IUnitOfWork)losingDb;
+        var exception = await Assert.ThrowsAsync<OptimisticConcurrencyException>(
+            () => unitOfWork.SaveChangesAsync(CancellationToken));
+        Assert.IsType<DbUpdateConcurrencyException>(exception.InnerException);
+
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Theory]
+    [InlineData("Missing")]
+    [InlineData("Null")]
+    [InlineData("Negative")]
+    public async Task UpdateDashboardWidgets_ShouldRejectMissingNullOrNegativeExpectedRevision(string scenario)
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        var widgets = ValidUpdateRequest(dashboard).Widgets;
+
+        object requestBody = scenario switch
+        {
+            "Missing" => new { widgets },
+            "Null" => new { widgets, expectedRevision = (long?)null },
+            "Negative" => new { widgets, expectedRevision = -1L },
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            requestBody,
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
     }
 }
