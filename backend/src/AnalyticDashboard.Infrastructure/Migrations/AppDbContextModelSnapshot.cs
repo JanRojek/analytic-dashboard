@@ -230,7 +230,7 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                     b.Property<Guid>("DashboardId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("DatasetId")
+                    b.Property<Guid?>("DatasetId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("GroupByColumn")
@@ -473,8 +473,7 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                     b.HasOne("AnalyticDashboard.Domain.Entities.Dataset", null)
                         .WithMany()
                         .HasForeignKey("DatasetId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>

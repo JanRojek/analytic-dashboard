@@ -1,15 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+
 using AnalyticDashboard.Api.Contracts.Widgets;
+using AnalyticDashboard.Application.Common.Exceptions;
+using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Domain.Analytics;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Domain.ValueObjects;
 using AnalyticDashboard.Infrastructure.Data;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using AnalyticDashboard.Application.Common.Exceptions;
-using AnalyticDashboard.Application.Common.Persistence;
 
 namespace AnalyticDashboard.IntegrationTests.Widgets;
 
@@ -32,7 +34,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
     private sealed record WidgetSnapshot(
         Guid Id,
         Guid DashboardId,
-        Guid DatasetId,
+        Guid? DatasetId,
         WidgetType Type,
         string Title,
         string GroupByColumn,
@@ -98,20 +100,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         SeededDashboard dashboard)
     {
         return new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.DatasetId,
-                "First updated",
-                new WidgetLayoutRequest(0, 30, 12, 20)
-            ),
-            CreateUpdate(
-                dashboard.SecondWidgetId,
-                dashboard.DatasetId,
-                "Second updated",
-                new WidgetLayoutRequest(12, 30, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "First updated",
+                    new WidgetLayoutRequest(0, 30, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Second updated",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ],
+            0
+        );
     }
 
     private static async Task<long> ReadResponseRevisionAsync(HttpResponseMessage response)
@@ -244,28 +248,30 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var updatedAggregation = Enum.GetValues<AggregationType>()[^1];
 
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.AlternateDatasetId,
-                "  Revenue by region  ",
-                new WidgetLayoutRequest(0, 30, 14, 25),
-                type: updatedType,
-                groupByColumn: "Region",
-                measureColumn: "Revenue",
-                aggregation: updatedAggregation
-            ),
-            CreateUpdate(
-                dashboard.SecondWidgetId,
-                dashboard.AlternateDatasetId,
-                "Orders by product",
-                new WidgetLayoutRequest(14, 30, 10, 25),
-                type: updatedType,
-                groupByColumn: "Product",
-                measureColumn: "Orders",
-                aggregation: updatedAggregation
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.AlternateDatasetId,
+                    "  Revenue by region  ",
+                    new WidgetLayoutRequest(0, 30, 14, 25),
+                    type: updatedType,
+                    groupByColumn: "Region",
+                    measureColumn: "Revenue",
+                    aggregation: updatedAggregation
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.AlternateDatasetId,
+                    "Orders by product",
+                    new WidgetLayoutRequest(14, 30, 10, 25),
+                    type: updatedType,
+                    groupByColumn: "Product",
+                    measureColumn: "Orders",
+                    aggregation: updatedAggregation
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -320,20 +326,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         // the domain validation inside UpdateDashboardWidgetsHandler.
         var invalidTitle = new string('X', Widget.MaxTitleLength + 1);
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.AlternateDatasetId,
-                "This change must not be saved",
-                new WidgetLayoutRequest(0, 30, 12, 20)
-            ),
-            CreateUpdate(
-                dashboard.SecondWidgetId,
-                dashboard.AlternateDatasetId,
-                invalidTitle,
-                new WidgetLayoutRequest(12, 30, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.AlternateDatasetId,
+                    "This change must not be saved",
+                    new WidgetLayoutRequest(0, 30, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.AlternateDatasetId,
+                    invalidTitle,
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -359,20 +367,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var before = await ReadSnapshotsAsync(dashboard.DashboardId);
 
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.AlternateDatasetId,
-                "First changed",
-                new WidgetLayoutRequest(0, 30, 12, 20)
-            ),
-            CreateUpdate(
-                dashboard.SecondWidgetId,
-                dashboard.AlternateDatasetId,
-                "Second changed",
-                new WidgetLayoutRequest(6, 30, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.AlternateDatasetId,
+                    "First changed",
+                    new WidgetLayoutRequest(0, 30, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.AlternateDatasetId,
+                    "Second changed",
+                    new WidgetLayoutRequest(6, 30, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -474,20 +484,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var before = await ReadSnapshotsAsync(dashboard.DashboardId);
 
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.DatasetId,
-                "First changed",
-                new WidgetLayoutRequest(0, 30, 12, 20)
-            ),
-            CreateUpdate(
-                dashboard.SecondWidgetId,
-                Guid.NewGuid(),
-                "Second changed",
-                new WidgetLayoutRequest(12, 30, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "First changed",
+                    new WidgetLayoutRequest(0, 30, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    Guid.NewGuid(),
+                    "Second changed",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -537,20 +549,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var before = await ReadSnapshotsAsync(dashboard.DashboardId);
 
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.DatasetId,
-                "First changed",
-                null
-            ),
-            CreateUpdate(
-                dashboard.SecondWidgetId,
-                dashboard.DatasetId,
-                "Second changed",
-                new WidgetLayoutRequest(12, 30, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "First changed",
+                    null
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Second changed",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -622,15 +636,17 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             dashboard.ProjectId,
             dashboard.DashboardId,
             new UpdateDashboardWidgetsRequest(
-            [
-                null,
-                CreateUpdate(
-                    dashboard.SecondWidgetId,
-                    dashboard.DatasetId,
-                    "Second changed",
-                    new WidgetLayoutRequest(12, 30, 12, 20)
-                )
-            ], 0),
+                [
+                    null,
+                    CreateUpdate(
+                        dashboard.SecondWidgetId,
+                        dashboard.DatasetId,
+                        "Second changed",
+                        new WidgetLayoutRequest(12, 30, 12, 20)
+                    )
+                ],
+                0
+            ),
             userId
         );
 
@@ -663,20 +679,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             dashboard.ProjectId,
             dashboard.DashboardId,
             new UpdateDashboardWidgetsRequest(
-            [
-                CreateUpdate(
-                    dashboard.FirstWidgetId,
-                    dashboard.DatasetId,
-                    "First changed",
-                    new WidgetLayoutRequest(x, y, width, height)
-                ),
-                CreateUpdate(
-                    dashboard.SecondWidgetId,
-                    dashboard.DatasetId,
-                    "Second changed",
-                    new WidgetLayoutRequest(12, 30, 12, 20)
-                )
-            ], 0),
+                [
+                    CreateUpdate(
+                        dashboard.FirstWidgetId,
+                        dashboard.DatasetId,
+                        "First changed",
+                        new WidgetLayoutRequest(x, y, width, height)
+                    ),
+                    CreateUpdate(
+                        dashboard.SecondWidgetId,
+                        dashboard.DatasetId,
+                        "Second changed",
+                        new WidgetLayoutRequest(12, 30, 12, 20)
+                    )
+                ],
+                0
+            ),
             userId
         );
 
@@ -700,20 +718,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             dashboard.ProjectId,
             dashboard.DashboardId,
             new UpdateDashboardWidgetsRequest(
-            [
-                CreateUpdate(
-                    dashboard.FirstWidgetId,
-                    dashboard.DatasetId,
-                    "First changed",
-                    new WidgetLayoutRequest(0, int.MaxValue - 10, 12, 20)
-                ),
-                CreateUpdate(
-                    dashboard.SecondWidgetId,
-                    dashboard.DatasetId,
-                    "Second changed",
-                    new WidgetLayoutRequest(6, int.MaxValue - 5, 12, 20)
-                )
-            ], 0),
+                [
+                    CreateUpdate(
+                        dashboard.FirstWidgetId,
+                        dashboard.DatasetId,
+                        "First changed",
+                        new WidgetLayoutRequest(0, int.MaxValue - 10, 12, 20)
+                    ),
+                    CreateUpdate(
+                        dashboard.SecondWidgetId,
+                        dashboard.DatasetId,
+                        "Second changed",
+                        new WidgetLayoutRequest(6, int.MaxValue - 5, 12, 20)
+                    )
+                ],
+                0
+            ),
             userId
         );
 
@@ -766,7 +786,6 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         Assert.Equal(0, widgetCount);
     }
 
-
     [Fact]
     public async Task UpdateDashboardWidgets_ShouldSynchronizeCreateUpdateDelete_WhenRequestIsValid()
     {
@@ -779,28 +798,30 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var updatedAggregation = Enum.GetValues<AggregationType>()[^1];
 
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.DatasetId,
-                "ChangedTitle",
-                new WidgetLayoutRequest(2, 30, 12, 25),
-                type: updatedType,
-                groupByColumn: "Region",
-                measureColumn: "Revenue",
-                aggregation: updatedAggregation
-            ),
-            CreateUpdate(
-                newWidgetId,
-                dashboard.AlternateDatasetId,
-                "Orders by product 2",
-                new WidgetLayoutRequest(14, 30, 10, 24),
-                type: updatedType,
-                groupByColumn: "Product",
-                measureColumn: "Orders",
-                aggregation: updatedAggregation
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "ChangedTitle",
+                    new WidgetLayoutRequest(2, 30, 12, 25),
+                    type: updatedType,
+                    groupByColumn: "Region",
+                    measureColumn: "Revenue",
+                    aggregation: updatedAggregation
+                ),
+                CreateUpdate(
+                    newWidgetId,
+                    dashboard.AlternateDatasetId,
+                    "Orders by product 2",
+                    new WidgetLayoutRequest(14, 30, 10, 24),
+                    type: updatedType,
+                    groupByColumn: "Product",
+                    measureColumn: "Orders",
+                    aggregation: updatedAggregation
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -882,20 +903,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
 
         var newWidgetId = Guid.NewGuid();
         var staleRequestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.DatasetId,
-                "Stale update must not win",
-                new WidgetLayoutRequest(0, 40, 12, 20)
-            ),
-            CreateUpdate(
-                newWidgetId,
-                dashboard.DatasetId,
-                "Stale create must not happen",
-                new WidgetLayoutRequest(12, 40, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "Stale update must not win",
+                    new WidgetLayoutRequest(0, 40, 12, 20)
+                ),
+                CreateUpdate(
+                    newWidgetId,
+                    dashboard.DatasetId,
+                    "Stale create must not happen",
+                    new WidgetLayoutRequest(12, 40, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var staleRequest = CreatePutRequest(
             dashboard.ProjectId,
@@ -925,20 +948,22 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var newWidgetId = Guid.NewGuid();
 
         var requestBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(
-                dashboard.FirstWidgetId,
-                dashboard.DatasetId,
-                "Should not update",
-                new WidgetLayoutRequest(0, 30, 12, 20)
-            ),
-            CreateUpdate(
-                newWidgetId,
-                Guid.NewGuid(),
-                "Should not be created",
-                new WidgetLayoutRequest(12, 30, 12, 20)
-            )
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "Should not update",
+                    new WidgetLayoutRequest(0, 30, 12, 20)
+                ),
+                CreateUpdate(
+                    newWidgetId,
+                    Guid.NewGuid(),
+                    "Should not be created",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var request = CreatePutRequest(
             dashboard.ProjectId,
@@ -960,25 +985,53 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var dashboard = await SeedDashboardAsync(userId);
 
         var firstBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(dashboard.FirstWidgetId, dashboard.DatasetId,
-                "Winner A first", new WidgetLayoutRequest(0, 30, 12, 20)),
-            CreateUpdate(dashboard.SecondWidgetId, dashboard.DatasetId,
-                "Winner A second", new WidgetLayoutRequest(12, 30, 12, 20))
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "Winner A first",
+                    new WidgetLayoutRequest(0, 30, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Winner A second",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                )
+            ],
+            0
+        );
 
         var secondBody = new UpdateDashboardWidgetsRequest(
-        [
-            CreateUpdate(dashboard.FirstWidgetId, dashboard.DatasetId,
-                "Winner B first", new WidgetLayoutRequest(0, 40, 12, 20)),
-            CreateUpdate(dashboard.SecondWidgetId, dashboard.DatasetId,
-                "Winner B second", new WidgetLayoutRequest(12, 40, 12, 20))
-        ], 0);
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    dashboard.DatasetId,
+                    "Winner B first",
+                    new WidgetLayoutRequest(0, 40, 12, 20)
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Winner B second",
+                    new WidgetLayoutRequest(12, 40, 12, 20)
+                )
+            ],
+            0
+        );
 
         using var firstRequest = CreatePutRequest(
-            dashboard.ProjectId, dashboard.DashboardId, firstBody, userId);
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            firstBody,
+            userId
+        );
         using var secondRequest = CreatePutRequest(
-            dashboard.ProjectId, dashboard.DashboardId, secondBody, userId);
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            secondBody,
+            userId
+        );
 
         var sendFirst = _fixture.Client.SendAsync(firstRequest, CancellationToken);
         var sendSecond = _fixture.Client.SendAsync(secondRequest, CancellationToken);
@@ -996,10 +1049,15 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         Assert.Equal(2, saved.Count);
 
         var firstWon = firstResponse.StatusCode == HttpStatusCode.OK;
-        Assert.Equal(firstWon ? "Winner A first" : "Winner B first",
-            saved[dashboard.FirstWidgetId].Title);
-        Assert.Equal(firstWon ? "Winner A second" : "Winner B second",
-            saved[dashboard.SecondWidgetId].Title);
+
+        Assert.Equal(
+            firstWon ? "Winner A first" : "Winner B first",
+            saved[dashboard.FirstWidgetId].Title
+        );
+        Assert.Equal(
+            firstWon ? "Winner A second" : "Winner B second",
+            saved[dashboard.SecondWidgetId].Title
+        );
         Assert.Equal(firstWon ? 30 : 40, saved[dashboard.FirstWidgetId].Y);
         Assert.Equal(firstWon ? 30 : 40, saved[dashboard.SecondWidgetId].Y);
     }

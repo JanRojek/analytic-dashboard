@@ -99,6 +99,17 @@ public static class WidgetEndpoints
                         detail: "The widget or its dataset does not exist or is not accessible by the current user."
                     ),
 
+                GetWidgetDataResult.SourceRemoved =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Widget source removed",
+                        detail: "Reconnect a dataset to view this widget's data.",
+                        extensions: new Dictionary<string, object?>
+                        {
+                            ["code"] = "widget_source_removed"
+                        }
+                    ),
+
                 GetWidgetDataResult.InvalidQuery invalid =>
                     Results.Problem(
                         statusCode: StatusCodes.Status400BadRequest,
@@ -113,6 +124,9 @@ public static class WidgetEndpoints
         })
         .WithName("GetWidgetData")
         .Produces<GetWidgetDataResult.Success>()
+        .ProducesProblem(
+            StatusCodes.Status409Conflict
+        )
         .ProducesProblem(
             StatusCodes.Status400BadRequest
         )

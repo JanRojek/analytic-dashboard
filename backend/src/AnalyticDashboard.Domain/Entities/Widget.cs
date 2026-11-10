@@ -9,7 +9,7 @@ public sealed class Widget
 
     public Guid DashboardId { get; private set; }
 
-    public Guid DatasetId { get; private set; }
+    public Guid? DatasetId { get; private set; }
 
     public WidgetType Type { get; private set; }
 
@@ -80,6 +80,11 @@ public sealed class Widget
         MeasureColumn = null!;
 
         Layout = null!;
+    }
+
+    public void DetachDataset()
+    {
+        DatasetId = null;
     }
 
     public void Rename(string title)

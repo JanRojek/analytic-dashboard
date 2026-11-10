@@ -15,9 +15,6 @@ public sealed class WidgetConfiguration : IEntityTypeConfiguration<Widget>
         builder.Property(widget => widget.DashboardId)
             .IsRequired();
 
-        builder.Property(widget => widget.DatasetId)
-            .IsRequired();
-
         builder.Property(widget => widget.Type)
             .IsRequired()
             .HasConversion<string>();

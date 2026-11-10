@@ -13,6 +13,8 @@ public abstract record GetWidgetDataResult
 
     public sealed record NotFound : GetWidgetDataResult;
 
+    public sealed record SourceRemoved : GetWidgetDataResult;
+
     public sealed record InvalidQuery(
         string Message
     ) : GetWidgetDataResult;

@@ -35,8 +35,13 @@ public sealed class GetWidgetDataHandler
             return new GetWidgetDataResult.NotFound();
         }
 
+        if (widget.DatasetId is not { } datasetId)
+        {
+            return new GetWidgetDataResult.SourceRemoved();
+        }
+
         var queryResult = await _queryExecutor.ExecuteAsync(
-            widget.DatasetId,
+            datasetId,
             query.ProjectId,
             query.OwnerId,
             widget.GroupByColumn,

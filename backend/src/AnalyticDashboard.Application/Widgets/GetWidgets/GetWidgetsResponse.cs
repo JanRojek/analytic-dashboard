@@ -6,7 +6,7 @@ namespace AnalyticDashboard.Application.Widgets.GetWidgets;
 public sealed record GetWidgetsResponse(
     Guid Id,
     Guid DashboardId,
-    Guid DatasetId,
+    Guid? DatasetId,
     WidgetType Type,
     string Title,
     string GroupByColumn,
