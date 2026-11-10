@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  ActionIcon,
-  Button,
-  Modal,
-  Tooltip,
-} from "@mantine/core";
+import { useCallback, useEffect, useState } from "react";
+import { Button, Modal } from "@mantine/core";
 import { useNavigate } from "react-router-dom";
+
+import { addWidget, removeWidget, updateWidget, updateWidgetLayouts } from "../editor/editorState";
+import { createEditorSnapshot } from "../editor/editorSnapshot";
+import { useEditorHistory } from "../editor/useEditorHistory";
+import { useDashboardAutosave, type DashboardAutosaveStatus } from "../editor/useDashboardAutosave";
+import { readEditorSnapshotDraft } from "../editor/editorSnapshotDraft";
 
 import { EmptyState, ErrorState } from "../../../components/Feedback";
 import { Icon } from "../../../components/Icon";
@@ -19,6 +20,7 @@ import type {
   Widget,
   WidgetInput,
   WidgetType,
+  WidgetLayout,
 } from "../../../data/types";
 import {
   editorScope,
@@ -28,11 +30,9 @@ import {
   type EditorDocument,
 } from "../../../mocks/editor";
 import { useSession } from "../../../session/SessionContext";
-import {
-  useDeleteWidget,
-  useUpdateDashboardWidgets,
-} from "../../dashboards/hooks";
-import { chartTypes, queryCaption } from "../chartConfig";
+import { useDatasetProfile } from "../../data/hooks";
+import { useDeleteWidget } from "../../dashboards/hooks";
+import { chartTypes } from "../chartConfig";
 import { orderedWidgets } from "../dashboardUtils";
 import {
   createDraftWidget,
@@ -42,7 +42,7 @@ import {
 import { DashboardCanvas } from "./DashboardCanvas";
 import { ChartGallery } from "./ChartGallery";
 import { DraftChartInspector } from "./DraftChartInspector";
-import { WidgetChart } from "./WidgetChart";
+import { DashboardWidgetContent } from "./DashboardWidgetContent";
 import { WidgetResults } from "./WidgetResults";
 import { DashboardWorkspaceHeader } from "./DashboardWorkspaceHeader";
 import { ConfiguredChartInspector } from "./ConfiguredChartInspector";
@@ -51,6 +51,15 @@ type DashboardWorkspaceProps = {
   dashboard: Dashboard;
   sourceWidgets: Widget[];
   editing: boolean;
+};
+
+const AUTOSAVE_MESSAGES: Record<DashboardAutosaveStatus, string> = {
+  saved: "All changes saved",
+  pending: "Waiting to save…",
+  saving: "Saving changes…",
+  invalid: "Complete chart configuration to save",
+  error: "Autosave failed — changes kept locally",
+  conflict: "Save conflict — changes kept locally",
 };
 
 export function DashboardWorkspace({
@@ -62,7 +71,7 @@ export function DashboardWorkspace({
   const navigate = useNavigate();
   const scope = editorScope(mode, session?.user.id || "", dashboard.projectId);
   const draftKey = `aperture:widget-drafts:${scope}:${dashboard.id}`;
-
+  const snapshotDraftKey = `${scope}:editor:${dashboard.id}:snapshot-draft`;
 
   const [initial] = useState(() => {
     const stored = readEditor(scope, dashboard.id, editing);
@@ -71,47 +80,46 @@ export function DashboardWorkspace({
       return stored;
     }
 
-    const storedDocument: EditorDocument = {
-      ...stored.document,
-      overrides:
-          editing && stored.dirty
-              ? stored.document.overrides
-              : {},
-    };
-
-    const serverGeometry = Object.fromEntries(
-        sourceWidgets.map((widget) => [
-          widget.id,
-          toGridCell(widget.layout),
-        ]),
-    );
-
-    const localGeometry = storedDocument.gridLayout ?? {};
-
     const draftGeometry = Object.fromEntries(
-        Object.entries(localGeometry).filter(([id]) =>
+        Object.entries(stored.document.gridLayout ?? {}).filter(([id]) =>
             id.startsWith("draft-"),
         ),
     );
 
-    const gridLayout = !editing
-        ? serverGeometry
-        : stored.dirty
-            ? { ...serverGeometry, ...localGeometry }
-            : { ...serverGeometry, ...draftGeometry };
-
     return {
       ...stored,
       document: {
-        ...storedDocument,
-        gridLayout,
+        ...stored.document,
+        order: [],
+        widths: {},
+        overrides: {},
+        gridLayout: draftGeometry,
       },
     };
   });
 
   const [document, setDocument] = useState(initial.document);
-  const [dirty, setDirty] = useState(initial.dirty);
+  const [recoveredDraft] = useState(() =>
+      mode === "api" && editing
+          ? readEditorSnapshotDraft(snapshotDraftKey)
+          : null,
+  );
+  const [initialSnapshot] = useState(() =>
+      recoveredDraft?.snapshot ??
+      (mode === "api"
+          ? {
+            widgets: sourceWidgets.map((widget) => ({
+              ...widget,
+              layout: { ...widget.layout },
+            })),
+          }
+          : createEditorSnapshot(sourceWidgets, initial.document)),
+  );
+
+  const editor = useEditorHistory(initialSnapshot);
+  const [dirty, setDirty] = useState(mode === "demo" && initial.dirty);
   const [selectedId, setSelectedId] = useState("");
+  const [editingInspectorField, setEditingInspectorField] = useState(false);
   const [draftWidgets, setDraftWidgets] = useState<DraftWidget[]>(() =>
       readDraftWidgets(draftKey),
   );
@@ -120,17 +128,38 @@ export function DashboardWorkspace({
   const [showTable, setShowTable] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
-  const editRevision = useRef(0);
 
-  const widgets = orderedWidgets(
-      sourceWidgets,
-      mode === "api" && !editing
-          ? { ...document, overrides: {} }
-          : document,
-  );
+  const autosave = useDashboardAutosave({
+    enabled: mode === "api" && editing,
+    suspend: editingInspectorField,
+    projectId: dashboard.projectId,
+    dashboardId: dashboard.id,
+    draftKey: snapshotDraftKey,
+    snapshot: editor.snapshot,
+    baseRevision: recoveredDraft?.baseRevision ?? dashboard.revision,
+    serverRevision: dashboard.revision,
+    hasRecoveredDraft: Boolean(recoveredDraft),
+  });
+
+  const widgets =
+      mode === "api"
+          ? editing
+              ? editor.snapshot.widgets
+              : sourceWidgets
+          : orderedWidgets(sourceWidgets, document);
   const visibleDrafts = editing ? draftWidgets : [];
   const chartCount = widgets.length + visibleDrafts.length;
-  const resolvedGridGeometry = resolveGridGeometry(document.gridLayout ?? {}, [
+  const canvasGeometry =
+      mode === "api"
+          ? {
+            ...Object.fromEntries(
+                widgets.map((widget) => [widget.id, toGridCell(widget.layout)]),
+            ),
+            ...(editing ? document.gridLayout : {}),
+          }
+          : (document.gridLayout ?? {});
+
+  const resolvedGridGeometry = resolveGridGeometry(canvasGeometry, [
     ...widgets.map((widget) => widget.id),
     ...visibleDrafts.map((draft) => draft.id),
   ]);
@@ -141,12 +170,18 @@ export function DashboardWorkspace({
       ? undefined
       : widgets.find((widget) => widget.id === selectedId);
 
-  const remove = useDeleteWidget(dashboard.projectId);
+  const selectedDatasetProfile = useDatasetProfile(
+      dashboard.projectId,
+      selected?.datasetId ?? "",
+      editing && Boolean(selected),
+  );
 
-  const saveWidgets = useUpdateDashboardWidgets(dashboard.projectId);
+  const remove = useDeleteWidget(dashboard.projectId);
+  const hasUnsavedChanges =
+      mode === "api" ? autosave.status !== "saved" : dirty;
 
   useEffect(() => {
-    if (!dirty || !editing) return;
+    if (!hasUnsavedChanges || !editing) return;
 
     const guard = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -154,7 +189,7 @@ export function DashboardWorkspace({
 
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
-  }, [dirty, editing]);
+  }, [hasUnsavedChanges, editing]);
 
   useEffect(() => {
     if (!editing) return;
@@ -166,12 +201,101 @@ export function DashboardWorkspace({
     }
   }, [draftKey, draftWidgets, editing]);
 
-  function update(next: EditorDocument) {
-    editRevision.current += 1;
+  useEffect(() => {
+    if (mode !== "demo" || !editing || !dirty) return;
 
+    const timeout = window.setTimeout(() => {
+      try {
+        const saved = saveEditor(scope, dashboard.id, document);
+        setDocument(saved);
+        setDirty(false);
+        setSaveMessage("Saved in this browser");
+        setSaveError("");
+      } catch {
+        setSaveError("Your browser could not save these edits.");
+      }
+    }, 800);
+
+    return () => window.clearTimeout(timeout);
+  }, [mode, editing, dirty, scope, dashboard.id, document]);
+
+  const runHistoryAction = useCallback(
+      (action: "undo" | "redo") => {
+        if (mode !== "api" || !editing) return;
+
+        if (action === "undo") {
+          if (!editor.canUndo) return;
+          editor.undo();
+        } else {
+          if (!editor.canRedo) return;
+          editor.redo();
+        }
+      },
+      [
+        mode,
+        editing,
+        editor.canUndo,
+        editor.canRedo,
+        editor.undo,
+        editor.redo,
+      ],
+  );
+
+  useEffect(() => {
+    if (mode !== "api" || !editing) return;
+
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (
+          event.defaultPrevented ||
+          event.isComposing ||
+          !(event.ctrlKey || event.metaKey) ||
+          event.altKey
+      ) {
+        return;
+      }
+
+      if (
+          event.target instanceof Element &&
+          event.target.closest(
+              'input, textarea, select, [contenteditable], [role="textbox"]',
+          )
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+
+      const action =
+          key === "y" || (key === "z" && event.shiftKey) ? "redo" : "undo";
+
+      if (
+          (action === "undo" && !editor.canUndo) ||
+          (action === "redo" && !editor.canRedo)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      runHistoryAction(action);
+    };
+
+    window.addEventListener("keydown", handleHistoryShortcut);
+    return () => window.removeEventListener("keydown", handleHistoryShortcut);
+  }, [
+    mode,
+    editing,
+    editor.canUndo,
+    editor.canRedo,
+    runHistoryAction,
+  ]);
+
+  function update(next: EditorDocument) {
     setDocument(next);
-    setDirty(true);
-    setSaveMessage("");
+    if (mode === "demo") {
+      setDirty(true);
+      setSaveMessage("");
+    }
 
     try {
       persistEditorDraft(scope, dashboard.id, next);
@@ -183,99 +307,11 @@ export function DashboardWorkspace({
     }
   }
 
-  async function persist(): Promise<void> {
-    if (saveWidgets.isPending) return;
-
-    if (
-        widgets.some(
-            (widget) =>
-                !widget.title.trim() ||
-                !widget.groupByColumn ||
-                !widget.measureColumn,
-        )
-    ) {
-      setSaveError(
-          "Give every chart a title and choose its group and measure before saving.",
-      );
-      return;
-    }
-
-    if (mode === "api") {
-      const updates = widgets.map((widget) => ({
-        widgetId: widget.id,
-        datasetId: widget.datasetId,
-        type: widget.type,
-        title: widget.title,
-        groupByColumn: widget.groupByColumn,
-        measureColumn: widget.measureColumn,
-        aggregation: widget.aggregation,
-        layout: toWidgetLayout(
-            resolvedGridGeometry[widget.id],
-        ),
-      }));
-
-      const revisionAtSave = editRevision.current;
-
-      try {
-        await saveWidgets.mutateAsync({
-          dashboardId: dashboard.id,
-          updates,
-        });
-
-        if (editRevision.current !== revisionAtSave) {
-          setSaveError("");
-          return;
-        }
-      } catch (error) {
-        setSaveError(
-            error instanceof Error
-                ? error.message
-                : "The dashboard could not be saved.",
-        );
-        return;
-      }
-    }
-
-
-    try {
-      const nextDocument: EditorDocument =
-          mode === "api"
-              ? {
-                ...document,
-                overrides: {},
-                gridLayout: resolvedGridGeometry,
-              }
-              : document;
-
-      const saved = saveEditor(
-          scope,
-          dashboard.id,
-          nextDocument,
-      );
-
-      setDocument(saved);
-      setDirty(false);
-      setSaveError("");
-
-      setSaveMessage(
-          mode === "api"
-              ? "Dashboard saved to server"
-              : "Saved in this browser",
-      );
-    } catch {
-      setSaveError(
-          mode === "api"
-              ? "Dashboard saved to server, but local editor settings could not be saved."
-              : "Your browser could not save these edits.",
-      );
-    }
-  }
-
   function leave(path: string) {
     if (
-        dirty &&
+        hasUnsavedChanges &&
         !window.confirm(
-            "Leave with unsaved layout changes? Your draft will stay in this browser, but the presentation shows your last saved layout.",
+            "Some changes are not saved yet. Your local draft will remain in this browser, but Preview may show the last saved version. Leave the editor?",
         )
     ) {
       return;
@@ -284,10 +320,16 @@ export function DashboardWorkspace({
     navigate(path);
   }
 
-  function selectChart(id: string) {
+  const selectChart = useCallback((id: string) => {
+    setEditingInspectorField(false);
     setSelectedId(id);
     setShowTable(false);
-  }
+  }, []);
+
+  const inspectChartResults = useCallback((id: string) => {
+    setSelectedId(id);
+    setShowTable(true);
+  }, []);
 
   function addDraft(type: WidgetType) {
     const draft = createDraftWidget(type);
@@ -316,29 +358,82 @@ export function DashboardWorkspace({
   function commitGridGeometry(
       gridLayout: NonNullable<EditorDocument["gridLayout"]>,
   ) {
+    if (mode === "api") {
+      editor.apply((snapshot) => {
+        const layouts: Record<string, WidgetLayout> = {};
+
+        for (const widget of snapshot.widgets) {
+          const geometry = gridLayout[widget.id];
+          if (geometry) layouts[widget.id] = toWidgetLayout(geometry);
+        }
+
+        return updateWidgetLayouts(snapshot, layouts);
+      });
+
+      const draftGeometry = Object.fromEntries(
+          Object.entries(gridLayout).filter(([id]) => id.startsWith("draft-")),
+      );
+      update({ ...document, gridLayout: draftGeometry });
+      return;
+    }
+
     update({ ...document, gridLayout });
   }
 
-  function changeWidget(patch: Partial<WidgetInput>) {
+  function changeWidget(patch: Partial<WidgetInput>, groupId?: string) {
     if (!selected) return;
+
+    if (mode === "api") {
+      editor.apply(
+          (snapshot) => updateWidget(snapshot, selected.id, patch),
+          groupId,
+      );
+      return;
+    }
 
     update({
       ...document,
       overrides: {
         ...document.overrides,
-        [selected.id]: { ...document.overrides[selected.id], ...patch },
+        [selected.id]: {
+          ...document.overrides[selected.id],
+          ...patch,
+        },
       },
     });
   }
 
-  const saveStatus = dirty
-      ? "Layout draft kept locally"
-      : draftWidgets.length > 0 && editing
-          ? `${draftWidgets.length} chart draft${draftWidgets.length === 1 ? "" : "s"} kept locally`
-          : saveMessage ||
-          (mode === "api"
-              ? "Layout loaded from server"
-              : "Saved in this browser");
+  const draftStatus = `${draftWidgets.length} chart draft${draftWidgets.length === 1 ? "" : "s"} kept locally`;
+  const saveStatus =
+      mode === "api"
+          ? editingInspectorField && autosave.status === "pending"
+              ? "Finish editing to save…"
+              : autosave.status === "saved" && draftWidgets.length > 0 && editing
+                  ? draftStatus
+                  : AUTOSAVE_MESSAGES[autosave.status]
+          : dirty
+              ? "Saving locally…"
+              : draftWidgets.length > 0 && editing
+                  ? draftStatus
+                  : saveMessage || "Saved in this browser";
+
+  const datasetError =
+      editing && selected && selectedDatasetProfile.isError
+          ? selectedDatasetProfile.error instanceof Error
+              ? selectedDatasetProfile.error.message
+              : "Could not load the selected dataset."
+          : null;
+  const autosaveError = mode === "api" ? autosave.error : null;
+  const bannerError = saveError || autosaveError || datasetError;
+  const retryAutosave = mode === "api" && autosave.status === "error";
+  const retryDataset = Boolean(datasetError);
+  const showBannerRetry =
+      !saveError && (autosaveError ? retryAutosave : retryDataset);
+
+  function retryBanner() {
+    if (retryAutosave) autosave.retry();
+    if (retryDataset) void selectedDatasetProfile.refetch();
+  }
 
   return (
       <div
@@ -348,17 +443,12 @@ export function DashboardWorkspace({
             dashboardName={dashboard.name}
             editing={editing}
             isDemo={mode === "demo"}
-            dirty={dirty}
+            dirty={hasUnsavedChanges}
             saveStatus={saveStatus}
-            onBack={() =>
-                leave(`/projects/${dashboard.projectId}/dashboards`)
-            }
+            onBack={() => leave(`/projects/${dashboard.projectId}/dashboards`)}
             onPreview={() =>
-                navigate(
-                    `/projects/${dashboard.projectId}/dashboards/${dashboard.id}/view`,
-                )
+                leave(`/projects/${dashboard.projectId}/dashboards/${dashboard.id}/view`)
             }
-            onSave={persist}
             onEdit={() =>
                 navigate(
                     `/projects/${dashboard.projectId}/dashboards/${dashboard.id}/edit`,
@@ -366,9 +456,30 @@ export function DashboardWorkspace({
             }
         />
 
-        {saveError && (
-            <div className="analytics-storage-error" role="alert">
-              {saveError}
+        {bannerError && (
+            <div
+                className="analytics-storage-error"
+                role="alert"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 16,
+                }}
+            >
+              <span>{bannerError}</span>
+              {showBannerRetry && (
+                  <Button
+                      type="button"
+                      variant="subtle"
+                      color="orange"
+                      size="xs"
+                      onClick={retryBanner}
+                      style={{ flexShrink: 0 }}
+                  >
+                    Try again
+                  </Button>
+              )}
             </div>
         )}
 
@@ -403,7 +514,7 @@ export function DashboardWorkspace({
               {chartCount > 0 ? (
                   <DashboardCanvas
                       editing={editing}
-                      geometry={document.gridLayout ?? {}}
+                      geometry={canvasGeometry}
                       onGeometryCommit={editing ? commitGridGeometry : undefined}
                   >
                     {widgets.map((widget) => (
@@ -428,44 +539,13 @@ export function DashboardWorkspace({
                               }
                             }}
                         >
-                          <div className="canvas-chart-heading">
-                            <div>
-                              <h2>{widget.title}</h2>
-                              <p>{queryCaption(widget)}</p>
-                            </div>
-
-                            {editing ? (
-                                <Tooltip label={`Configure ${widget.title}`}>
-                                  <ActionIcon
-                                      variant={
-                                        selected?.id === widget.id ? "light" : "subtle"
-                                      }
-                                      aria-label={`Configure ${widget.title}`}
-                                      onClick={() => selectChart(widget.id)}
-                                  >
-                                    <Icon name="settings" size={16} />
-                                  </ActionIcon>
-                                </Tooltip>
-                            ) : (
-                                <Tooltip label="Inspect results">
-                                  <ActionIcon
-                                      variant="subtle"
-                                      aria-label={`Inspect results for ${widget.title}`}
-                                      onClick={() => {
-                                        setSelectedId(widget.id);
-                                        setShowTable(true);
-                                      }}
-                                  >
-                                    <Icon name="data" size={16} />
-                                  </ActionIcon>
-                                </Tooltip>
-                            )}
-                          </div>
-
-                          <WidgetChart
+                          <DashboardWidgetContent
                               widget={widget}
                               projectId={dashboard.projectId}
-                              fillHeight
+                              editing={editing}
+                              selected={selected?.id === widget.id}
+                              onSelect={selectChart}
+                              onInspectResults={inspectChartResults}
                           />
                         </section>
                     ))}
@@ -525,8 +605,9 @@ export function DashboardWorkspace({
             {editing && (
                 <p className="canvas-stage-hint">
                   <Icon name="shield" size={14} />
-                  Chart positions and sizes are kept in this browser. Use Save changes
-                  to publish them to Preview.
+                  {mode === "api"
+                      ? "Changes save automatically after a short pause. Preview shows the last server-saved version."
+                      : "Layout changes are saved automatically in this browser."}
                 </p>
             )}
           </main>
@@ -542,42 +623,78 @@ export function DashboardWorkspace({
                         key={selectedDraft.id}
                         dashboard={dashboard}
                         draft={selectedDraft}
-                        layout={toWidgetLayout(
-                          resolvedGridGeometry[selectedDraft.id],
-                        )}
+                        layout={toWidgetLayout(resolvedGridGeometry[selectedDraft.id])}
                         onChange={(patch) => changeDraft(selectedDraft.id, patch)}
                         onDiscard={() => discardDraft(selectedDraft.id)}
-                        onCreated={(widgetId) => {
+                        onCreated={(widget) => {
+                          if (mode === "api") {
+                            editor.apply((snapshot) => addWidget(snapshot, widget));
+                          }
+
                           const nextLayout = { ...(document.gridLayout ?? {}) };
-                          const draftGeometry =
-                            resolvedGridGeometry[selectedDraft.id];
+                          const draftGeometry = resolvedGridGeometry[selectedDraft.id];
                           delete nextLayout[selectedDraft.id];
-                          if (draftGeometry) nextLayout[widgetId] = draftGeometry;
+                          if (mode === "demo" && draftGeometry) {
+                            nextLayout[widget.id] = draftGeometry;
+                          }
                           update({ ...document, gridLayout: nextLayout });
 
                           setDraftWidgets((current) =>
-                              current.filter((draft) => draft.id !== selectedDraft.id),
+                              current.filter((item) => item.id !== selectedDraft.id),
                           );
-                          selectChart(widgetId);
+                          selectChart(widget.id);
                         }}
                     />
                 ) : selected ? (
-                    <ConfiguredChartInspector
-                        key={selected.id}
-                        widget={selected}
-                        projectId={dashboard.projectId}
-                        onChange={changeWidget}
-                        onOpenDataset={() =>
-                            leave(
-                                `/projects/${dashboard.projectId}/data/${selected.datasetId}`,
-                            )
-                        }
-                        onInspectResults={() => setShowTable(true)}
-                        onRemove={() => {
-                          remove.reset();
-                          setDeleteOpen(true);
+                    <div
+                        onFocusCapture={(event) => {
+                          const target = event.target;
+                          if (
+                              target instanceof HTMLElement &&
+                              target.matches('input, textarea, [contenteditable="true"]')
+                          ) {
+                            setEditingInspectorField(true);
+                          }
                         }}
-                    />
+                        onBlurCapture={(event) => {
+                          const target = event.target;
+                          if (
+                              !(target instanceof HTMLElement) ||
+                              !target.matches('input, textarea, [contenteditable="true"]')
+                          ) {
+                            return;
+                          }
+
+                          const next = event.relatedTarget;
+                          if (
+                              next instanceof Element &&
+                              event.currentTarget.contains(next) &&
+                              next.matches('input, textarea, [contenteditable="true"]')
+                          ) {
+                            return;
+                          }
+
+                          setEditingInspectorField(false);
+                        }}
+                    >
+                      <ConfiguredChartInspector
+                          key={selected.id}
+                          widget={selected}
+                          projectId={dashboard.projectId}
+                          saveCompleted={mode === "api" && autosave.status === "saved" && !editingInspectorField}
+                          onChange={changeWidget}
+                          onOpenDataset={() =>
+                              leave(
+                                  `/projects/${dashboard.projectId}/data/${selected.datasetId}`,
+                              )
+                          }
+                          onInspectResults={() => setShowTable(true)}
+                          onRemove={() => {
+                            remove.reset();
+                            setDeleteOpen(true);
+                          }}
+                      />
+                    </div>
                 ) : (
                     <div className="inspector-empty">
                       <Icon name="settings" size={28} />
@@ -620,34 +737,38 @@ export function DashboardWorkspace({
 
                     const widgetId = selected.id;
 
-                    remove.mutate(
-                        {
-                          dashboardId: dashboard.id,
-                          widgetId,
-                        },
-                        {
-                          onSuccess: () => {
-                            const gridLayout = { ...document.gridLayout };
-                            const overrides = { ...document.overrides };
-                            const widths = { ...document.widths };
+                    const gridLayout = { ...document.gridLayout };
+                    const overrides = { ...document.overrides };
+                    const widths = { ...document.widths };
 
-                            delete gridLayout[widgetId];
-                            delete overrides[widgetId];
-                            delete widths[widgetId];
+                    delete gridLayout[widgetId];
+                    delete overrides[widgetId];
+                    delete widths[widgetId];
 
-                            update({
-                              ...document,
-                              gridLayout,
-                              overrides,
-                              widths,
-                              order: document.order.filter((id) => id !== widgetId),
-                            });
+                    const nextDocument: EditorDocument = {
+                      ...document,
+                      gridLayout,
+                      overrides,
+                      widths,
+                      order: document.order.filter((id) => id !== widgetId),
+                    };
 
-                            setDeleteOpen(false);
-                            selectChart("");
-                          },
-                        },
-                    );
+                    const finishRemove = () => {
+                      update(nextDocument);
+                      setDeleteOpen(false);
+                      selectChart("");
+                    };
+
+                    if (mode === "api") {
+                      editor.apply((snapshot) => removeWidget(snapshot, widgetId));
+                      setDeleteOpen(false);
+                      selectChart("");
+                    } else {
+                      remove.mutate(
+                          { dashboardId: dashboard.id, widgetId },
+                          { onSuccess: finishRemove },
+                      );
+                    }
                   }}
               >
                 Remove chart

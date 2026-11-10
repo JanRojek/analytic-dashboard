@@ -3,9 +3,9 @@ import { Button, Select, TextInput } from "@mantine/core";
 
 import { ErrorState } from "../../../components/Feedback";
 import type {
-  CreateWidgetInput,
   Dashboard,
   QueryConfig,
+  Widget,
   WidgetLayout,
 } from "../../../data/types";
 import { useSession } from "../../../session/SessionContext";
@@ -22,7 +22,7 @@ type DraftChartInspectorProps = {
   layout: WidgetLayout;
   onChange: (patch: Partial<DraftWidget>) => void;
   onDiscard: () => void;
-  onCreated: (widgetId: string) => void;
+  onCreated: (widget: Widget) => void;
 };
 
 export function DraftChartInspector({
@@ -33,7 +33,7 @@ export function DraftChartInspector({
   onDiscard,
   onCreated,
 }: DraftChartInspectorProps) {
-  const { adapter } = useSession();
+  const { adapter, mode } = useSession();
   const createWidget = useCreateWidget(dashboard.projectId);
   const datasets = useDatasets(dashboard.projectId);
   const profile = useDatasetProfile(
@@ -42,7 +42,6 @@ export function DraftChartInspector({
     Boolean(draft.datasetId),
   );
 
-  // Suggestions must not make an incomplete draft appear complete.
   const suggested = profile.data ? defaults(profile.data) : null;
   const query: QueryConfig | null = suggested
     ? {
@@ -68,7 +67,7 @@ export function DraftChartInspector({
         throw new Error("Choose a dataset, group and measure first.");
       }
 
-      const input: CreateWidgetInput = {
+      const input = {
         datasetId: draft.datasetId,
         type: draft.type,
         title: draft.title.trim() || queryCaption(query),
@@ -88,12 +87,22 @@ export function DraftChartInspector({
         );
       }
 
-      return createWidget.mutateAsync({
+      if (mode === "demo") {
+        return createWidget.mutateAsync({
+          dashboardId: dashboard.id,
+          input,
+        });
+      }
+
+      return {
+        ...input,
+        id: crypto.randomUUID(),
         dashboardId: dashboard.id,
-        input,
-      });
+        createdAtUtc: new Date().toISOString(),
+        layout: { ...layout },
+      } satisfies Widget;
     },
-    onSuccess: (widget) => onCreated(widget.id),
+    onSuccess: (widget) => onCreated(widget),
   });
 
   return (
@@ -181,8 +190,9 @@ export function DraftChartInspector({
       </Button>
 
       <p className="analytics-note">
-        Your unfinished chart stays in this browser. Applying data creates the
-        configured chart in your dashboard.
+        {mode === "api"
+          ? "Applying data adds the configured chart to your editor. Save changes to publish it."
+          : "Your unfinished chart stays in this browser. Applying data creates it in the demo dashboard."}
       </p>
 
       <Button

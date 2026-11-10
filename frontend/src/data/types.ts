@@ -72,7 +72,11 @@ export interface Dashboard {
   id: string;
   projectId: string;
   name: string;
+  revision: number;
   createdAtUtc: string;
+}
+export interface UpdateDashboardWidgetsResponse {
+  revision: number;
 }
 export interface QueryConfig {
   groupByColumn: string;
@@ -151,9 +155,9 @@ export interface DataAdapter {
   deleteDashboard(projectId: string, dashboardId: string): Promise<void>;
   listWidgets(projectId: string, dashboardId: string): Promise<Widget[]>;
   createWidget(
-      projectId: string,
-      dashboardId: string,
-      input: CreateWidgetInput,
+    projectId: string,
+    dashboardId: string,
+    input: CreateWidgetInput,
   ): Promise<Widget>;
   deleteWidget(
     projectId: string,
@@ -166,8 +170,9 @@ export interface DataAdapter {
     widgetId: string,
   ): Promise<QueryItem[]>;
   updateDashboardWidgets(
-      projectId: string,
-      dashboardId: string,
-      updates: DashboardWidgetUpdate[],
-  ): Promise<void>;
+    projectId: string,
+    dashboardId: string,
+    updates: DashboardWidgetUpdate[],
+    expectedRevision: number,
+  ): Promise<UpdateDashboardWidgetsResponse>;
 }

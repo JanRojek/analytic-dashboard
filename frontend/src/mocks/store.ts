@@ -37,6 +37,13 @@ export function readDemoState(storage: StorageLike = localStorage): DemoState {
       )
     )
       throw new Error("Invalid datasets");
+
+    for (const dashboard of state.dashboards) {
+      if (!Number.isSafeInteger(dashboard.revision) || dashboard.revision < 0) {
+        dashboard.revision = 0;
+      }
+    }
+
     return state;
   } catch {
     throw new Error(

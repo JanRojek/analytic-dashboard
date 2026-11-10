@@ -3,6 +3,7 @@ import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
 import type {
   CreateWidgetInput,
+  Dashboard,
   DashboardWidgetUpdate,
 } from "../../data/types";
 
@@ -119,18 +120,27 @@ export function useUpdateDashboardWidgets(projectId: string) {
     mutationFn: ({
       dashboardId,
       updates,
+      expectedRevision,
     }: {
       dashboardId: string;
       updates: DashboardWidgetUpdate[];
+      expectedRevision: number;
     }) =>
-        adapter.updateDashboardWidgets(
-            projectId,
-            dashboardId,
-            updates,
-        ),
+      adapter.updateDashboardWidgets(
+        projectId,
+        dashboardId,
+        updates,
+        expectedRevision,
+      ),
 
-    onSuccess: async (_, { dashboardId }) => {
-      await queryClient.invalidateQueries({
+    onSuccess: (result, { dashboardId }) => {
+      queryClient.setQueryData<Dashboard>(
+        queryKeys.dashboards.detail(projectId, dashboardId),
+        (dashboard) =>
+          dashboard ? { ...dashboard, revision: result.revision } : dashboard,
+      );
+
+      void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
       });
     },

@@ -39,7 +39,6 @@ export function upgradeLegacyGridGeometry(
   );
 }
 
-
 export function toGridCell(layout: WidgetLayout): DashboardGridCell {
   return {
     x: layout.x,
@@ -59,8 +58,8 @@ export function toWidgetLayout(cell: DashboardGridCell): WidgetLayout {
 }
 
 export function resolveGridGeometry(
-    geometry: DashboardGridGeometry,
-    ids: readonly string[],
+  geometry: DashboardGridGeometry,
+  ids: readonly string[],
 ): DashboardGridGeometry {
   const resolved: DashboardGridGeometry = {};
   const occupied: DashboardGridCell[] = [];
@@ -87,9 +86,9 @@ export function resolveGridGeometry(
 }
 
 export function findFirstFreeGridCell(
-    occupied: readonly DashboardGridCell[],
-    width = DASHBOARD_GRID_DEFAULT_WIDTH,
-    height = DASHBOARD_GRID_DEFAULT_HEIGHT,
+  occupied: readonly DashboardGridCell[],
+  width = DASHBOARD_GRID_DEFAULT_WIDTH,
+  height = DASHBOARD_GRID_DEFAULT_HEIGHT,
 ): DashboardGridCell {
   const byX = [...occupied].sort((a, b) => a.x - b.x);
 
@@ -101,8 +100,7 @@ export function findFirstFreeGridCell(
     let x = 0;
 
     for (const cell of byX) {
-      const overlapsVertically =
-          y < cell.y + cell.h && cell.y < y + height;
+      const overlapsVertically = y < cell.y + cell.h && cell.y < y + height;
 
       if (!overlapsVertically) continue;
 

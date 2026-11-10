@@ -91,7 +91,9 @@ export function SaveChartDialog({
           <Select
             label="Dashboard"
             placeholder={
-              dashboards.isPending ? "Loading dashboards…" : "Choose a dashboard"
+              dashboards.isPending
+                ? "Loading dashboards…"
+                : "Choose a dashboard"
             }
             data={[
               ...(dashboards.data ?? []).map((dashboard) => ({
@@ -119,11 +121,7 @@ export function SaveChartDialog({
         {save.isError && <ErrorState error={save.error} />}
 
         <div className="analytics-dialog-actions">
-          <Button
-            variant="default"
-            onClick={onClose}
-            disabled={save.isPending}
-          >
+          <Button variant="default" onClick={onClose} disabled={save.isPending}>
             Cancel
           </Button>
 

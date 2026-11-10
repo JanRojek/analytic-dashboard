@@ -1,5 +1,4 @@
-﻿import { ErrorState } from "../../../components/Feedback";
-import { Icon } from "../../../components/Icon";
+﻿import { Icon } from "../../../components/Icon";
 
 import type { Widget, WidgetInput } from "../../../data/types";
 
@@ -25,9 +24,7 @@ export function InspectorQuery({
 
       {profile.isPending ? (
         <p className="muted">Reading columns…</p>
-      ) : profile.isError ? (
-        <ErrorState error={profile.error} retry={() => profile.refetch()} />
-      ) : (
+      ) : profile.isError ? null : (
         <>
           <button className="inspector-dataset" onClick={onOpenDataset}>
             <Icon name="data" size={15} />
@@ -43,10 +40,11 @@ export function InspectorQuery({
         </>
       )}
 
-      <p className="analytics-note">
-        Changes update the chart preview. Save to keep this configuration in
-        this browser.
-      </p>
+      {!profile.isError && (
+        <p className="analytics-note">
+          Changes update the chart preview and are saved automatically.
+        </p>
+      )}
     </div>
   );
 }

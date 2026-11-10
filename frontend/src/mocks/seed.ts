@@ -136,6 +136,7 @@ export function createSeed(): DemoState {
         id: "b-retail",
         projectId: "p-retail",
         name: "Retail overview",
+        revision: 0,
         createdAtUtc,
       },
     ],

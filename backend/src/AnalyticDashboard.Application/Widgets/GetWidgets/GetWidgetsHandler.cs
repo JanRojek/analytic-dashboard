@@ -15,13 +15,12 @@ public sealed class GetWidgetsHandler
         GetWidgetsQuery query,
         CancellationToken cancellationToken)
     {
-        var widgets =
-            await _widgetRepository.GetAllByDashboardProjectOwnerAsync(
-                query.DashboardId,
-                query.ProjectId,
-                query.OwnerId,
-                cancellationToken
-            );
+        var widgets = await _widgetRepository.GetAllByDashboardProjectOwnerAsync(
+            query.DashboardId,
+            query.ProjectId,
+            query.OwnerId,
+            cancellationToken
+        );
 
         return widgets.Select(widget => new GetWidgetsResponse(
             widget.Id,

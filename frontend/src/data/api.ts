@@ -9,6 +9,7 @@ import type {
   User,
   Widget,
   ImportStatus,
+  UpdateDashboardWidgetsResponse,
 } from "./types";
 
 const sessionExpiryListeners = new Set<() => void>();
@@ -188,11 +189,11 @@ export const apiAdapter: DataAdapter = {
   deleteDashboard: (p, d) =>
     request<void>(dashboardPath(p, d), { method: "DELETE" }),
   listWidgets: (p, d) => request<Widget[]>(widgetsPath(p, d)),
-  updateDashboardWidgets: (p, d, updates) =>
-      request<void>(
-          widgetsPath(p, d),
-          json({ widgets: updates }, "PUT"),
-      ),
+  updateDashboardWidgets: (p, d, updates, expectedRevision) =>
+    request<UpdateDashboardWidgetsResponse>(
+      widgetsPath(p, d),
+      json({ widgets: updates, expectedRevision }, "PUT"),
+    ),
   async createWidget(p, d, input) {
     const result = await request<{ id: string }>(
       widgetsPath(p, d),

@@ -171,6 +171,7 @@ export const demoAdapter: DataAdapter = {
         id: id(),
         projectId: p,
         name: normalizedName(name),
+        revision: 0,
         createdAtUtc: now(),
       };
       state.dashboards.unshift(dashboard);
@@ -230,26 +231,33 @@ export const demoAdapter: DataAdapter = {
     return queryRows(data.columns, data.rows, widget);
   },
 
-  async updateDashboardWidgets(p, d, updates) {
-    mutateDemoState((state) => {
-      requireDashboard(state, p, d);
+  async updateDashboardWidgets(p, d, updates, expectedRevision) {
+    return mutateDemoState((state) => {
+      const dashboard = requireDashboard(state, p, d);
+
+      if (dashboard.revision !== expectedRevision) {
+        throw new Error("Dashboard revision conflict.");
+      }
 
       const widgets = state.widgets.filter(
-          (widget) => widget.dashboardId === d,
+        (widget) => widget.dashboardId === d,
       );
 
-      const updatesById = new Map(
-          updates.map((update) => [update.widgetId, update]),
+      const existingWidgetsById = new Map(
+        widgets.map((widget) => [widget.id, widget]),
       );
+
+      const submittedIds = new Set(updates.map((update) => update.widgetId));
 
       if (
-          updatesById.size !== updates.length ||
-          updatesById.size !== widgets.length ||
-          widgets.some((widget) => !updatesById.has(widget.id))
+        submittedIds.size !== updates.length ||
+        updates.some(
+          (update) =>
+            !update.widgetId ||
+            update.widgetId === "00000000-0000-0000-0000-000000000000",
+        )
       ) {
-        throw new Error(
-            "Provided widget IDs do not match the dashboard widgets.",
-        );
+        throw new Error("Widget IDs must be non-empty and unique.");
       }
 
       const validated = updates.map((update) => {
@@ -258,18 +266,16 @@ export const demoAdapter: DataAdapter = {
         const measureColumn = update.measureColumn.trim();
 
         if (
-            !groupByColumn ||
-            !measureColumn ||
-            [...groupByColumn].length > 255 ||
-            [...measureColumn].length > 255
+          !groupByColumn ||
+          !measureColumn ||
+          [...groupByColumn].length > 255 ||
+          [...measureColumn].length > 255
         ) {
           throw new Error("Invalid widget column configuration.");
         }
 
         if (
-            !["Kpi", "BarChart", "LineChart", "PieChart"].includes(
-                update.type,
-            )
+          !["Kpi", "BarChart", "LineChart", "PieChart"].includes(update.type)
         ) {
           throw new Error("Unsupported widget type.");
         }
@@ -277,12 +283,12 @@ export const demoAdapter: DataAdapter = {
         const { x, y, width, height } = update.layout;
 
         if (
-            ![x, y, width, height].every(Number.isInteger) ||
-            x < 0 ||
-            y < 0 ||
-            width < 6 ||
-            height < 14 ||
-            x + width > 24
+          ![x, y, width, height].every(Number.isInteger) ||
+          x < 0 ||
+          y < 0 ||
+          width < 6 ||
+          height < 14 ||
+          x + width > 24
         ) {
           throw new Error("Invalid widget layout.");
         }
@@ -309,10 +315,10 @@ export const demoAdapter: DataAdapter = {
           const b = validated[j].layout;
 
           const intersects =
-              a.x < b.x + b.width &&
-              b.x < a.x + a.width &&
-              a.y < b.y + b.height &&
-              b.y < a.y + a.height;
+            a.x < b.x + b.width &&
+            b.x < a.x + a.width &&
+            a.y < b.y + b.height &&
+            b.y < a.y + a.height;
 
           if (intersects) {
             throw new Error("Widget layouts must not overlap.");
@@ -320,14 +326,12 @@ export const demoAdapter: DataAdapter = {
         }
       }
 
-      const validatedById = new Map(
-          validated.map((update) => [update.widgetId, update]),
-      );
+      const synchronizedWidgets: Widget[] = validated.map((update) => {
+        const existing = existingWidgetsById.get(update.widgetId);
 
-      for (const widget of widgets) {
-        const update = validatedById.get(widget.id)!;
-
-        Object.assign(widget, {
+        return {
+          id: update.widgetId,
+          dashboardId: d,
           datasetId: update.datasetId,
           type: update.type,
           title: update.title,
@@ -335,8 +339,18 @@ export const demoAdapter: DataAdapter = {
           measureColumn: update.measureColumn,
           aggregation: update.aggregation,
           layout: { ...update.layout },
-        });
-      }
+          createdAtUtc: existing?.createdAtUtc ?? now(),
+        };
+      });
+
+      state.widgets = [
+        ...state.widgets.filter((widget) => widget.dashboardId !== d),
+        ...synchronizedWidgets,
+      ];
+
+      dashboard.revision += 1;
+
+      return { revision: dashboard.revision };
     });
   },
 };

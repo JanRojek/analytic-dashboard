@@ -93,14 +93,17 @@ function parseDocument(value: unknown): EditorDocument | null {
     value.gridColumns !== undefined &&
     value.gridColumns !== DASHBOARD_GRID_LEGACY_COLUMNS &&
     value.gridColumns !== DASHBOARD_GRID_COLUMNS
-  ) return null;
-  const sourceColumns = value.gridColumns === DASHBOARD_GRID_COLUMNS
-    ? DASHBOARD_GRID_COLUMNS
-    : DASHBOARD_GRID_LEGACY_COLUMNS;
+  )
+    return null;
+  const sourceColumns =
+    value.gridColumns === DASHBOARD_GRID_COLUMNS
+      ? DASHBOARD_GRID_COLUMNS
+      : DASHBOARD_GRID_LEGACY_COLUMNS;
   const sourceGrid = readGridLayout(value.gridLayout, sourceColumns);
-  const gridLayout = sourceColumns === DASHBOARD_GRID_LEGACY_COLUMNS
-    ? upgradeLegacyGridGeometry(sourceGrid)
-    : sourceGrid;
+  const gridLayout =
+    sourceColumns === DASHBOARD_GRID_LEGACY_COLUMNS
+      ? upgradeLegacyGridGeometry(sourceGrid)
+      : sourceGrid;
 
   const overrides: EditorDocument["overrides"] = {};
   for (const [id, patch] of Object.entries(value.overrides)) {

@@ -172,9 +172,9 @@
   line-height: 1.2;
   cursor: pointer;
   transition:
-          background-color 150ms,
-          border-color 150ms,
-          color 150ms;
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms;
 }
 
 .chart-gallery-item > svg {
@@ -193,7 +193,6 @@
   outline: 2px solid #357a5d;
   outline-offset: 2px;
 }
-
 
 .canvas-panel-heading {
   display: flex;
@@ -347,7 +346,9 @@ body.aperture-canvas-interacting * {
   pointer-events: none;
 }
 
-.dashboard-canvas .canvas-chart.react-grid-item.is-selected > .react-resizable-handle {
+.dashboard-canvas
+  .canvas-chart.react-grid-item.is-selected
+  > .react-resizable-handle {
   opacity: 0.85;
   pointer-events: auto;
 }
@@ -360,8 +361,8 @@ body.aperture-canvas-interacting * {
   border-radius: 5px;
   background: #fff;
   transition:
-          border-color 0.15s,
-          box-shadow 0.15s;
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .is-editing .canvas-chart {
