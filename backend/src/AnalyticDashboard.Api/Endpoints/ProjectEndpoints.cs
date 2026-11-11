@@ -289,19 +289,25 @@ public static class ProjectEndpoints
                 DeleteProjectResult.NotFound =>
                     Results.NotFound(),
 
+                DeleteProjectResult.ImportInProgress =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Project import in progress",
+                        detail: "The project cannot be deleted while one of its datasets has an active import.",
+                        extensions: new Dictionary<string, object?>
+                        {
+                            ["code"] = "project_import_in_progress"
+                        }
+                    ),
+
                 _ => throw new UnreachableException()
             };
         })
         .WithName("DeleteProject")
-        .Produces(
-            StatusCodes.Status204NoContent
-        )
-        .Produces(
-            StatusCodes.Status401Unauthorized
-        )
-        .Produces(
-            StatusCodes.Status404NotFound
-        );
+        .Produces(StatusCodes.Status204NoContent)
+        .Produces(StatusCodes.Status401Unauthorized)
+        .Produces(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }

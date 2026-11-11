@@ -69,14 +69,4 @@ public sealed class DatasetVersionRepository
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
-
-    public async Task<IReadOnlyList<DatasetVersion>> GetAllByDatasetIdAsync(
-        Guid datasetId,
-        CancellationToken cancellationToken)
-    {
-        return await _dbContext.DatasetVersions
-            .Where(version => version.DatasetId == datasetId)
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-    }
 }

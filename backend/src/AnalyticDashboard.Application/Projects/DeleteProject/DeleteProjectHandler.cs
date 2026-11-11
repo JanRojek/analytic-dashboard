@@ -1,22 +1,23 @@
-﻿using AnalyticDashboard.Application.Projects.Persistence;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+
+using AnalyticDashboard.Application.Projects.Persistence;
 
 namespace AnalyticDashboard.Application.Projects.DeleteProject;
 
 public sealed class DeleteProjectHandler
 {
-    private readonly IProjectRepository _projectRepository;
+    private readonly IProjectDeletionStore _deletionStore;
 
-    public DeleteProjectHandler(IProjectRepository projectRepository)
+    public DeleteProjectHandler(IProjectDeletionStore deletionStore)
     {
-        _projectRepository = projectRepository;
+        _deletionStore = deletionStore;
     }
 
     public async Task<DeleteProjectResult> HandleAsync(
         DeleteProjectCommand command,
         CancellationToken cancellationToken)
     {
-        var outcome = await _projectRepository.DeleteByIdAndOwnerAsync(
+        var outcome = await _deletionStore.DeleteAsync(
             command.ProjectId,
             command.OwnerId,
             cancellationToken
@@ -24,11 +25,14 @@ public sealed class DeleteProjectHandler
 
         return outcome switch
         {
-            ProjectDeleteOutcome.Deleted =>
+            ProjectDeletionOutcome.Deleted =>
                 new DeleteProjectResult.Success(),
 
-            ProjectDeleteOutcome.NotFound =>
+            ProjectDeletionOutcome.NotFound =>
                 new DeleteProjectResult.NotFound(),
+
+            ProjectDeletionOutcome.ImportInProgress =>
+                new DeleteProjectResult.ImportInProgress(),
 
             _ => throw new UnreachableException()
         };

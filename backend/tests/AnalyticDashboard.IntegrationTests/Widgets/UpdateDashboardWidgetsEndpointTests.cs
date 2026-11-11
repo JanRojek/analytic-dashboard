@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using AnalyticDashboard.Api.Contracts.Widgets;
 using AnalyticDashboard.Application.Common.Exceptions;
@@ -76,7 +77,7 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
 
     private static DashboardWidgetUpdateRequest CreateUpdate(
         Guid widgetId,
-        Guid datasetId,
+        Guid? datasetId,
         string? title,
         WidgetLayoutRequest? layout,
         WidgetType? type = null,
@@ -189,6 +190,19 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
             firstWidget.Id,
             secondWidget.Id
         );
+    }
+
+    private async Task DetachFirstWidgetAsync(Guid widgetId)
+    {
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var widget = await context.Widgets.SingleAsync(
+            item => item.Id == widgetId,
+            CancellationToken
+        );
+
+        widget.DetachDataset();
+        await context.SaveChangesAsync(CancellationToken);
     }
 
     private async Task<Dictionary<Guid, WidgetSnapshot>> ReadSnapshotsAsync(
@@ -398,6 +412,278 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Theory]
+    [InlineData("NewNull")]
+    [InlineData("NewEmpty")]
+    [InlineData("ConnectedNull")]
+    [InlineData("Reconnect")]
+    public async Task UpdateDashboardWidgets_ShouldRejectInvalidDatasetTransition_AndPreserveWholeDashboard(
+        string scenario)
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+
+        if (scenario != "ConnectedNull")
+        {
+            await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
+        }
+
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        var invalidUpdate = CreateUpdate(
+            dashboard.FirstWidgetId,
+            null,
+            "Changed title",
+            new WidgetLayoutRequest(0, 30, 12, 20)
+        );
+
+        invalidUpdate = scenario switch
+        {
+            "NewNull" => invalidUpdate with { WidgetId = Guid.NewGuid() },
+            "NewEmpty" => invalidUpdate with
+            {
+                WidgetId = Guid.NewGuid(),
+                DatasetId = Guid.Empty
+            },
+            "ConnectedNull" => invalidUpdate,
+            "Reconnect" => invalidUpdate with { DatasetId = dashboard.AlternateDatasetId },
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+
+        var body = new UpdateDashboardWidgetsRequest(
+            [
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Must not be persisted",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                ),
+                invalidUpdate
+            ],
+            0
+        );
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            body,
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Theory]
+    [InlineData("GroupBy")]
+    [InlineData("Measure")]
+    [InlineData("Aggregation")]
+    [InlineData("Type")]
+    [InlineData("InvalidTitle")]
+    public async Task UpdateDashboardWidgets_ShouldRejectInvalidDetachedConfiguration_AndPreserveWholeDashboard(
+        string scenario)
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
+
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        var invalidUpdate = CreateUpdate(
+            dashboard.FirstWidgetId,
+            null,
+            "Changed title",
+            new WidgetLayoutRequest(0, 30, 12, 20)
+        );
+
+        invalidUpdate = scenario switch
+        {
+            "GroupBy" => invalidUpdate with { GroupByColumn = "Other" },
+            "Measure" => invalidUpdate with { MeasureColumn = "Revenue" },
+            "Aggregation" => invalidUpdate with { Aggregation = AggregationType.Average.ToString() },
+            "Type" => invalidUpdate with { Type = WidgetType.PieChart },
+            "InvalidTitle" => invalidUpdate with { Title = new string('a', Widget.MaxTitleLength + 1) },
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+
+        var body = new UpdateDashboardWidgetsRequest(
+            [
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Must not be persisted",
+                    new WidgetLayoutRequest(12, 30, 12, 20)
+                ),
+                invalidUpdate
+            ],
+            0
+        );
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            body,
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldRoundTripDetachedWidget_AndPersistTitleAndLayout()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
+
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        using var getRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/projects/{dashboard.ProjectId}/dashboards/{dashboard.DashboardId}/widgets"
+        );
+        getRequest.Headers.Add(TestAuthHandler.UserIdHeader, userId.ToString());
+        using var getResponse = await _fixture.Client.SendAsync(getRequest, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var widgets = await getResponse.Content.ReadFromJsonAsync<JsonArray>(CancellationToken);
+        Assert.NotNull(widgets);
+
+        foreach (var item in widgets)
+        {
+            var widget = item!.AsObject();
+            widget["widgetId"] = widget["id"]!.DeepClone();
+            widget.Remove("id");
+
+            if (widget["widgetId"]!.GetValue<Guid>() == dashboard.FirstWidgetId)
+            {
+                Assert.Null(widget["datasetId"]);
+                widget["title"] = "Renamed detached chart";
+                widget["layout"] = JsonSerializer.SerializeToNode(new
+                {
+                    x = 0,
+                    y = 30,
+                    width = 12,
+                    height = 20
+                });
+            }
+        }
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new
+            {
+                widgets,
+                expectedRevision = 0L
+            },
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadResponseRevisionAsync(response));
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        var after = await ReadSnapshotsAsync(dashboard.DashboardId);
+        Assert.Equal(before.Count, after.Count);
+        Assert.Equal(before[dashboard.SecondWidgetId], after[dashboard.SecondWidgetId]);
+        Assert.Equal(
+            before[dashboard.FirstWidgetId] with
+            {
+                Title = "Renamed detached chart",
+                X = 0,
+                Y = 30,
+                Width = 12,
+                Height = 20
+            },
+            after[dashboard.FirstWidgetId]
+        );
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UpdateDashboardWidgets_ShouldRequireDatasetIdProperty_WhileAllowingExplicitNull(
+        bool omitDatasetId)
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
+
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+        var body = new UpdateDashboardWidgetsRequest(
+            [
+                CreateUpdate(
+                    dashboard.FirstWidgetId,
+                    null,
+                    "First widget",
+                    new WidgetLayoutRequest(
+                        0,
+                        0,
+                        12,
+                        20
+                    )
+                ),
+                CreateUpdate(
+                    dashboard.SecondWidgetId,
+                    dashboard.DatasetId,
+                    "Second widget",
+                    new WidgetLayoutRequest(12, 0, 12, 20)
+                )
+            ],
+            0
+        );
+        var json = JsonSerializer.SerializeToNode(
+            body,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        )!;
+
+        if (omitDatasetId)
+        {
+            json["widgets"]![0]!.AsObject().Remove("datasetId");
+        }
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            json,
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(omitDatasetId ? HttpStatusCode.BadRequest : HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(omitDatasetId ? 0L : 1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldDeleteDetachedWidget_WhenOmitted()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
+        var body = new UpdateDashboardWidgetsRequest(
+            [ValidUpdateRequest(dashboard).Widgets![1]],
+            0
+        );
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            body,
+            userId
+        );
+        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+        var after = await ReadSnapshotsAsync(dashboard.DashboardId);
+        Assert.False(after.ContainsKey(dashboard.FirstWidgetId));
+        Assert.Equal(dashboard.SecondWidgetId, Assert.Single(after).Key);
     }
 
     [Theory]

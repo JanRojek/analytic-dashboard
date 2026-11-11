@@ -32,6 +32,11 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         );
 
         builder.UseSetting(
+            "StorageCleanup:WorkerEnabled",
+            "false"
+        );
+
+        builder.UseSetting(
             "ConnectionStrings:Default",
             _connectionString
         );

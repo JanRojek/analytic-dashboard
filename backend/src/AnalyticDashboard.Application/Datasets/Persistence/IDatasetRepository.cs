@@ -22,13 +22,6 @@ public interface IDatasetRepository
         CancellationToken cancellationToken
     );
 
-    Task<bool> DeleteByIdAndProjectOwnerAsync(
-        Guid datasetId,
-        Guid projectId,
-        Guid ownerId,
-        CancellationToken cancellationToken
-    );
-
     Task<bool> PublishVersionAsync(
         Guid datasetId,
         Guid projectId,

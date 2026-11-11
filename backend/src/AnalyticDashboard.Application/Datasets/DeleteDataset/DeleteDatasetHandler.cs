@@ -1,70 +1,40 @@
+using System.Diagnostics;
 using AnalyticDashboard.Application.Datasets.Persistence;
-using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.Application.Datasets.DeleteDataset;
 
 public sealed class DeleteDatasetHandler
 {
-    private readonly IDatasetRepository _datasetRepository;
-    private readonly IDatasetVersionRepository _versionRepository;
-    private readonly IFileStorage _fileStorage;
+    private readonly IDatasetDeletionStore _deletionStore;
 
-    public DeleteDatasetHandler(
-        IDatasetRepository datasetRepository,
-        IDatasetVersionRepository versionRepository,
-        IFileStorage fileStorage)
+    public DeleteDatasetHandler(IDatasetDeletionStore deletionStore)
     {
-        _datasetRepository = datasetRepository;
-        _versionRepository = versionRepository;
-        _fileStorage = fileStorage;
+        _deletionStore = deletionStore;
     }
 
     public async Task<DeleteDatasetResult> HandleAsync(
         DeleteDatasetCommand command,
         CancellationToken cancellationToken)
     {
-        var dataset =
-            await _datasetRepository.GetByIdAndProjectOwnerAsync(
-                command.DatasetId,
-                command.ProjectId,
-                command.OwnerId,
-                cancellationToken
-            );
+        var outcome = await _deletionStore.DeleteAsync(
+            command.DatasetId,
+            command.ProjectId,
+            command.OwnerId,
+            cancellationToken
+        );
 
-        if (dataset is null)
+        return outcome switch
         {
-            return new DeleteDatasetResult.NotFound();
-        }
+            DatasetDeletionOutcome.Deleted =>
+                new DeleteDatasetResult.Success(),
 
-        var versions =
-            await _versionRepository.GetAllByDatasetIdAsync(
-                dataset.Id,
-                cancellationToken
-            );
+            DatasetDeletionOutcome.NotFound =>
+                new DeleteDatasetResult.NotFound(),
 
-        foreach (var version in versions)
-        {
-            if (version.StorageKey is null)
-            {
-                continue;
-            }
+            DatasetDeletionOutcome.ImportInProgress =>
+                new DeleteDatasetResult.ImportInProgress(),
 
-            await _fileStorage.DeleteAsync(
-                version.StorageKey,
-                cancellationToken
-            );
-        }
-
-        var deleted =
-            await _datasetRepository.DeleteByIdAndProjectOwnerAsync(
-                command.DatasetId,
-                command.ProjectId,
-                command.OwnerId,
-                cancellationToken
-            );
-
-        return deleted
-            ? new DeleteDatasetResult.Success()
-            : new DeleteDatasetResult.NotFound();
+            _ => throw new UnreachableException()
+        };
     }
 }

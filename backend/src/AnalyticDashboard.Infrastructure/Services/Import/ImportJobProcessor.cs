@@ -28,7 +28,7 @@ public sealed class ImportJobProcessor
     public async Task<bool> ProcessNextAsync(
         CancellationToken cancellationToken)
     {
-        var workItem = await _importJobRepository.GetNextPendingAsync(
+        var workItem = await _importJobRepository.ClaimNextPendingAsync(
             cancellationToken
         );
 
@@ -42,12 +42,6 @@ public sealed class ImportJobProcessor
         var dataset = workItem.Dataset;
 
         var resultStorageKey = $"datasets/{dataset.Id:N}/versions/{version.Id:N}/data.parquet";
-
-        job.MarkRunning();
-
-        await _importJobRepository.SaveChangesAsync(
-            cancellationToken
-        );
 
         DuckDbCsvImportResult importResult;
 

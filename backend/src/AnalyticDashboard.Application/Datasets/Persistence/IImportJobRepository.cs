@@ -4,7 +4,7 @@ namespace AnalyticDashboard.Application.Datasets.Persistence;
 
 public interface IImportJobRepository
 {
-    Task<ImportJobWorkItem?> GetNextPendingAsync(
+    Task<ImportJobWorkItem?> ClaimNextPendingAsync(
         CancellationToken cancellationToken
     );
 

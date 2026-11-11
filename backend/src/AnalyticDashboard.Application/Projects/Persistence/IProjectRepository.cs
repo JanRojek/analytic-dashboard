@@ -22,12 +22,6 @@ public interface IProjectRepository
         CancellationToken cancellationToken
     );
 
-    Task<ProjectDeleteOutcome> DeleteByIdAndOwnerAsync(
-        Guid projectId,
-        Guid ownerId,
-        CancellationToken cancellationToken
-    );
-
     Task<int> CountByOwnerAsync(
         Guid ownerId,
         CancellationToken cancellationToken

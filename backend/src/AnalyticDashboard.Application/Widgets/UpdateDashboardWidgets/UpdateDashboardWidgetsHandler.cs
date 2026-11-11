@@ -1,4 +1,3 @@
-
 using AnalyticDashboard.Application.Common.Exceptions;
 using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Application.Dashboards.Persistence;
@@ -15,16 +14,19 @@ public sealed class UpdateDashboardWidgetsHandler
     private readonly IDatasetRepository _datasetRepository;
     private readonly IWidgetRepository _widgetRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IProjectWriteTransactionFactory _transactionFactory;
 
     public UpdateDashboardWidgetsHandler(
         IDashboardRepository dashboardRepository,
         IDatasetRepository datasetRepository,
         IWidgetRepository widgetRepository,
+        IProjectWriteTransactionFactory transactionFactory,
         IUnitOfWork unitOfWork)
     {
         _dashboardRepository = dashboardRepository;
         _datasetRepository = datasetRepository;
         _widgetRepository = widgetRepository;
+        _transactionFactory = transactionFactory;
         _unitOfWork = unitOfWork;
     }
 
@@ -32,6 +34,16 @@ public sealed class UpdateDashboardWidgetsHandler
         UpdateDashboardWidgetsCommand command,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await _transactionFactory.BeginAsync(
+            command.ProjectId,
+            cancellationToken
+        );
+
+        if (transaction is null)
+        {
+            return new UpdateDashboardWidgetsResult.DashboardNotFound();
+        }
+
         var dashboard = await _dashboardRepository.GetForUpdateByIdAndProjectOwnerAsync(
             command.DashboardId,
             command.ProjectId,
@@ -82,8 +94,19 @@ public sealed class UpdateDashboardWidgetsHandler
             return new UpdateDashboardWidgetsResult.LayoutCollision(widgetCollisions);
         }
 
+        var existingWidgets = await _widgetRepository.GetAllForUpdateAsync(
+            command.DashboardId,
+            command.ProjectId,
+            command.OwnerId,
+            cancellationToken
+        );
+
+        var existingWidgetsById = existingWidgets
+            .ToDictionary(widget => widget.Id);
+
         var requestedDatasetIds = command.Widgets
-            .Select(widget => widget.DatasetId)
+            .Where(widget => widget.DatasetId.HasValue)
+            .Select(widget => widget.DatasetId!.Value)
             .ToHashSet();
 
         var availableDatasetIds = await _datasetRepository.GetExistingDatasetIdsAsync(
@@ -105,6 +128,42 @@ public sealed class UpdateDashboardWidgetsHandler
 
         foreach (var change in command.Widgets)
         {
+            existingWidgetsById.TryGetValue(change.WidgetId, out var existingWidget);
+
+            if (change.DatasetId is null
+                && (existingWidget is null || existingWidget.DatasetId is not null))
+            {
+                configurationErrors.Add(new WidgetConfigurationError(
+                    change.WidgetId,
+                    "A dataset is required for new or connected widgets."
+                ));
+                continue;
+            }
+
+            if (existingWidget is { DatasetId: null })
+            {
+                if (change.DatasetId is not null)
+                {
+                    configurationErrors.Add(new WidgetConfigurationError(
+                        change.WidgetId,
+                        "Reconnecting a detached widget is not supported yet."
+                    ));
+                    continue;
+                }
+
+                if (change.Type != existingWidget.Type
+                    || change.GroupByColumn != existingWidget.GroupByColumn
+                    || change.MeasureColumn != existingWidget.MeasureColumn
+                    || change.Aggregation != existingWidget.Aggregation)
+                {
+                    configurationErrors.Add(new WidgetConfigurationError(
+                        change.WidgetId,
+                        "Detached widgets must preserve their configuration."
+                    ));
+                    continue;
+                }
+            }
+
             try
             {
                 Widget.ValidateConfiguration(
@@ -129,16 +188,6 @@ public sealed class UpdateDashboardWidgetsHandler
             return new UpdateDashboardWidgetsResult.InvalidConfiguration(configurationErrors);
         }
 
-        var existingWidgets = await _widgetRepository.GetAllForUpdateAsync(
-            command.DashboardId,
-            command.ProjectId,
-            command.OwnerId,
-            cancellationToken
-        );
-
-        var existingWidgetsById = existingWidgets
-            .ToDictionary(widget => widget.Id);
-
         var submittedWidgetIds = command.Widgets
             .Select(change => change.WidgetId)
             .ToHashSet();
@@ -159,7 +208,7 @@ public sealed class UpdateDashboardWidgetsHandler
         {
             var newWidget = new Widget(
                 command.DashboardId,
-                change.DatasetId,
+                change.DatasetId!.Value,
                 change.Type,
                 change.Title,
                 change.GroupByColumn,
@@ -177,14 +226,22 @@ public sealed class UpdateDashboardWidgetsHandler
             var widget = existingWidgetsById[change.WidgetId];
 
             widget.UpdateLayout(change.Layout);
-            widget.UpdateConfiguration(
-                change.DatasetId,
-                change.Type,
-                change.Title,
-                change.GroupByColumn,
-                change.MeasureColumn,
-                change.Aggregation
-            );
+
+            if (change.DatasetId is { } datasetId)
+            {
+                widget.UpdateConfiguration(
+                    datasetId,
+                    change.Type,
+                    change.Title,
+                    change.GroupByColumn,
+                    change.MeasureColumn,
+                    change.Aggregation
+                );
+            }
+            else
+            {
+                widget.Rename(change.Title);
+            }
         }
 
         foreach (var change in widgetsToDelete)
@@ -217,6 +274,8 @@ public sealed class UpdateDashboardWidgetsHandler
                 currentRevision.Value
             );
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         return new UpdateDashboardWidgetsResult.Success(dashboard.Revision);
     }

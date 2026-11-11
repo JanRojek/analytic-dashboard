@@ -24,9 +24,4 @@ public interface IDatasetVersionRepository
         IReadOnlyCollection<Guid> versionIds,
         CancellationToken cancellationToken
     );
-
-    Task<IReadOnlyList<DatasetVersion>> GetAllByDatasetIdAsync(
-        Guid datasetId,
-        CancellationToken cancellationToken
-    );
 }

@@ -82,6 +82,26 @@ public static class DependencyInjection
 
         services.AddScoped<IEmailSender, SmtpEmailSender>();
 
+        services.AddScoped<IStorageCleanupQueue, StorageCleanupQueue>();
+
+        services.AddScoped<IDatasetDeletionStore, DatasetDeletionStore>();
+
+        services.AddScoped<IProjectWriteTransactionFactory, ProjectWriteTransactionFactory>();
+
+        services.AddScoped<StorageCleanupProcessor>();
+
+        services.AddScoped<IProjectDeletionStore, ProjectDeletionStore>();
+
+        var cleanupWorkerEnabled = configuration.GetValue(
+            "StorageCleanup:WorkerEnabled",
+            true
+        );
+
+        if (cleanupWorkerEnabled)
+        {
+            services.AddHostedService<StorageCleanupWorker>();
+        }
+
         var workerEnabled = configuration.GetValue(
             "ImportJobs:WorkerEnabled",
             true

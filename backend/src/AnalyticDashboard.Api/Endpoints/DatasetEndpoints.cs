@@ -251,19 +251,25 @@ public static class DatasetEndpoints
                 DeleteDatasetResult.NotFound =>
                     Results.NotFound(),
 
+                DeleteDatasetResult.ImportInProgress =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: "Dataset import in progress",
+                        detail: "The dataset cannot be deleted while an import is pending or running.",
+                        extensions: new Dictionary<string, object?>
+                        {
+                            ["code"] = "dataset_import_in_progress"
+                        }
+                    ),
+
                 _ => throw new UnreachableException()
             };
         })
         .WithName("DeleteDataset")
-        .Produces(
-            StatusCodes.Status204NoContent
-        )
-        .Produces(
-            StatusCodes.Status401Unauthorized
-        )
-        .Produces(
-            StatusCodes.Status404NotFound
-        );
+        .Produces(StatusCodes.Status204NoContent)
+        .Produces(StatusCodes.Status401Unauthorized)
+        .Produces(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         datasets.MapGet("/{datasetId:guid}/import-status", async (
             Guid projectId,

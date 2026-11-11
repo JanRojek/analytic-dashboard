@@ -93,7 +93,7 @@ public sealed class Widget
     }
 
     public static void ValidateConfiguration(
-        Guid datasetId,
+        Guid? datasetId,
         WidgetType type,
         string title,
         string groupByColumn,

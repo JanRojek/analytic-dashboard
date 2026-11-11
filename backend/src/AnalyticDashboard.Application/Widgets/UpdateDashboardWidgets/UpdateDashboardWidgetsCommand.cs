@@ -14,7 +14,7 @@ public sealed record UpdateDashboardWidgetsCommand(
 
 public sealed record DashboardWidgetUpdate(
     Guid WidgetId,
-    Guid DatasetId,
+    Guid? DatasetId,
     WidgetType Type,
     string Title,
     string GroupByColumn,

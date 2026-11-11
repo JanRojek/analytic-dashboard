@@ -18,6 +18,11 @@ public interface IFileStorage
         CancellationToken cancellationToken
     );
 
+    Task DeleteDirectoryAsync(
+        string storageKey,
+        CancellationToken cancellationToken
+    );
+
     Task DeleteAsync(
         string storageKey,
         CancellationToken cancellationToken

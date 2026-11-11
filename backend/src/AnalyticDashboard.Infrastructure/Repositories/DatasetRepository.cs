@@ -63,26 +63,6 @@ public sealed class DatasetRepository : IDatasetRepository
             .SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<bool> DeleteByIdAndProjectOwnerAsync(
-        Guid datasetId,
-        Guid projectId,
-        Guid ownerId,
-        CancellationToken cancellationToken)
-    {
-        var affectedRows = await _dbContext.Datasets
-            .Where(dataset =>
-                dataset.Id == datasetId
-                && dataset.ProjectId == projectId
-                && _dbContext.Projects.Any(project =>
-                    project.Id == dataset.ProjectId
-                    && project.OwnerId == ownerId
-                )
-            )
-            .ExecuteDeleteAsync(cancellationToken);
-
-        return affectedRows == 1;
-    }
-
     public async Task<bool> PublishVersionAsync(
         Guid datasetId,
         Guid projectId,

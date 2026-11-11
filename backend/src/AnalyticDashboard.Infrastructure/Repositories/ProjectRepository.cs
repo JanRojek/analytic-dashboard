@@ -89,22 +89,6 @@ public sealed class ProjectRepository : IProjectRepository
         }
     }
 
-    public async Task<ProjectDeleteOutcome> DeleteByIdAndOwnerAsync(
-        Guid projectId,
-        Guid ownerId,
-        CancellationToken cancellationToken)
-    {
-        var affectedRows = await _dbContext.Projects
-            .Where(project =>
-                project.Id == projectId
-                && project.OwnerId == ownerId)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        return affectedRows == 1
-            ? ProjectDeleteOutcome.Deleted
-            : ProjectDeleteOutcome.NotFound;
-    }
-
     public async Task<int> CountByOwnerAsync(
         Guid ownerId,
         CancellationToken cancellationToken)

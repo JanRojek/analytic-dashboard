@@ -85,6 +85,22 @@ public sealed class LocalFileStorage : IFileStorage
         );
     }
 
+    public Task DeleteDirectoryAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var directoryPath = ResolvePath(storageKey);
+
+        if (Directory.Exists(directoryPath))
+        {
+            Directory.Delete(directoryPath, recursive: true);
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task DeleteAsync(
         string storageKey,
         CancellationToken cancellationToken)

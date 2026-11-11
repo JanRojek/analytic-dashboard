@@ -5,6 +5,7 @@ using AnalyticDashboard.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using AnalyticDashboard.Application.Common.Exceptions;
+using AnalyticDashboard.Infrastructure.Storage;
 
 namespace AnalyticDashboard.Infrastructure.Data;
 
@@ -16,11 +17,9 @@ public class AppDbContext : IdentityUserContext<ApplicationUser, Guid>, IUnitOfW
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
     public DbSet<Dashboard> Dashboards => Set<Dashboard>();
     public DbSet<Widget> Widgets => Set<Widget>();
+    public DbSet<StorageCleanupJob> StorageCleanupJobs => Set<StorageCleanupJob>();
 
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-    {
-    }
-
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {}
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
