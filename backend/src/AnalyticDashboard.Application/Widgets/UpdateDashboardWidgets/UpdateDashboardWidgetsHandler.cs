@@ -71,27 +71,11 @@ public sealed class UpdateDashboardWidgetsHandler
             );
         }
 
-        var widgetCollisions = new List<WidgetCollision>();
+        var collision = FindFirstCollision(command.Widgets, cancellationToken);
 
-        for (var i = 0; i < command.Widgets.Count - 1; i++)
+        if (collision is not null)
         {
-            for (var j = i + 1; j < command.Widgets.Count; j++)
-            {
-                var firstUpdate = command.Widgets[i];
-                var secondUpdate = command.Widgets[j];
-
-                if (Intersects(firstUpdate.Layout, secondUpdate.Layout))
-                {
-                    widgetCollisions.Add(
-                        new WidgetCollision(firstUpdate.WidgetId, secondUpdate.WidgetId)
-                    );
-                }
-            }
-        }
-
-        if (widgetCollisions.Count > 0)
-        {
-            return new UpdateDashboardWidgetsResult.LayoutCollision(widgetCollisions);
+            return new UpdateDashboardWidgetsResult.LayoutCollision([collision]);
         }
 
         var existingWidgets = await _widgetRepository.GetAllForUpdateAsync(
@@ -290,19 +274,44 @@ public sealed class UpdateDashboardWidgetsHandler
             .All(widgetId => widgetId != Guid.Empty && seen.Add(widgetId));
     }
 
-    private static bool Intersects(
-        WidgetLayout first,
-        WidgetLayout second)
+    private static WidgetCollision? FindFirstCollision(
+        IReadOnlyList<DashboardWidgetUpdate> widgetList,
+        CancellationToken cancellationToken)
     {
-        var firstRight = (long)first.X + first.Width;
-        var secondRight = (long)second.X + second.Width;
+        var columnOccupancy = new (Guid WidgetId, long OccupiedUntil)[WidgetLayout.Columns];
 
-        var firstBottom = (long)first.Y + first.Height;
-        var secondBottom = (long)second.Y + second.Height;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        return first.X < secondRight &&
-               second.X < firstRight &&
-               first.Y < secondBottom &&
-               second.Y < firstBottom;
+        var sortedWidgets = widgetList
+            .OrderBy(widget => widget.Layout.Y)
+            .ToList();
+
+        foreach (var widget in sortedWidgets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var layout = widget.Layout;
+            var right = layout.X + layout.Width;
+
+            for (var column = layout.X; column < right; column++)
+            {
+                if (layout.Y < columnOccupancy[column].OccupiedUntil)
+                {
+                    return new WidgetCollision(
+                        widget.WidgetId,
+                        columnOccupancy[column].WidgetId
+                    );
+                }
+            }
+
+            var bottom = (long)layout.Y + layout.Height;
+
+            for (var column = layout.X; column < right; column++)
+            {
+                columnOccupancy[column] = (widget.WidgetId, bottom);
+            }
+        }
+
+        return null;
     }
 }

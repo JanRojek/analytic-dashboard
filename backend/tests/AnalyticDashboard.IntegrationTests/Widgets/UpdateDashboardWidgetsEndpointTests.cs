@@ -192,19 +192,6 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         );
     }
 
-    private async Task DetachFirstWidgetAsync(Guid widgetId)
-    {
-        await using var scope = _fixture.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var widget = await context.Widgets.SingleAsync(
-            item => item.Id == widgetId,
-            CancellationToken
-        );
-
-        widget.DetachDataset();
-        await context.SaveChangesAsync(CancellationToken);
-    }
-
     private async Task<Dictionary<Guid, WidgetSnapshot>> ReadSnapshotsAsync(
         Guid dashboardId)
     {
@@ -419,104 +406,63 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
     [InlineData("NewEmpty")]
     [InlineData("ConnectedNull")]
     [InlineData("Reconnect")]
-    public async Task UpdateDashboardWidgets_ShouldRejectInvalidDatasetTransition_AndPreserveWholeDashboard(
+    [InlineData("GroupBy")]
+    [InlineData("Measure")]
+    [InlineData("Aggregation")]
+    [InlineData("Type")]
+    [InlineData("InvalidTitle")]
+    public async Task UpdateDashboardWidgets_ShouldRejectInvalidDetachedTransition_AndPreserveWholeDashboard(
         string scenario)
     {
         var userId = Guid.NewGuid();
         var dashboard = await SeedDashboardAsync(userId);
-
         if (scenario != "ConnectedNull")
         {
             await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
         }
 
         var before = await ReadSnapshotsAsync(dashboard.DashboardId);
-        var invalidUpdate = CreateUpdate(
+        var first = CreateUpdate(
             dashboard.FirstWidgetId,
             null,
             "Changed title",
-            new WidgetLayoutRequest(0, 30, 12, 20)
+            new WidgetLayoutRequest(
+                0,
+                30,
+                12,
+                20
+            )
         );
-
-        invalidUpdate = scenario switch
+        first = scenario switch
         {
-            "NewNull" => invalidUpdate with { WidgetId = Guid.NewGuid() },
-            "NewEmpty" => invalidUpdate with
+            "NewNull" => first with { WidgetId = Guid.NewGuid() },
+            "NewEmpty" => first with
             {
                 WidgetId = Guid.NewGuid(),
                 DatasetId = Guid.Empty
             },
-            "ConnectedNull" => invalidUpdate,
-            "Reconnect" => invalidUpdate with { DatasetId = dashboard.AlternateDatasetId },
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+            "Reconnect" => first with { DatasetId = dashboard.AlternateDatasetId },
+            "GroupBy" => first with { GroupByColumn = "Other" },
+            "Measure" => first with { MeasureColumn = "Revenue" },
+            "Aggregation" => first with { Aggregation = AggregationType.Average.ToString() },
+            "Type" => first with { Type = WidgetType.PieChart },
+            "InvalidTitle" => first with { Title = new string('a', Widget.MaxTitleLength + 1) },
+            _ => first
         };
-
         var body = new UpdateDashboardWidgetsRequest(
             [
                 CreateUpdate(
                     dashboard.SecondWidgetId,
                     dashboard.DatasetId,
                     "Must not be persisted",
-                    new WidgetLayoutRequest(12, 30, 12, 20)
+                    new WidgetLayoutRequest(
+                        12,
+                        30,
+                        12,
+                        20
+                    )
                 ),
-                invalidUpdate
-            ],
-            0
-        );
-
-        using var request = CreatePutRequest(
-            dashboard.ProjectId,
-            dashboard.DashboardId,
-            body,
-            userId
-        );
-        using var response = await _fixture.Client.SendAsync(request, CancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal(0L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
-        await AssertUnchangedAsync(dashboard.DashboardId, before);
-    }
-
-    [Theory]
-    [InlineData("GroupBy")]
-    [InlineData("Measure")]
-    [InlineData("Aggregation")]
-    [InlineData("Type")]
-    [InlineData("InvalidTitle")]
-    public async Task UpdateDashboardWidgets_ShouldRejectInvalidDetachedConfiguration_AndPreserveWholeDashboard(
-        string scenario)
-    {
-        var userId = Guid.NewGuid();
-        var dashboard = await SeedDashboardAsync(userId);
-        await DetachFirstWidgetAsync(dashboard.FirstWidgetId);
-
-        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
-        var invalidUpdate = CreateUpdate(
-            dashboard.FirstWidgetId,
-            null,
-            "Changed title",
-            new WidgetLayoutRequest(0, 30, 12, 20)
-        );
-
-        invalidUpdate = scenario switch
-        {
-            "GroupBy" => invalidUpdate with { GroupByColumn = "Other" },
-            "Measure" => invalidUpdate with { MeasureColumn = "Revenue" },
-            "Aggregation" => invalidUpdate with { Aggregation = AggregationType.Average.ToString() },
-            "Type" => invalidUpdate with { Type = WidgetType.PieChart },
-            "InvalidTitle" => invalidUpdate with { Title = new string('a', Widget.MaxTitleLength + 1) },
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
-        };
-
-        var body = new UpdateDashboardWidgetsRequest(
-            [
-                CreateUpdate(
-                    dashboard.SecondWidgetId,
-                    dashboard.DatasetId,
-                    "Must not be persisted",
-                    new WidgetLayoutRequest(12, 30, 12, 20)
-                ),
-                invalidUpdate
+                first
             ],
             0
         );
@@ -626,12 +572,6 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                         12,
                         20
                     )
-                ),
-                CreateUpdate(
-                    dashboard.SecondWidgetId,
-                    dashboard.DatasetId,
-                    "Second widget",
-                    new WidgetLayoutRequest(12, 0, 12, 20)
                 )
             ],
             0
@@ -657,7 +597,15 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         Assert.Equal(omitDatasetId ? HttpStatusCode.BadRequest : HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(omitDatasetId ? 0L : 1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
 
-        await AssertUnchangedAsync(dashboard.DashboardId, before);
+        if (omitDatasetId)
+        {
+            await AssertUnchangedAsync(dashboard.DashboardId, before);
+        }
+        else
+        {
+            var after = await ReadSnapshotsAsync(dashboard.DashboardId);
+            Assert.Equal(before[dashboard.FirstWidgetId], Assert.Single(after).Value);
+        }
     }
 
     [Fact]
@@ -684,6 +632,19 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
         var after = await ReadSnapshotsAsync(dashboard.DashboardId);
         Assert.False(after.ContainsKey(dashboard.FirstWidgetId));
         Assert.Equal(dashboard.SecondWidgetId, Assert.Single(after).Key);
+    }
+
+    private async Task DetachFirstWidgetAsync(Guid widgetId)
+    {
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var widget = await context.Widgets.SingleAsync(
+            item => item.Id == widgetId,
+            CancellationToken
+        );
+
+        widget.DetachDataset();
+        await context.SaveChangesAsync(CancellationToken);
     }
 
     [Theory]
@@ -1016,6 +977,124 @@ public sealed class UpdateDashboardWidgetsEndpointTests : IClassFixture<ApiFixtu
                         dashboard.DatasetId,
                         "Second changed",
                         new WidgetLayoutRequest(6, int.MaxValue - 5, 12, 20)
+                    )
+                ],
+                0
+            ),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertUnchangedAsync(dashboard.DashboardId, before);
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldAcceptMoreThanOneHundredNonOverlappingWidgets()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+
+        var widgets = Enumerable.Range(0, 128)
+            .Select(index => CreateUpdate(
+                Guid.NewGuid(),
+                dashboard.DatasetId,
+                $"Widget {index}",
+                new WidgetLayoutRequest(0, index * WidgetLayout.MinHeight, 24, WidgetLayout.MinHeight)
+            ))
+            .ToArray();
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(widgets, 0),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+
+        var saved = await ReadSnapshotsAsync(dashboard.DashboardId);
+        Assert.Equal(widgets.Length, saved.Count);
+        Assert.All(widgets, widget => Assert.Contains(widget.WidgetId, saved.Keys));
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldAcceptVerticalEdgeContact_WhenBottomExceedsIntMaxValue()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(
+                [
+                    CreateUpdate(
+                        dashboard.FirstWidgetId,
+                        dashboard.DatasetId,
+                        "First",
+                        new WidgetLayoutRequest(0, int.MaxValue - 20, 12, 14)
+                    ),
+                    CreateUpdate(
+                        dashboard.SecondWidgetId,
+                        dashboard.DatasetId,
+                        "Second",
+                        new WidgetLayoutRequest(0, int.MaxValue - 6, 12, 14)
+                    )
+                ],
+                0
+            ),
+            userId
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1L, await ReadDashboardRevisionAsync(dashboard.DashboardId));
+    }
+
+    [Fact]
+    public async Task UpdateDashboardWidgets_ShouldDetectCollisionWithEarlierTallWidget()
+    {
+        var userId = Guid.NewGuid();
+        var dashboard = await SeedDashboardAsync(userId);
+        var before = await ReadSnapshotsAsync(dashboard.DashboardId);
+
+        using var request = CreatePutRequest(
+            dashboard.ProjectId,
+            dashboard.DashboardId,
+            new UpdateDashboardWidgetsRequest(
+                [
+                    CreateUpdate(
+                        Guid.NewGuid(),
+                        dashboard.DatasetId,
+                        "Late overlap",
+                        new WidgetLayoutRequest(0, 100, 12, 20)
+                    ),
+                    CreateUpdate(
+                        Guid.NewGuid(),
+                        dashboard.DatasetId,
+                        "Earlier tall widget",
+                        new WidgetLayoutRequest(0, 0, 12, 110)
+                    ),
+                    CreateUpdate(
+                        Guid.NewGuid(),
+                        dashboard.DatasetId,
+                        "Adjacent widget",
+                        new WidgetLayoutRequest(12, 0, 12, 20)
                     )
                 ],
                 0
