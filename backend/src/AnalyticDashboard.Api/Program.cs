@@ -65,6 +65,9 @@ builder.Services
     {
         options.User.RequireUniqueEmail = true;
         options.SignIn.RequireConfirmedEmail = true;
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         options.Stores.SchemaVersion =
             IdentitySchemaVersions.Version2;
     })
@@ -156,6 +159,8 @@ builder.Services.AddSingleton<IPasswordResetLinkBuilder, PasswordResetLinkBuilde
 builder.Services.AddScoped<EmailConfirmationSender>();
 builder.Services.AddScoped<PasswordResetEmailSender>();
 
+builder.Services.AddAuthRateLimiting(builder.Configuration);
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevSeed:Enabled"))
@@ -169,6 +174,9 @@ if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevSeed
 app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
+
+app.UseRouting();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

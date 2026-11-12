@@ -13,18 +13,30 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
     private readonly bool _useTestAuthentication;
+    private readonly int _authPermitLimit;
 
     public CustomWebApplicationFactory(
         string connectionString,
-        bool useTestAuthentication = true)
+        bool useTestAuthentication = true,
+        int authPermitLimit = 10000)
     {
         _connectionString = connectionString;
         _useTestAuthentication = useTestAuthentication;
+        _authPermitLimit = authPermitLimit;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Functional tests share a host/IP. Rate-limit tests opt into a small limit.
+        foreach (var endpoint in new[] { "Login", "Register", "ForgotPassword", "ResendConfirmation" })
+        {
+            builder.UseSetting(
+                $"AuthRateLimiting:{endpoint}:PermitLimit",
+                _authPermitLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            );
+        }
 
         builder.UseSetting(
             "ImportJobs:WorkerEnabled",

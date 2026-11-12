@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using AnalyticDashboard.Api.Contracts.Auth;
@@ -9,9 +9,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AnalyticDashboard.IntegrationTests.Auth;
 
-public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
+public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>, IDisposable
 {
     private readonly ApiFixture _fixture;
+    private readonly HttpClient _client;
 
     private static CancellationToken CancellationToken =>
         TestContext.Current.CancellationToken;
@@ -19,7 +20,10 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
     public LoginUserEndpointTests(ApiFixture fixture)
     {
         _fixture = fixture;
+        _client = fixture.CreateRealAuthClient();
     }
+
+    public void Dispose() => _client.Dispose();
 
     private static HttpRequestMessage CreateRegisterRequest(
         string email,
@@ -91,7 +95,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             password
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -101,7 +105,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             registerResponse.StatusCode
         );
 
-        var emailSender = _fixture.Services
+        var emailSender = _fixture.RealAuthServices
             .GetRequiredService<TestEmailSender>();
 
         var message = Assert.Single(
@@ -137,7 +141,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             token
         );
 
-        using var confirmResponse = await _fixture.Client.SendAsync(
+        using var confirmResponse = await _client.SendAsync(
             confirmRequest,
             CancellationToken
         );
@@ -153,7 +157,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -187,7 +191,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             "Trgjnyrsgmir!4"
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -197,7 +201,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             registerResponse.StatusCode
         );
 
-        var emailSender = _fixture.Services
+        var emailSender = _fixture.RealAuthServices
             .GetRequiredService<TestEmailSender>();
 
         var message = Assert.Single(
@@ -233,7 +237,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             token
         );
 
-        using var confirmResponse = await _fixture.Client.SendAsync(
+        using var confirmResponse = await _client.SendAsync(
             confirmRequest,
             CancellationToken
         );
@@ -249,7 +253,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -306,7 +310,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -364,7 +368,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             password
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -380,7 +384,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -437,7 +441,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             "Trgjnyrsgmir!4"
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -453,7 +457,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -508,7 +512,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -566,7 +570,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             password
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -576,7 +580,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             registerResponse.StatusCode
         );
 
-        var emailSender = _fixture.Services
+        var emailSender = _fixture.RealAuthServices
             .GetRequiredService<TestEmailSender>();
 
         var message = Assert.Single(
@@ -612,7 +616,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             token
         );
 
-        using var confirmResponse = await _fixture.Client.SendAsync(
+        using var confirmResponse = await _client.SendAsync(
             confirmRequest,
             CancellationToken
         );
@@ -628,7 +632,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -670,7 +674,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             password
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -680,7 +684,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             registerResponse.StatusCode
         );
 
-        var emailSender = _fixture.Services
+        var emailSender = _fixture.RealAuthServices
             .GetRequiredService<TestEmailSender>();
 
         var message = Assert.Single(
@@ -716,7 +720,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             token
         );
 
-        using var confirmResponse = await _fixture.Client.SendAsync(
+        using var confirmResponse = await _client.SendAsync(
             confirmRequest,
             CancellationToken
         );
@@ -732,7 +736,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: true
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );
@@ -767,7 +771,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             password
         );
 
-        using var registerResponse = await _fixture.Client.SendAsync(
+        using var registerResponse = await _client.SendAsync(
             registerRequest,
             CancellationToken
         );
@@ -777,7 +781,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             registerResponse.StatusCode
         );
 
-        var emailSender = _fixture.Services
+        var emailSender = _fixture.RealAuthServices
             .GetRequiredService<TestEmailSender>();
 
         var message = Assert.Single(
@@ -813,7 +817,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             token
         );
 
-        using var confirmResponse = await _fixture.Client.SendAsync(
+        using var confirmResponse = await _client.SendAsync(
             confirmRequest,
             CancellationToken
         );
@@ -829,7 +833,7 @@ public sealed class LoginUserEndpointTests : IClassFixture<ApiFixture>
             rememberMe: false
         );
 
-        using var loginResponse = await _fixture.Client.SendAsync(
+        using var loginResponse = await _client.SendAsync(
             loginRequest,
             CancellationToken
         );

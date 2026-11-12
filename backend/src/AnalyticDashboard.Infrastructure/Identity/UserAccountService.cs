@@ -174,27 +174,40 @@ public sealed class UserAccountService : IUserAccountService
             return new UserPasswordSignInResult.InvalidCredentials();
         }
 
-        var isPasswordCorrect = await _userManager.CheckPasswordAsync(
+        var result = await _signInManager.PasswordSignInAsync(
             user,
-            password
+            password,
+            isPersistent: rememberMe,
+            lockoutOnFailure: true
         );
 
-        if (!isPasswordCorrect)
+        if (result.Succeeded)
         {
-            return new UserPasswordSignInResult.InvalidCredentials();
+            return new UserPasswordSignInResult.Success();
         }
 
-        if (!user.EmailConfirmed)
+        // Identity checks confirmation before lockout and password verification.
+        // Protect the legacy 409 response without allowing an unconfirmed sign-in.
+        if (result.IsNotAllowed && !user.EmailConfirmed)
         {
-            return new UserPasswordSignInResult.EmailNotConfirmed();
+            if (_userManager.SupportsUserLockout
+                && await _userManager.IsLockedOutAsync(user))
+            {
+                return new UserPasswordSignInResult.InvalidCredentials();
+            }
+
+            if (await _userManager.CheckPasswordAsync(user, password))
+            {
+                return new UserPasswordSignInResult.EmailNotConfirmed();
+            }
+
+            if (_userManager.SupportsUserLockout)
+            {
+                await _userManager.AccessFailedAsync(user);
+            }
         }
 
-        await _signInManager.SignInAsync(
-            user,
-            isPersistent: rememberMe
-        );
-
-        return new UserPasswordSignInResult.Success();
+        return new UserPasswordSignInResult.InvalidCredentials();
     }
 
     public async Task<UserAccountDetailsResult> GetByIdAsync(

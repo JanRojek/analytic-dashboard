@@ -98,6 +98,8 @@ public static class AuthEndpoints
             );
         })
         .WithName("RegisterUser")
+        .RequireRateLimiting(AuthRateLimiting.Register)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .AllowAnonymous()
         .Produces<RegisterUserResponse>(
             StatusCodes.Status201Created
@@ -316,6 +318,8 @@ public static class AuthEndpoints
             }
         })
         .WithName("LoginUser")
+        .RequireRateLimiting(AuthRateLimiting.Login)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .AllowAnonymous()
         .Produces(
             StatusCodes.Status204NoContent
@@ -394,6 +398,8 @@ public static class AuthEndpoints
             return TypedResults.NoContent();
         })
         .WithName("ResendConfirmation")
+        .RequireRateLimiting(AuthRateLimiting.ResendConfirmation)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .AllowAnonymous()
         .Produces(
             StatusCodes.Status204NoContent
@@ -416,6 +422,8 @@ public static class AuthEndpoints
             return TypedResults.NoContent();
         })
         .WithName("ForgotPassword")
+        .RequireRateLimiting(AuthRateLimiting.ForgotPassword)
+        .ProducesProblem(StatusCodes.Status429TooManyRequests)
         .AllowAnonymous()
         .Produces(
             StatusCodes.Status204NoContent
