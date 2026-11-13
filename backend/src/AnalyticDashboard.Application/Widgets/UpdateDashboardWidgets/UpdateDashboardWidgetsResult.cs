@@ -11,7 +11,7 @@ public abstract record UpdateDashboardWidgetsResult
     public sealed record InvalidConfiguration(IReadOnlyList<WidgetConfigurationError> Errors)
         : UpdateDashboardWidgetsResult;
 
-    public sealed record DatasetNotFound(Guid DatasetId) : UpdateDashboardWidgetsResult;
+    public sealed record DatasetNotFound : UpdateDashboardWidgetsResult;
 
     public sealed record RevisionConflict(long ExpectedRevision, long CurrentRevision) : UpdateDashboardWidgetsResult;
 

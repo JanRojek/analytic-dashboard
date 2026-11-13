@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using AnalyticDashboard.Application.Common.Exceptions;
 using AnalyticDashboard.Infrastructure.Storage;
+using Npgsql;
 
 namespace AnalyticDashboard.Infrastructure.Data;
 
@@ -51,6 +52,33 @@ public class AppDbContext : IdentityUserContext<ApplicationUser, Guid>, IUnitOfW
         catch (DbUpdateConcurrencyException ex)
         {
             throw new OptimisticConcurrencyException(ex.Message, ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+               {
+                   SqlState: PostgresErrorCodes.UniqueViolation,
+                   TableName: "Widgets",
+                   ConstraintName: "PK_Widgets"
+               })
+        {
+            throw new WidgetIdConflictException(ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+               {
+                   SqlState: PostgresErrorCodes.ForeignKeyViolation,
+                   TableName: "Widgets",
+                   ConstraintName: "FK_Widgets_datasets_DatasetId"
+               })
+        {
+            throw new MissingReferenceException(nameof(Dataset), ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+               {
+                   SqlState: PostgresErrorCodes.ForeignKeyViolation,
+                   TableName: "Widgets",
+                   ConstraintName: "FK_Widgets_Dashboards_DashboardId"
+               })
+        {
+            throw new MissingReferenceException(nameof(Dashboard), ex);
         }
     }
 }

@@ -1,7 +1,9 @@
+using AnalyticDashboard.Application.Common.Exceptions;
 using AnalyticDashboard.Application.Dashboards.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace AnalyticDashboard.Infrastructure.Repositories;
 
@@ -23,7 +25,19 @@ public sealed class DashboardRepository : IDashboardRepository
             cancellationToken
         );
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+               {
+                   SqlState: PostgresErrorCodes.ForeignKeyViolation,
+                   TableName: "Dashboards",
+                   ConstraintName: "FK_Dashboards_projects_ProjectId"
+               })
+        {
+            throw new MissingReferenceException(nameof(Project), exception);
+        }
     }
 
     public async Task<IReadOnlyList<Dashboard>> GetAllByProjectAndOwnerAsync(

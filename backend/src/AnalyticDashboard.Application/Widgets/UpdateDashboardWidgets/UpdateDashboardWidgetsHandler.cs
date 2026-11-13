@@ -104,7 +104,7 @@ public sealed class UpdateDashboardWidgetsHandler
         {
             if (!availableDatasetIds.Contains(datasetId))
             {
-                return new UpdateDashboardWidgetsResult.DatasetNotFound(datasetId);
+                return new UpdateDashboardWidgetsResult.DatasetNotFound();
             }
         }
 
@@ -238,6 +238,20 @@ public sealed class UpdateDashboardWidgetsHandler
         try
         {
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (WidgetIdConflictException)
+        {
+            return new UpdateDashboardWidgetsResult.InvalidWidgetSet(
+                "The widget set could not be saved."
+            );
+        }
+        catch (MissingReferenceException exception) when (exception.EntityType == nameof(Dataset))
+        {
+            return new UpdateDashboardWidgetsResult.DatasetNotFound();
+        }
+        catch (MissingReferenceException exception) when (exception.EntityType == nameof(Dashboard))
+        {
+            return new UpdateDashboardWidgetsResult.DashboardNotFound();
         }
         catch (OptimisticConcurrencyException)
         {

@@ -1,3 +1,4 @@
+using AnalyticDashboard.Application.Common.Exceptions;
 using AnalyticDashboard.Application.Dashboards.Persistence;
 using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Domain.Entities;
@@ -49,10 +50,14 @@ public sealed class CreateDashboardHandler
             );
         }
 
-        await _dashboardRepository.AddAsync(
-            dashboard,
-            cancellationToken
-        );
+        try
+        {
+            await _dashboardRepository.AddAsync(dashboard, cancellationToken);
+        }
+        catch (MissingReferenceException exception) when (exception.EntityType == nameof(Project))
+        {
+            return new CreateDashboardResult.ProjectNotFound();
+        }
 
         return new CreateDashboardResult.Success(
             dashboard.Id
