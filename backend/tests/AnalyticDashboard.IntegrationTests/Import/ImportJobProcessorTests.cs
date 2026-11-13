@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -80,8 +80,7 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
         var sourceStorageKey =
             $"tests/import-jobs/{Guid.NewGuid():N}/source.csv";
 
-        var resultStorageKey =
-            $"datasets/{dataset.Id:N}/versions/{version.Id:N}/data.parquet";
+        string? resultStorageKey = null;
 
         var importJob = new ImportJob(
             version.Id,
@@ -183,9 +182,10 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
                 storedVersion.Status
             );
 
-            Assert.Equal(
-                resultStorageKey,
-                storedVersion.StorageKey
+            resultStorageKey = Assert.IsType<string>(storedVersion.StorageKey);
+            Assert.StartsWith(
+                $"datasets/{dataset.Id:N}/versions/{version.Id:N}/attempts/",
+                resultStorageKey
             );
 
             Assert.Equal(
@@ -285,10 +285,10 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
                 CancellationToken
             );
 
-            await fileStorage.DeleteAsync(
-                resultStorageKey,
-                CancellationToken
-            );
+            if (resultStorageKey is not null)
+            {
+                await fileStorage.DeleteAsync(resultStorageKey, CancellationToken);
+            }
         }
     }
 
@@ -316,8 +316,6 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
         var sourceStorageKey =
             $"tests/import-jobs/{Guid.NewGuid():N}/missing.csv";
 
-        var resultStorageKey =
-            $"datasets/{dataset.Id:N}/versions/{version.Id:N}/data.parquet";
 
         var importJob = new ImportJob(
             version.Id,
@@ -426,17 +424,6 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
                 )
             );
 
-            var fileStorage = verificationScope.ServiceProvider
-                .GetRequiredService<IFileStorage>();
-
-            var resultExists = await fileStorage.ExistsAsync(
-                resultStorageKey,
-                CancellationToken
-            );
-
-            Assert.False(
-                resultExists
-            );
         }
         finally
         {
@@ -451,8 +438,8 @@ public sealed class ImportJobProcessorTests : IClassFixture<ApiFixture>
                 CancellationToken
             );
 
-            await fileStorage.DeleteAsync(
-                resultStorageKey,
+            await fileStorage.DeleteDirectoryAsync(
+                $"datasets/{dataset.Id:N}",
                 CancellationToken
             );
         }

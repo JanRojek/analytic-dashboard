@@ -1,5 +1,4 @@
 using AnalyticDashboard.Application.Datasets.Persistence;
-using AnalyticDashboard.Application.Storage;
 
 namespace AnalyticDashboard.Infrastructure.Services.Import;
 
@@ -7,16 +6,13 @@ public sealed class ImportJobRecoveryService
 {
     private readonly IImportJobRepository _importJobRepository;
     private readonly IDatasetVersionRepository _versionRepository;
-    private readonly IFileStorage _fileStorage;
 
     public ImportJobRecoveryService(
         IImportJobRepository importJobRepository,
-        IDatasetVersionRepository versionRepository,
-        IFileStorage fileStorage)
+        IDatasetVersionRepository versionRepository)
     {
         _importJobRepository = importJobRepository;
         _versionRepository = versionRepository;
-        _fileStorage = fileStorage;
     }
 
     public async Task RecoverInterruptedAsync(
@@ -39,11 +35,6 @@ public sealed class ImportJobRecoveryService
                     $"Dataset version {job.DatasetVersionId} not found."
                 );
             }
-
-            await _fileStorage.DeleteAsync(
-                $"datasets/{datasetVersion.DatasetId:N}/versions/{datasetVersion.Id:N}/data.parquet",
-                cancellationToken
-            );
 
             datasetVersion.MarkFailed();
             job.MarkFailed("Import interrupted by application restart.");

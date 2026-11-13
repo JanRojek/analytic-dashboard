@@ -2,6 +2,9 @@
 
 public interface IFileStorage
 {
+    /// <summary>
+    /// Creates a new file without replacing an existing one. A failed write may only clean up the file it created.
+    /// </summary>
     Task SaveAsync(
         string storageKey,
         Stream content,

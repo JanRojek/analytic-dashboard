@@ -20,18 +20,13 @@ public sealed class DuckDbCsvImporter
 
     public async Task<DuckDbCsvImportResult> ImportAsync(
         string sourceStorageKey,
-        string resultStorageKey,
+        string resultStorageDirectory,
         CancellationToken cancellationToken)
     {
-        var tempSourcePath = Path.Combine(
-            Path.GetTempPath(),
-            $"analytic-dashboard-{Guid.NewGuid():N}.csv"
-        );
-
-        var tempParquetPath = Path.Combine(
-            Path.GetTempPath(),
-            $"analytic-dashboard-{Guid.NewGuid():N}.parquet"
-        );
+        var resultStorageKey = $"{resultStorageDirectory}/{Guid.NewGuid():N}.parquet";
+        var workspace = Directory.CreateTempSubdirectory("analytic-dashboard-import-");
+        var tempSourcePath = Path.Combine(workspace.FullName, "source.csv");
+        var tempParquetPath = Path.Combine(workspace.FullName, "data.parquet");
 
         try
         {
@@ -59,35 +54,9 @@ public sealed class DuckDbCsvImporter
                 result.ColumnCount
             );
         }
-        catch
-        {
-            try
-            {
-                await _fileStorage.DeleteAsync(
-                    resultStorageKey,
-                    CancellationToken.None
-                );
-            }
-            catch (Exception cleanupException)
-            {
-                _logger.LogWarning(
-                    cleanupException,
-                    "Failed to clean up result storage object {StorageKey} after DuckDB import failure.",
-                    resultStorageKey
-                );
-            }
-
-            throw;
-        }
         finally
         {
-            TryDeleteTempFile(
-                tempSourcePath
-            );
-
-            TryDeleteTempFile(
-                tempParquetPath
-            );
+            TryDeleteWorkspace(workspace.FullName);
         }
     }
 
@@ -234,22 +203,19 @@ public sealed class DuckDbCsvImporter
         );
     }
 
-    private void TryDeleteTempFile(
-        string filePath)
+    private void TryDeleteWorkspace(
+        string directoryPath)
     {
         try
         {
-            if (File.Exists(filePath))
-            {
-                File.Delete(filePath);
-            }
+            Directory.Delete(directoryPath, recursive: true);
         }
         catch (Exception exception)
         {
             _logger.LogWarning(
                 exception,
-                "Failed to delete temporary DuckDB import file {FilePath}.",
-                filePath
+                "Failed to delete temporary DuckDB import workspace {DirectoryPath}.",
+                directoryPath
             );
         }
     }

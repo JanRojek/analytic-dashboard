@@ -26,8 +26,7 @@ public sealed class DuckDbCsvImporterTests : IClassFixture<ApiFixture>
         var sourceStorageKey =
             $"tests/duckdb/{importId:N}/source.csv";
 
-        var resultStorageKey =
-            $"tests/duckdb/{importId:N}/data.parquet";
+        var resultStorageDirectory = $"tests/duckdb/{importId:N}/attempts";
 
         await using var scope =
             _fixture.Services.CreateAsyncScope();
@@ -59,14 +58,12 @@ public sealed class DuckDbCsvImporterTests : IClassFixture<ApiFixture>
 
             var result = await importer.ImportAsync(
                 sourceStorageKey,
-                resultStorageKey,
+                resultStorageDirectory,
                 CancellationToken
             );
 
-            Assert.Equal(
-                resultStorageKey,
-                result.StorageKey
-            );
+            Assert.StartsWith(resultStorageDirectory + "/", result.StorageKey);
+            Assert.EndsWith(".parquet", result.StorageKey);
 
             Assert.Equal(
                 3,
@@ -79,7 +76,7 @@ public sealed class DuckDbCsvImporterTests : IClassFixture<ApiFixture>
             );
 
             var resultExists = await fileStorage.ExistsAsync(
-                resultStorageKey,
+                result.StorageKey,
                 CancellationToken
             );
 
@@ -89,7 +86,7 @@ public sealed class DuckDbCsvImporterTests : IClassFixture<ApiFixture>
 
             await using var parquetStream =
                 await fileStorage.OpenReadAsync(
-                    resultStorageKey,
+                    result.StorageKey,
                     CancellationToken
                 );
 
@@ -107,13 +104,8 @@ public sealed class DuckDbCsvImporterTests : IClassFixture<ApiFixture>
         }
         finally
         {
-            await fileStorage.DeleteAsync(
-                sourceStorageKey,
-                CancellationToken
-            );
-
-            await fileStorage.DeleteAsync(
-                resultStorageKey,
+            await fileStorage.DeleteDirectoryAsync(
+                $"tests/duckdb/{importId:N}",
                 CancellationToken
             );
         }

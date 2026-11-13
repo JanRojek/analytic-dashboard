@@ -34,7 +34,7 @@ public sealed class LocalFileStorage : IFileStorage
             );
         }
 
-        await using var outputStream = new FileStream(
+        var outputStream = new FileStream(
             filePath,
             FileMode.CreateNew,
             FileAccess.Write,
@@ -43,10 +43,30 @@ public sealed class LocalFileStorage : IFileStorage
             FileOptions.Asynchronous
         );
 
-        await content.CopyToAsync(
-            outputStream,
-            cancellationToken
-        );
+        try
+        {
+            await using (outputStream)
+            {
+                await content.CopyToAsync(outputStream, cancellationToken);
+            }
+        }
+        catch (Exception writeException)
+        {
+            try
+            {
+                File.Delete(filePath);
+            }
+            catch (Exception cleanupException)
+            {
+                throw new AggregateException(
+                    "Storage write failed and cleanup of its partial file also failed.",
+                    writeException,
+                    cleanupException
+                );
+            }
+
+            throw;
+        }
     }
 
     public Task<Stream> OpenReadAsync(

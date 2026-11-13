@@ -21,7 +21,7 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task RecoverInterruptedAsync_ShouldFailRunningJobAndDeleteParquet()
+    public async Task RecoverInterruptedAsync_ShouldFailRunningJobWithoutDeletingUnownedParquet()
     {
         var userId = Guid.NewGuid();
 
@@ -130,7 +130,7 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
                     storedJob.CompletedAtUtc
                 );
 
-                Assert.False(
+                Assert.True(
                     await fileStorage.ExistsAsync(resultStorageKey, CancellationToken)
                 );
             }

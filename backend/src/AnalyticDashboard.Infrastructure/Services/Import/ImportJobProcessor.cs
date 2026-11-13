@@ -1,5 +1,4 @@
 ﻿using AnalyticDashboard.Application.Datasets.Persistence;
-using AnalyticDashboard.Application.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace AnalyticDashboard.Infrastructure.Services.Import;
@@ -10,18 +9,15 @@ public sealed class ImportJobProcessor
 
     private readonly IImportJobRepository _importJobRepository;
     private readonly DuckDbCsvImporter _csvImporter;
-    private readonly IFileStorage _fileStorage;
     private readonly ILogger<ImportJobProcessor> _logger;
 
     public ImportJobProcessor(
         IImportJobRepository importJobRepository,
         DuckDbCsvImporter csvImporter,
-        IFileStorage fileStorage,
         ILogger<ImportJobProcessor> logger)
     {
         _importJobRepository = importJobRepository;
         _csvImporter = csvImporter;
-        _fileStorage = fileStorage;
         _logger = logger;
     }
 
@@ -41,7 +37,7 @@ public sealed class ImportJobProcessor
         var version = workItem.Version;
         var dataset = workItem.Dataset;
 
-        var resultStorageKey = $"datasets/{dataset.Id:N}/versions/{version.Id:N}/data.parquet";
+        var resultStorageDirectory = $"datasets/{dataset.Id:N}/versions/{version.Id:N}/attempts";
 
         DuckDbCsvImportResult importResult;
 
@@ -49,7 +45,7 @@ public sealed class ImportJobProcessor
         {
             importResult = await _csvImporter.ImportAsync(
                 job.SourceStorageKey,
-                resultStorageKey,
+                resultStorageDirectory,
                 cancellationToken
             );
         }
@@ -91,32 +87,8 @@ public sealed class ImportJobProcessor
 
         job.MarkCompleted();
 
-        try
-        {
-            await _importJobRepository.SaveChangesAsync(
-                cancellationToken
-            );
-        }
-        catch
-        {
-            try
-            {
-                await _fileStorage.DeleteAsync(
-                    importResult.StorageKey,
-                    CancellationToken.None
-                );
-            }
-            catch (Exception cleanupException)
-            {
-                _logger.LogWarning(
-                    cleanupException,
-                    "Failed to clean up Parquet artifact {StorageKey} after database finalization failure.",
-                    importResult.StorageKey
-                );
-            }
-
-            throw;
-        }
+        // A failed acknowledgement does not prove that publication was rolled back.
+        await _importJobRepository.SaveChangesAsync(cancellationToken);
 
         return true;
     }
