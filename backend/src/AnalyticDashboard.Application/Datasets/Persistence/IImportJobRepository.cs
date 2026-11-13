@@ -1,15 +1,10 @@
-﻿using AnalyticDashboard.Domain.Entities;
+using AnalyticDashboard.Domain.Entities;
 
 namespace AnalyticDashboard.Application.Datasets.Persistence;
 
 public interface IImportJobRepository
 {
     Task<ImportJobWorkItem?> ClaimNextPendingAsync(
-        CancellationToken cancellationToken
-    );
-
-    Task<ImportJob?> GetByIdAsync(
-        Guid importJobId,
         CancellationToken cancellationToken
     );
 

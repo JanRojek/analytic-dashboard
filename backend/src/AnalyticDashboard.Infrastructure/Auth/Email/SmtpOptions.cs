@@ -14,5 +14,7 @@ public sealed class SmtpOptions
 
     public required string FromName { get; set; }
 
-    public bool UseSsl { get; set; }
+    public SmtpEncryptionMode EncryptionMode { get; set; } = SmtpEncryptionMode.StartTls;
+
+    public bool AllowUnencryptedInDevelopment { get; set; }
 }

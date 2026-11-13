@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 using AnalyticDashboard.Application.Auth.Accounts;
 using AnalyticDashboard.Application.Auth.Email;
 using AnalyticDashboard.Application.Projects.Persistence;
@@ -7,6 +9,7 @@ using AnalyticDashboard.Infrastructure.Services.Import;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using AnalyticDashboard.Application.Profiling;
 using AnalyticDashboard.Infrastructure.Auth.Email;
 using AnalyticDashboard.Infrastructure.Identity;
@@ -22,6 +25,7 @@ using AnalyticDashboard.Application.Widgets.Persistence;
 using AnalyticDashboard.Infrastructure.Services.Analytics;
 using AnalyticDashboard.Infrastructure.Services.DuckDb;
 using AnalyticDashboard.Infrastructure.Services.Datasets;
+using MimeKit;
 
 namespace AnalyticDashboard.Infrastructure;
 
@@ -70,7 +74,35 @@ public static class DependencyInjection
 
         services.AddSingleton<IEmailConfirmationLinkBuilder, EmailConfirmationLinkBuilder>();
 
-        services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
+        services.AddOptions<SmtpOptions>()
+            .Bind(configuration.GetSection("Smtp"))
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Host)
+                && Uri.CheckHostName(options.Host) != UriHostNameType.Unknown,
+                "Smtp:Host must be a host name or IP address.")
+            .Validate(options => options.Port is >= 1 and <= 65535,
+                "Smtp:Port must be between 1 and 65535.")
+            .Validate(options => Enum.IsDefined(options.EncryptionMode),
+                "Smtp:EncryptionMode must be None, StartTls or SslOnConnect.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.FromEmail)
+                && new EmailAddressAttribute().IsValid(options.FromEmail)
+                && MailboxAddress.TryParse(options.FromEmail, out var address)
+                && address.Address == options.FromEmail,
+                "Smtp:FromEmail must be a valid email address.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.FromName),
+                "Smtp:FromName is required.")
+            .Validate(options => string.IsNullOrWhiteSpace(options.Username)
+                == string.IsNullOrWhiteSpace(options.Password),
+                "SMTP username and password must be provided together.")
+            .Validate(options => options.EncryptionMode != SmtpEncryptionMode.None
+                || string.IsNullOrWhiteSpace(options.Username),
+                "SMTP authentication requires TLS encryption.")
+            .Validate<IHostEnvironment>((options, environment) =>
+                options.EncryptionMode != SmtpEncryptionMode.None
+                || (environment.IsDevelopment() && options.AllowUnencryptedInDevelopment),
+                "Unencrypted SMTP is allowed only when explicitly enabled in Development.")
+            .Validate(_ => configuration["Smtp:UseSsl"] is null,
+                "Smtp:UseSsl is no longer supported. Configure Smtp:EncryptionMode instead.")
+            .ValidateOnStart();
 
         services.AddScoped<DuckDbCsvImporter>();
 

@@ -1,14 +1,9 @@
-﻿using AnalyticDashboard.Domain.Entities;
+using AnalyticDashboard.Domain.Entities;
 
 namespace AnalyticDashboard.Application.Datasets.Persistence;
 
 public interface IDatasetVersionRepository
 {
-    Task AddAsync(
-        DatasetVersion version,
-        CancellationToken cancellationToken
-    );
-
     Task<DatasetVersion?> GetByIdAsync(
         Guid versionId,
         Guid datasetId,

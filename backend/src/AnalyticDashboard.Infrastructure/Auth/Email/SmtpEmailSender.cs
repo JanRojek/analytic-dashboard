@@ -44,9 +44,13 @@ public sealed class SmtpEmailSender : IEmailSender
 
         using var client = new SmtpClient();
 
-        var socketOptions = _options.UseSsl
-            ? SecureSocketOptions.SslOnConnect
-            : SecureSocketOptions.None;
+        var socketOptions = _options.EncryptionMode switch
+        {
+            SmtpEncryptionMode.None => SecureSocketOptions.None,
+            SmtpEncryptionMode.StartTls => SecureSocketOptions.StartTls,
+            SmtpEncryptionMode.SslOnConnect => SecureSocketOptions.SslOnConnect,
+            _ => throw new InvalidOperationException("Unsupported SMTP encryption mode.")
+        };
 
         try
         {
@@ -75,6 +79,13 @@ public sealed class SmtpEmailSender : IEmailSender
             await client.DisconnectAsync(
                 true,
                 cancellationToken
+            );
+        }
+        catch (NotSupportedException exception)
+        {
+            throw new EmailDeliveryException(
+                "The SMTP server does not support the required encryption or authentication settings.",
+                exception
             );
         }
         catch (SocketException exception)

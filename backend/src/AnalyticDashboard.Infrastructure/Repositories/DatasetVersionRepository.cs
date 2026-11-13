@@ -1,4 +1,4 @@
-﻿using AnalyticDashboard.Application.Datasets.Persistence;
+using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -14,17 +14,6 @@ public sealed class DatasetVersionRepository
         AppDbContext dbContext)
     {
         _dbContext = dbContext;
-    }
-
-    public async Task AddAsync(
-        DatasetVersion version,
-        CancellationToken cancellationToken)
-    {
-        _dbContext.DatasetVersions.Add(version);
-
-        await _dbContext.SaveChangesAsync(
-            cancellationToken
-        );
     }
 
     public async Task<DatasetVersion?> GetByIdAsync(

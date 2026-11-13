@@ -1,4 +1,4 @@
-﻿using AnalyticDashboard.Application.Common.Persistence;
+using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
@@ -88,17 +88,6 @@ public sealed class ImportJobRepository : IImportJobRepository
             version,
             dataset
         );
-    }
-
-    public async Task<ImportJob?> GetByIdAsync(
-        Guid importJobId,
-        CancellationToken cancellationToken)
-    {
-        return await _dbContext.ImportJobs
-            .SingleOrDefaultAsync(
-                job => job.Id == importJobId,
-                cancellationToken
-            );
     }
 
     public async Task<ImportJob?> GetLatestByDatasetIdAsync(
