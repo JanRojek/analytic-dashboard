@@ -470,7 +470,8 @@ public static class DatasetEndpoints
             if (!Enum.TryParse<AggregationType>(
                 request.Aggregation,
                 ignoreCase: true,
-                out var aggregation))
+                out var aggregation)
+                || !Enum.IsDefined(aggregation))
             {
                 return Results.ValidationProblem(
                     new Dictionary<string, string[]>

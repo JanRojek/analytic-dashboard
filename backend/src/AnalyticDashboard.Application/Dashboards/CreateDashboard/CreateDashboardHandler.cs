@@ -17,7 +17,7 @@ public sealed class CreateDashboardHandler
         _projectRepository = projectRepository;
     }
 
-    public async Task<CreateDashboardResponse?> HandleAsync(
+    public async Task<CreateDashboardResult> HandleAsync(
         CreateDashboardCommand command,
         CancellationToken cancellationToken)
     {
@@ -29,20 +29,32 @@ public sealed class CreateDashboardHandler
 
         if (project is null)
         {
-            return null;
+            return new CreateDashboardResult.ProjectNotFound();
         }
 
-        var dashboard = new Dashboard(
-            command.ProjectId,
-            command.Name
-        );
+        Dashboard dashboard;
+
+        try
+        {
+            dashboard = new Dashboard(
+                command.ProjectId,
+                command.Name
+            );
+        }
+        catch (InvalidEntityNameException exception)
+            when (exception.EntityType == nameof(Dashboard))
+        {
+            return new CreateDashboardResult.InvalidName(
+                exception.Message
+            );
+        }
 
         await _dashboardRepository.AddAsync(
             dashboard,
             cancellationToken
         );
 
-        return new CreateDashboardResponse(
+        return new CreateDashboardResult.Success(
             dashboard.Id
         );
     }

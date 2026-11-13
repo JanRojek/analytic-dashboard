@@ -26,8 +26,19 @@ public sealed class QueryDatasetEndpointTests
         _fixture = fixture;
     }
 
-    [Fact]
-    public async Task QueryDataset_ShouldGroupAndSumNumericColumn()
+    [Theory]
+    [InlineData("Sum", 40d, 20d)]
+    [InlineData("Average", 20d, 20d)]
+    [InlineData("Min", 10d, 20d)]
+    [InlineData("Max", 30d, 20d)]
+    [InlineData("Count", 2d, 1d)]
+    [InlineData("sUm", 40d, 20d)]
+    [InlineData("0", 40d, 20d)]
+    [InlineData("4", 2d, 1d)]
+    public async Task QueryDataset_ShouldGroupAndAggregateNumericColumn(
+        string aggregation,
+        double expectedPoland,
+        double expectedGermany)
     {
         var userId = Guid.NewGuid();
 
@@ -142,7 +153,8 @@ public sealed class QueryDatasetEndpointTests
             using var queryRequest = CreateQueryRequest(
                 project.Id,
                 importResult.DatasetId,
-                userId
+                userId,
+                aggregation
             );
 
             using var queryResponse =
@@ -179,12 +191,12 @@ public sealed class QueryDatasetEndpointTests
             );
 
             Assert.Equal(
-                40d,
+                expectedPoland,
                 poland.Value
             );
 
             Assert.Equal(
-                20d,
+                expectedGermany,
                 germany.Value
             );
         }
@@ -256,7 +268,8 @@ public sealed class QueryDatasetEndpointTests
     private static HttpRequestMessage CreateQueryRequest(
         Guid projectId,
         Guid datasetId,
-        Guid userId)
+        Guid userId,
+        string aggregation)
     {
         var request = new HttpRequestMessage(
             HttpMethod.Post,
@@ -272,7 +285,7 @@ public sealed class QueryDatasetEndpointTests
             new QueryDatasetRequest(
                 "Country",
                 "Amount",
-                "Sum"
+                aggregation
             )
         );
 

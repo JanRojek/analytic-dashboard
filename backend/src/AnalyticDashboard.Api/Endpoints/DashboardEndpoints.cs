@@ -1,8 +1,10 @@
+using System.Diagnostics;
+using System.Security.Claims;
+
 using AnalyticDashboard.Application.Dashboards.CreateDashboard;
 using AnalyticDashboard.Application.Dashboards.DeleteDashboard;
 using AnalyticDashboard.Application.Dashboards.GetDashboardById;
 using AnalyticDashboard.Application.Dashboards.GetDashboards;
-using System.Security.Claims;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Dashboards;
 
@@ -51,24 +53,37 @@ public static class DashboardEndpoints
                 cancellationToken
             );
 
-            if (result is null)
+            return result switch
             {
-                return Results.Problem(
-                    statusCode: StatusCodes.Status404NotFound,
-                    title: "Project not found",
-                    detail: "The project does not exist or is not accessible by the current user."
-                );
-            }
+                CreateDashboardResult.Success success =>
+                    Results.Created(
+                        $"/projects/{projectId}/dashboards/{success.Id}",
+                        new CreateDashboardResponse(success.Id)
+                    ),
 
-            return Results.Created(
-                $"/projects/{projectId}/dashboards/{result.Id}",
-                result
-            );
+                CreateDashboardResult.ProjectNotFound =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status404NotFound,
+                        title: "Project not found",
+                        detail: "The project does not exist or is not accessible by the current user."
+                    ),
+
+                CreateDashboardResult.InvalidName invalidName =>
+                    Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["Name"] = [invalidName.Message]
+                        }
+                    ),
+
+                _ => throw new UnreachableException()
+            };
         })
         .WithName("CreateDashboard")
         .Produces<CreateDashboardResponse>(
             StatusCodes.Status201Created
         )
+        .ProducesValidationProblem()
         .ProducesProblem(
             StatusCodes.Status404NotFound
         );

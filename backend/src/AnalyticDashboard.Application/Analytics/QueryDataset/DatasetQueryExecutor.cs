@@ -29,6 +29,13 @@ public sealed class DatasetQueryExecutor
         AggregationType aggregation,
         CancellationToken cancellationToken)
     {
+        if (!Enum.IsDefined(aggregation))
+        {
+            return new DatasetQueryExecutionResult.InvalidQuery(
+                "Unsupported aggregation type."
+            );
+        }
+
         if (string.IsNullOrWhiteSpace(groupByColumn))
         {
             return new DatasetQueryExecutionResult.InvalidQuery(
