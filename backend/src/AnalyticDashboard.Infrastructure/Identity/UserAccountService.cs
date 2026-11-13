@@ -27,6 +27,26 @@ public sealed class UserAccountService : IUserAccountService
         string displayName,
         string password)
     {
+        var userType = _dbContext.Model.FindEntityType(typeof(ApplicationUser))!;
+        (string Property, string? Value)[] accountNames =
+        [
+            (nameof(ApplicationUser.Email), email),
+            (nameof(ApplicationUser.UserName), email),
+            (nameof(ApplicationUser.NormalizedEmail), _userManager.NormalizeEmail(email)),
+            (nameof(ApplicationUser.NormalizedUserName), _userManager.NormalizeName(email))
+        ];
+
+        foreach (var (property, value) in accountNames)
+        {
+            var maxLength = userType.FindProperty(property)!.GetMaxLength();
+            if (maxLength is { } limit && value?.EnumerateRunes().Count() > limit)
+            {
+                return new UserAccountCreationResult.InvalidEmail(
+                    $"Email cannot be longer than {limit} characters."
+                );
+            }
+        }
+
         var user = new ApplicationUser
         {
             Email = email,

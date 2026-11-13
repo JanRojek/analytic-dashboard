@@ -19,7 +19,7 @@ public sealed class ImportJobConfiguration
 
         builder.Property(job => job.SourceFileName)
             .IsRequired()
-            .HasMaxLength(255);
+            .HasMaxLength(DatasetVersion.MaxOriginalFileNameLength);
 
         builder.Property(job => job.SourceStorageKey)
             .IsRequired()

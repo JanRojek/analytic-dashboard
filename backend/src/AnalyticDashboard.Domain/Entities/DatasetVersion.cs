@@ -2,6 +2,8 @@
 
 public sealed class DatasetVersion
 {
+    public const int MaxOriginalFileNameLength = 255;
+
     public Guid Id { get; private set; }
 
     public Guid DatasetId { get; private set; }

@@ -21,7 +21,7 @@ public sealed class DatasetConfiguration
 
         builder.Property(dataset => dataset.Name)
             .IsRequired()
-            .HasMaxLength(200);
+            .HasMaxLength(Dataset.MaxNameLength);
 
         builder.Property(dataset => dataset.CreatedAtUtc)
             .IsRequired();

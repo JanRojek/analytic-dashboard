@@ -2,6 +2,8 @@ namespace AnalyticDashboard.Domain.Entities;
 
 public sealed class Dataset
 {
+    public const int MaxNameLength = 200;
+
     public Guid Id { get; private set; }
 
     public Guid ProjectId { get; private set; }

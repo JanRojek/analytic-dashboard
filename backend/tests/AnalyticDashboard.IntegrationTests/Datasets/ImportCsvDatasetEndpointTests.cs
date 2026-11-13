@@ -78,10 +78,20 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
         );
     }
 
-    [Fact]
-    public async Task ImportCsvDataset_ShouldCreatePendingImportForOwnedProject()
+    [Theory]
+    [InlineData("sales", 1, 0)]
+    [InlineData("a", 200, 0)]
+    [InlineData("🚀", 200, 0)]
+    [InlineData("a", 200, 51)]
+    [InlineData("🚀", 200, 51)]
+    public async Task ImportCsvDataset_ShouldCreatePendingImportForOwnedProject(
+        string text,
+        int repeatCount,
+        int padding)
     {
         var userId = Guid.NewGuid();
+        var datasetName = string.Concat(Enumerable.Repeat(text, repeatCount));
+        var fileName = datasetName + new string(' ', padding) + ".csv";
 
         var project = new Project(
             userId,
@@ -96,7 +106,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
         {
             using var request = CreateImportRequest(
                 project.Id,
-                "sales.csv",
+                fileName,
                 "Name,Amount\nA,10\nB,20\n",
                 userId
             );
@@ -151,7 +161,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             );
 
             Assert.Equal(
-                "sales",
+                datasetName,
                 dataset.Name
             );
 
@@ -170,7 +180,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             );
 
             Assert.Equal(
-                "sales.csv",
+                fileName,
                 version.OriginalFileName
             );
 
@@ -197,7 +207,7 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             );
 
             Assert.Equal(
-                "sales.csv",
+                fileName,
                 importJob.SourceFileName
             );
 

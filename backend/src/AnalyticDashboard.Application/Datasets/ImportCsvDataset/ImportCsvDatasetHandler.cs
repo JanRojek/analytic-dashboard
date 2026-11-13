@@ -63,12 +63,26 @@ public sealed class ImportCsvDatasetHandler
 
         var datasetName = Path.GetFileNameWithoutExtension(
             originalFileName
-        );
+        ).Trim();
 
         if (string.IsNullOrWhiteSpace(datasetName))
         {
             return new ImportCsvDatasetResult.InvalidFile(
                 "Dataset name cannot be empty."
+            );
+        }
+
+        if (datasetName.EnumerateRunes().Count() > Dataset.MaxNameLength)
+        {
+            return new ImportCsvDatasetResult.InvalidFile(
+                $"Dataset name cannot be longer than {Dataset.MaxNameLength} characters."
+            );
+        }
+
+        if (originalFileName.EnumerateRunes().Count() > DatasetVersion.MaxOriginalFileNameLength)
+        {
+            return new ImportCsvDatasetResult.InvalidFile(
+                $"File name cannot be longer than {DatasetVersion.MaxOriginalFileNameLength} characters."
             );
         }
 

@@ -22,7 +22,7 @@ public sealed class DatasetVersionConfiguration
 
         builder.Property(version => version.OriginalFileName)
             .IsRequired()
-            .HasMaxLength(255);
+            .HasMaxLength(DatasetVersion.MaxOriginalFileNameLength);
 
         builder.Property(version => version.StorageKey)
             .HasMaxLength(500);
