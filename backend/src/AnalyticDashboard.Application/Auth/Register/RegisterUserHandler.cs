@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using AnalyticDashboard.Application.Auth.Accounts;
 using AnalyticDashboard.Application.Auth.Email;
+using Microsoft.Extensions.Logging;
 
 namespace AnalyticDashboard.Application.Auth.Register;
 
@@ -8,13 +9,16 @@ public sealed class RegisterUserHandler
 {
     private readonly IUserAccountService _userAccountService;
     private readonly EmailConfirmationSender _emailConfirmationSender;
+    private readonly ILogger<RegisterUserHandler> _logger;
 
     public RegisterUserHandler(
         IUserAccountService userAccountService,
-        EmailConfirmationSender emailSender)
+        EmailConfirmationSender emailSender,
+        ILogger<RegisterUserHandler> logger)
     {
         _userAccountService = userAccountService;
         _emailConfirmationSender = emailSender;
+        _logger = logger;
     }
 
     public async Task<RegisterUserResult> HandleAsync(
@@ -83,7 +87,14 @@ public sealed class RegisterUserHandler
                 cancellationToken
             );
         }
-        catch (EmailDeliveryException) {}
+        catch (EmailDeliveryException exception)
+        {
+            _logger.LogWarning(
+                new EventId(1701, "RegistrationEmailDeliveryFailed"),
+                "Email delivery failed during registration. FailureType: {FailureType}.",
+                exception.InnerException?.GetType().Name ?? exception.GetType().Name
+            );
+        }
 
         return new RegisterUserResult.Success(
             success.Id,
