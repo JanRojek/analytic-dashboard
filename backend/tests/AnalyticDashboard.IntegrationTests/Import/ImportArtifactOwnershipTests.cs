@@ -18,7 +18,8 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
 {
     private readonly ApiFixture _fixture;
 
-    private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
+    private static CancellationToken CancellationToken =>
+        TestContext.Current.CancellationToken;
 
     public ImportArtifactOwnershipTests(ApiFixture fixture)
     {
@@ -28,7 +29,8 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Import_ShouldPreserveExistingArtifact_WhenSourceOrDestinationFails(bool missingSource)
+    public async Task Import_ShouldPreserveExistingArtifact_WhenSourceOrDestinationFails(
+        bool missingSource)
     {
         await using var scope = _fixture.Services.CreateAsyncScope();
         var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
@@ -36,22 +38,35 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         var sourceKey = $"{directory}/source.csv";
         var occupiedPath = $"{directory}/published.parquet";
         var guarded = new ObservedStorage(storage);
-        var importer = new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance);
+        var importer = new DuckDbCsvImporter(
+            guarded,
+            NullLogger<DuckDbCsvImporter>.Instance
+        );
         var original = "published artifact must remain unchanged"u8.ToArray();
+
         try
         {
             await using var published = new MemoryStream(original);
             await storage.SaveAsync(occupiedPath, published, CancellationToken);
+
             if (!missingSource)
             {
                 await using var source = new MemoryStream("Country,Amount\nPL,10\n"u8.ToArray());
                 await storage.SaveAsync(sourceKey, source, CancellationToken);
             }
 
-            await Assert.ThrowsAnyAsync<IOException>(() => importer.ImportAsync(sourceKey, occupiedPath, CancellationToken));
+            await Assert.ThrowsAnyAsync<IOException>(() => importer.ImportAsync(
+                sourceKey,
+                occupiedPath,
+                CancellationToken
+            ));
 
             Assert.Equal(0, guarded.DeleteCalls);
-            await using var saved = await storage.OpenReadAsync(occupiedPath, CancellationToken);
+
+            await using var saved = await storage.OpenReadAsync(
+                occupiedPath,
+                CancellationToken
+            );
             using var contents = new MemoryStream();
             await saved.CopyToAsync(contents, CancellationToken);
             Assert.Equal(original, contents.ToArray());
@@ -65,16 +80,26 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
     [Fact]
     public async Task TwoAttemptsInSameJobNamespace_ShouldWriteDifferentParquetFiles()
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
+            CancellationToken
+        );
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
+
         await using var scope = _fixture.Services.CreateAsyncScope();
         var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
         var directory = $"tests/import-ownership/{Guid.NewGuid():N}";
         var sourceKey = $"{directory}/source.csv";
         var resultDirectory = $"{directory}/same-job/attempts";
         var guarded = new ObservedStorage(storage, resultDirectory + "/");
-        var firstImporter = new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance);
-        var secondImporter = new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance);
+        var firstImporter = new DuckDbCsvImporter(
+            guarded,
+            NullLogger<DuckDbCsvImporter>.Instance
+        );
+        var secondImporter = new DuckDbCsvImporter(
+            guarded,
+            NullLogger<DuckDbCsvImporter>.Instance
+        );
+
         try
         {
             await using var source = new MemoryStream("Country,Amount\nPL,10\n"u8.ToArray());
@@ -82,14 +107,20 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
 
             var first = firstImporter.ImportAsync(sourceKey, resultDirectory, timeout.Token);
             var second = secondImporter.ImportAsync(sourceKey, resultDirectory, timeout.Token);
-            var results = await Task.WhenAll(first, second).WaitAsync(timeout.Token);
+            var results = await Task.WhenAll(first, second).WaitAsync(
+                timeout.Token
+            );
 
             Assert.NotEqual(results[0].StorageKey, results[1].StorageKey);
             Assert.Equal(2, guarded.SavedKeys.Distinct().Count());
+
             foreach (var result in results)
             {
                 Assert.StartsWith(resultDirectory + "/", result.StorageKey);
-                await using var saved = await storage.OpenReadAsync(result.StorageKey, timeout.Token);
+                await using var saved = await storage.OpenReadAsync(
+                    result.StorageKey,
+                    timeout.Token
+                );
                 var magic = new byte[4];
                 await saved.ReadExactlyAsync(magic, timeout.Token);
                 Assert.Equal("PAR1", Encoding.ASCII.GetString(magic));
@@ -114,10 +145,13 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         var next = new DatasetVersion(dataset.Id, 2, "next.csv");
         var sourceKey = $"datasets/{dataset.Id:N}/imports/{next.Id:N}/source.csv";
         var job = new ImportJob(next.Id, "next.csv", sourceKey);
+
         await using var seedScope = _fixture.Services.CreateAsyncScope();
         var seedContext = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storage = seedScope.ServiceProvider.GetRequiredService<IFileStorage>();
-        var originalImporter = seedScope.ServiceProvider.GetRequiredService<DuckDbCsvImporter>();
+        var originalImporter = seedScope.ServiceProvider
+            .GetRequiredService<DuckDbCsvImporter>();
+
         try
         {
             await using var source = new MemoryStream("Country,Amount\nPL,10\n"u8.ToArray());
@@ -127,23 +161,29 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
                 $"datasets/{dataset.Id:N}/versions/{previous.Id:N}/attempts",
                 CancellationToken
             );
+
             seedContext.AddRange(project, dataset, previous, next, job);
             await seedContext.SaveChangesAsync(CancellationToken);
+
             previous.MarkReady(published.StorageKey, published.RowCount, published.ColumnCount);
             dataset.PublishVersion(previous.Id);
             await seedContext.SaveChangesAsync(CancellationToken);
+
             var guarded = new ObservedStorage(storage);
 
             await using (var processingScope = _fixture.Services.CreateAsyncScope())
             {
-                var repository = processingScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
+                var repository = processingScope.ServiceProvider
+                    .GetRequiredService<IImportJobRepository>();
                 var processor = new ImportJobProcessor(
                     new FailingFinalizationRepository(repository, commitSucceeded),
                     new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance),
                     NullLogger<ImportJobProcessor>.Instance
                 );
 
-                await Assert.ThrowsAsync<IOException>(() => processor.ProcessNextAsync(CancellationToken));
+                await Assert.ThrowsAsync<IOException>(() =>
+                    processor.ProcessNextAsync(CancellationToken)
+                );
             }
 
             Assert.Equal(0, guarded.DeleteCalls);
@@ -151,32 +191,52 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
             Assert.NotEqual(published.StorageKey, attemptKey);
             Assert.True(await storage.ExistsAsync(published.StorageKey, CancellationToken));
             Assert.True(await storage.ExistsAsync(attemptKey, CancellationToken));
+
             await using var verificationScope = _fixture.Services.CreateAsyncScope();
-            var verification = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var savedNext = await verification.DatasetVersions.AsNoTracking()
+            var verification = verificationScope.ServiceProvider
+                .GetRequiredService<AppDbContext>();
+            var savedNext = await verification.DatasetVersions
+                .AsNoTracking()
                 .SingleAsync(item => item.Id == next.Id, CancellationToken);
-            var savedDataset = await verification.Datasets.AsNoTracking()
+            var savedDataset = await verification.Datasets
+                .AsNoTracking()
                 .SingleAsync(item => item.Id == dataset.Id, CancellationToken);
-            Assert.Equal(commitSucceeded ? next.Id : previous.Id, savedDataset.CurrentVersionId);
-            Assert.Equal(commitSucceeded ? DatasetVersionStatus.Ready : DatasetVersionStatus.Pending, savedNext.Status);
+            Assert.Equal(
+                commitSucceeded ? next.Id : previous.Id,
+                savedDataset.CurrentVersionId
+            );
+            Assert.Equal(
+                commitSucceeded ? DatasetVersionStatus.Ready : DatasetVersionStatus.Pending,
+                savedNext.Status
+            );
             Assert.Equal(commitSucceeded ? attemptKey : null, savedNext.StorageKey);
+
             if (!commitSucceeded)
             {
-                var recovery = verificationScope.ServiceProvider.GetRequiredService<ImportJobRecoveryService>();
+                var recovery = verificationScope.ServiceProvider
+                    .GetRequiredService<ImportJobRecoveryService>();
                 await recovery.RecoverInterruptedAsync(CancellationToken);
                 Assert.True(await storage.ExistsAsync(published.StorageKey, CancellationToken));
                 Assert.True(await storage.ExistsAsync(attemptKey, CancellationToken));
             }
 
-            var deletion = verificationScope.ServiceProvider.GetRequiredService<IDatasetDeletionStore>();
-            Assert.Equal(DatasetDeletionOutcome.Deleted, await deletion.DeleteAsync(
-                dataset.Id,
-                project.Id,
-                project.OwnerId,
+            var deletion = verificationScope.ServiceProvider
+                .GetRequiredService<IDatasetDeletionStore>();
+            Assert.Equal(
+                DatasetDeletionOutcome.Deleted,
+                await deletion.DeleteAsync(
+                    dataset.Id,
+                    project.Id,
+                    project.OwnerId,
+                    CancellationToken
+                )
+            );
+            Assert.True(await verification.StorageCleanupJobs.AnyAsync(
+                item => item.DatasetId == dataset.Id,
                 CancellationToken
             ));
-            Assert.True(await verification.StorageCleanupJobs.AnyAsync(item => item.DatasetId == dataset.Id, CancellationToken));
-            var cleanup = verificationScope.ServiceProvider.GetRequiredService<StorageCleanupProcessor>();
+            var cleanup = verificationScope.ServiceProvider
+                .GetRequiredService<StorageCleanupProcessor>();
             Assert.True(await cleanup.ProcessNextAsync(CancellationToken));
             Assert.False(await storage.ExistsAsync(published.StorageKey, CancellationToken));
             Assert.False(await storage.ExistsAsync(attemptKey, CancellationToken));
@@ -184,7 +244,10 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         }
         finally
         {
-            await storage.DeleteDirectoryAsync($"datasets/{dataset.Id:N}", CancellationToken.None);
+            await storage.DeleteDirectoryAsync(
+                $"datasets/{dataset.Id:N}",
+                CancellationToken.None
+            );
         }
     }
 
@@ -197,29 +260,41 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         var version = new DatasetVersion(publishedDataset.Id, 1, "source.csv");
         var publishedKey = $"datasets/{publishedDataset.Id:N}/versions/{version.Id:N}/attempts/{Guid.NewGuid():N}.parquet";
         var removedKey = $"datasets/{removedDataset.Id:N}/versions/{Guid.NewGuid():N}/attempts/{Guid.NewGuid():N}.parquet";
+
         await using var scope = _fixture.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var storage = scope.ServiceProvider.GetRequiredService<IFileStorage>();
+
         try
         {
             await using var published = new MemoryStream("published data"u8.ToArray());
             await using var removed = new MemoryStream("unpublished data"u8.ToArray());
             await storage.SaveAsync(publishedKey, published, CancellationToken);
             await storage.SaveAsync(removedKey, removed, CancellationToken);
+
             context.AddRange(project, publishedDataset, removedDataset, version);
             await context.SaveChangesAsync(CancellationToken);
+
             version.MarkReady(publishedKey, 1, 1);
             publishedDataset.PublishVersion(version.Id);
             await context.SaveChangesAsync(CancellationToken);
+
             var deletion = scope.ServiceProvider.GetRequiredService<IDatasetDeletionStore>();
-            Assert.Equal(DatasetDeletionOutcome.Deleted, await deletion.DeleteAsync(
-                removedDataset.Id,
-                project.Id,
-                project.OwnerId,
-                CancellationToken
-            ));
+            Assert.Equal(
+                DatasetDeletionOutcome.Deleted,
+                await deletion.DeleteAsync(
+                    removedDataset.Id,
+                    project.Id,
+                    project.OwnerId,
+                    CancellationToken
+                )
+            );
             var guarded = new ObservedStorage(storage);
-            var cleanup = new StorageCleanupProcessor(context, guarded, NullLogger<StorageCleanupProcessor>.Instance);
+            var cleanup = new StorageCleanupProcessor(
+                context,
+                guarded,
+                NullLogger<StorageCleanupProcessor>.Instance
+            );
 
             Assert.True(await cleanup.ProcessNextAsync(CancellationToken));
 
@@ -230,24 +305,38 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
             Assert.Equal(1, queued.AttemptCount);
             Assert.True(await storage.ExistsAsync(publishedKey, CancellationToken));
             Assert.True(await storage.ExistsAsync(removedKey, CancellationToken));
-            Assert.Equal(DatasetVersionStatus.Ready, (await context.DatasetVersions.AsNoTracking()
-                .SingleAsync(item => item.Id == version.Id, CancellationToken)).Status);
-            context.Entry(queued).Property(item => item.NextAttemptAtUtc).CurrentValue = DateTime.UtcNow.AddMinutes(-1);
+            Assert.Equal(
+                DatasetVersionStatus.Ready,
+                (await context.DatasetVersions.AsNoTracking()
+                    .SingleAsync(item => item.Id == version.Id, CancellationToken)).Status
+            );
+            context.Entry(queued)
+                .Property(item => item.NextAttemptAtUtc)
+                .CurrentValue = DateTime.UtcNow.AddMinutes(-1);
             await context.SaveChangesAsync(CancellationToken);
+
             guarded.AllowDirectoryCleanup = true;
 
             Assert.True(await cleanup.ProcessNextAsync(CancellationToken));
 
             Assert.True(await storage.ExistsAsync(publishedKey, CancellationToken));
             Assert.False(await storage.ExistsAsync(removedKey, CancellationToken));
+
             await using var saved = await storage.OpenReadAsync(publishedKey, CancellationToken);
             using var reader = new StreamReader(saved, Encoding.UTF8);
             Assert.Equal("published data", await reader.ReadToEndAsync(CancellationToken));
         }
         finally
         {
-            await storage.DeleteDirectoryAsync($"datasets/{publishedDataset.Id:N}", CancellationToken.None);
-            await storage.DeleteDirectoryAsync($"datasets/{removedDataset.Id:N}", CancellationToken.None);
+            await storage.DeleteDirectoryAsync(
+                $"datasets/{publishedDataset.Id:N}",
+                CancellationToken.None
+            );
+
+            await storage.DeleteDirectoryAsync(
+                $"datasets/{removedDataset.Id:N}",
+                CancellationToken.None
+            );
         }
     }
 
@@ -255,7 +344,9 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
     {
         private readonly IFileStorage _inner;
         private readonly string? _barrierPrefix;
-        private readonly TaskCompletionSource _bothSaves = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _bothSaves = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
         private int _arrived;
         private int _deleteCalls;
 
@@ -266,13 +357,19 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         }
 
         public ConcurrentQueue<string> SavedKeys { get; } = new();
+
         public int DeleteCalls => _deleteCalls;
+
         public bool AllowDirectoryCleanup { get; set; }
 
-        public async Task SaveAsync(string storageKey, Stream content, CancellationToken cancellationToken)
+        public async Task SaveAsync(
+            string storageKey,
+            Stream content,
+            CancellationToken cancellationToken)
         {
             SavedKeys.Enqueue(storageKey);
-            if (_barrierPrefix is not null && storageKey.StartsWith(_barrierPrefix, StringComparison.Ordinal))
+            if (_barrierPrefix is not null
+                && storageKey.StartsWith(_barrierPrefix, StringComparison.Ordinal))
             {
                 if (Interlocked.Increment(ref _arrived) == 2)
                 {
@@ -280,6 +377,7 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
                 }
                 await _bothSaves.Task.WaitAsync(cancellationToken);
             }
+
             await _inner.SaveAsync(storageKey, content, cancellationToken);
         }
 
@@ -292,7 +390,9 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _deleteCalls);
-            throw new IOException("Cleanup unavailable; import must not attempt to delete published or unowned files.");
+            throw new IOException(
+                "Cleanup unavailable; import must not attempt to delete published or unowned files."
+            );
         }
 
         public Task DeleteDirectoryAsync(string storageKey, CancellationToken cancellationToken) =>
@@ -306,7 +406,9 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         private readonly IImportJobRepository _inner;
         private readonly bool _commitSucceeded;
 
-        public FailingFinalizationRepository(IImportJobRepository inner, bool commitSucceeded)
+        public FailingFinalizationRepository(
+            IImportJobRepository inner,
+            bool commitSucceeded)
         {
             _inner = inner;
             _commitSucceeded = commitSucceeded;
@@ -327,6 +429,7 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
             {
                 await _inner.SaveChangesAsync(cancellationToken);
             }
+
             throw new IOException("Simulated loss of database acknowledgement.");
         }
     }

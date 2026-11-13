@@ -51,8 +51,6 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
             sourceStorageKey
         );
 
-        importJob.MarkRunning();
-
         await using (var scope = _fixture.Services.CreateAsyncScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -61,6 +59,10 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
             dbContext.Datasets.Add(dataset);
             dbContext.DatasetVersions.Add(version);
             dbContext.ImportJobs.Add(importJob);
+
+            dbContext.Entry(importJob).Property(job => job.Status).CurrentValue = ImportJobStatus.Running;
+            dbContext.Entry(importJob).Property(job => job.StartedAtUtc).CurrentValue = DateTime.UtcNow;
+            dbContext.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 1;
 
             await dbContext.SaveChangesAsync(
                 CancellationToken

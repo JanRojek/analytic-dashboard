@@ -228,9 +228,6 @@ public sealed class GetImportStatusEndpointTests : IClassFixture<ApiFixture>
             sourceStorageKey
         );
 
-        importJob.MarkRunning();
-        importJob.MarkFailed(@"Internal error at C:\private\data.csv");
-
         version.MarkFailed();
 
         await using (var scope = _fixture.Services.CreateAsyncScope())
@@ -242,6 +239,11 @@ public sealed class GetImportStatusEndpointTests : IClassFixture<ApiFixture>
             dbContext.Datasets.Add(dataset);
             dbContext.DatasetVersions.Add(version);
             dbContext.ImportJobs.Add(importJob);
+
+            dbContext.Entry(importJob).Property(job => job.Status).CurrentValue = ImportJobStatus.Running;
+            dbContext.Entry(importJob).Property(job => job.StartedAtUtc).CurrentValue = DateTime.UtcNow;
+            dbContext.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 1;
+            importJob.MarkFailed(@"Internal error at C:\private\data.csv");
 
             await dbContext.SaveChangesAsync(
                 CancellationToken

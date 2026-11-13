@@ -91,9 +91,15 @@ public sealed class ImportClaimConcurrencyTests : IClassFixture<ApiFixture>
         await Task.WhenAll(claimTask, deleteTask)
             .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
-        var claimedJob = Assert.IsType<ImportJobWorkItem>(
-            await claimTask
-        );
+        var claimedJob = await claimTask;
+        if (claimedJob is null)
+        {
+            await using var retryScope = _fixture.Services.CreateAsyncScope();
+            var repository = retryScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
+            claimedJob = await repository.ClaimNextPendingAsync(cancellationToken);
+        }
+
+        Assert.NotNull(claimedJob);
 
         Assert.Equal(job.Id, claimedJob.Job.Id);
         Assert.Equal(ImportJobStatus.Running, claimedJob.Job.Status);

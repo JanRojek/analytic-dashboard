@@ -1,4 +1,5 @@
-using AnalyticDashboard.Application.Common.Persistence;
+using System.Data;
+
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
@@ -9,84 +10,91 @@ namespace AnalyticDashboard.Infrastructure.Repositories;
 public sealed class ImportJobRepository : IImportJobRepository
 {
     private readonly AppDbContext _dbContext;
-    private readonly IProjectWriteTransactionFactory _transactionFactory;
 
     public ImportJobRepository(
-        AppDbContext dbContext,
-        IProjectWriteTransactionFactory transactionFactory)
+        AppDbContext dbContext)
     {
         _dbContext = dbContext;
-        _transactionFactory = transactionFactory;
     }
-
 
     public async Task<ImportJobWorkItem?> ClaimNextPendingAsync(
         CancellationToken cancellationToken)
     {
-        var candidate = await (
-            from pendingJob in _dbContext.ImportJobs.AsNoTracking()
-            join pendingVersion in _dbContext.DatasetVersions.AsNoTracking()
-                on pendingJob.DatasetVersionId equals pendingVersion.Id
-            join pendingDataset in _dbContext.Datasets.AsNoTracking()
-                on pendingVersion.DatasetId equals pendingDataset.Id
-            where pendingJob.Status == ImportJobStatus.Pending
-            orderby pendingJob.CreatedAtUtc, pendingJob.Id
-            select new
-            {
-                JobId = pendingJob.Id,
-                pendingDataset.ProjectId
-            }
-        ).FirstOrDefaultAsync(cancellationToken);
-
-        if (candidate is null)
-        {
-            return null;
-        }
-
-        await using var transaction = await _transactionFactory.BeginAsync(
-            candidate.ProjectId,
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted,
             cancellationToken
         );
 
-        if (transaction is null)
-        {
-            return null;
-        }
+        // Keep the AUD-001 lock order: project before job; skip busy projects instead of waiting.
+        var claimedJobs = await _dbContext.ImportJobs
+            .FromSqlInterpolated($"""
+                WITH candidate_project AS MATERIALIZED (
+                    SELECT project."Id"
+                    FROM import_jobs AS pending_job
+                    JOIN dataset_versions AS version ON version."Id" = pending_job."DatasetVersionId"
+                    JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
+                    JOIN projects AS project ON project."Id" = dataset."ProjectId"
+                    WHERE pending_job."Status" = {ImportJobStatus.Pending.ToString()}
+                    ORDER BY pending_job."CreatedAtUtc", pending_job."Id"
+                    LIMIT 1
+                    FOR NO KEY UPDATE OF project SKIP LOCKED
+                ),
+                candidate_job AS MATERIALIZED (
+                    SELECT pending_job."Id"
+                    FROM import_jobs AS pending_job
+                    JOIN dataset_versions AS version ON version."Id" = pending_job."DatasetVersionId"
+                    JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
+                    JOIN candidate_project AS project ON project."Id" = dataset."ProjectId"
+                    WHERE pending_job."Status" = {ImportJobStatus.Pending.ToString()}
+                    ORDER BY pending_job."CreatedAtUtc", pending_job."Id"
+                    LIMIT 1
+                    FOR UPDATE OF pending_job SKIP LOCKED
+                )
+                UPDATE import_jobs AS job
+                SET "Status" = {ImportJobStatus.Running.ToString()},
+                    "StartedAtUtc" = clock_timestamp(),
+                    "AttemptNumber" = job."AttemptNumber" + 1
+                FROM candidate_job AS candidate
+                WHERE job."Id" = candidate."Id"
+                  AND job."Status" = {ImportJobStatus.Pending.ToString()}
+                RETURNING job.*
+                """)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
 
-        var job = await _dbContext.ImportJobs
-            .SingleOrDefaultAsync(
-                job =>
-                    job.Id == candidate.JobId
-                    && job.Status == ImportJobStatus.Pending,
-                cancellationToken
-            );
-
+        var job = claimedJobs.SingleOrDefault();
         if (job is null)
         {
             return null;
         }
 
-        var version = await _dbContext.DatasetVersions
-            .SingleAsync(
-                version => version.Id == job.DatasetVersionId,
-                cancellationToken
-            );
+        var trackedJob = _dbContext.ImportJobs.Local.SingleOrDefault(item => item.Id == job.Id);
+        if (trackedJob is null)
+        {
+            _dbContext.ImportJobs.Attach(job);
+        }
+        else
+        {
+            await _dbContext.Entry(trackedJob).ReloadAsync(cancellationToken);
+            job = trackedJob;
+        }
 
-        var dataset = await _dbContext.Datasets
-            .SingleAsync(
-                dataset => dataset.Id == version.DatasetId,
-                cancellationToken
-            );
+        var version = await _dbContext.DatasetVersions.SingleAsync(
+            version => version.Id == job.DatasetVersionId,
+            cancellationToken
+        );
+        var dataset = await _dbContext.Datasets.SingleAsync(
+            dataset => dataset.Id == version.DatasetId,
+            cancellationToken
+        );
 
-        job.MarkRunning();
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         return new ImportJobWorkItem(
             job,
             version,
-            dataset
+            dataset,
+            job.AttemptNumber
         );
     }
 

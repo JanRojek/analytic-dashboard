@@ -185,17 +185,19 @@ public sealed class DeleteDatasetEndpointTests : IClassFixture<ApiFixture>
             $"datasets/{dataset.Id:N}/imports/{version.Id:N}/source.csv"
         );
 
-        if (running)
-        {
-            job.MarkRunning();
-        }
-
         await using (var scope = _fixture.Services.CreateAsyncScope())
         {
             var context = scope.ServiceProvider
                 .GetRequiredService<AppDbContext>();
 
             context.AddRange(project, dataset, version, job);
+
+            if (running)
+            {
+                context.Entry(job).Property(item => item.Status).CurrentValue = ImportJobStatus.Running;
+                context.Entry(job).Property(item => item.StartedAtUtc).CurrentValue = DateTime.UtcNow;
+                context.Entry(job).Property(item => item.AttemptNumber).CurrentValue = 1;
+            }
 
             await context.SaveChangesAsync(cancellationToken);
         }

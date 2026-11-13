@@ -365,17 +365,19 @@ public sealed class DeleteProjectEndpointTests : IClassFixture<ApiFixture>
             $"datasets/{dataset.Id:N}/imports/{version.Id:N}/source.csv"
         );
 
-        if (running)
-        {
-            importJob.MarkRunning();
-        }
-
         await using (var scope = _fixture.Services.CreateAsyncScope())
         {
             var context = scope.ServiceProvider
                 .GetRequiredService<AppDbContext>();
 
             context.AddRange(project, dataset, version, importJob);
+
+            if (running)
+            {
+                context.Entry(importJob).Property(job => job.Status).CurrentValue = ImportJobStatus.Running;
+                context.Entry(importJob).Property(job => job.StartedAtUtc).CurrentValue = DateTime.UtcNow;
+                context.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 1;
+            }
 
             await context.SaveChangesAsync(cancellationToken);
         }

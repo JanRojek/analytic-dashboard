@@ -33,6 +33,9 @@ public sealed class ImportJobConfiguration
         builder.Property(job => job.ErrorMessage)
             .HasMaxLength(2000);
 
+        builder.Property(job => job.AttemptNumber)
+            .HasDefaultValue(0L);
+
         builder.Property(job => job.CreatedAtUtc)
             .IsRequired();
 

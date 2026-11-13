@@ -12,6 +12,8 @@ public sealed class ImportJob
 
     public ImportJobStatus Status { get; private set; }
 
+    public long AttemptNumber { get; private set; }
+
     public string? ErrorMessage { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
@@ -52,19 +54,6 @@ public sealed class ImportJob
         SourceStorageKey = sourceStorageKey;
         Status = ImportJobStatus.Pending;
         CreatedAtUtc = DateTime.UtcNow;
-    }
-
-    public void MarkRunning()
-    {
-        if (Status != ImportJobStatus.Pending)
-        {
-            throw new InvalidOperationException(
-                "Only a pending import job can start."
-            );
-        }
-
-        Status = ImportJobStatus.Running;
-        StartedAtUtc = DateTime.UtcNow;
     }
 
     public void MarkCompleted()
