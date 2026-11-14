@@ -58,9 +58,10 @@ public sealed class ImportJobProcessor
             heartbeatCancellation.Token
         );
 
+        bool processed;
         try
         {
-            return await ProcessClaimedAsync(
+            processed = await ProcessClaimedAsync(
                 workItem,
                 ownershipLost.Token,
                 conversionCancellation.Token,
@@ -72,6 +73,14 @@ public sealed class ImportJobProcessor
             await heartbeatCancellation.CancelAsync();
             await heartbeat;
         }
+
+        // A heartbeat left running could undo the shorter retry cooldown.
+        if (!processed && !await _importJobRepository.TryAbandonAsync(workItem, cancellationToken))
+        {
+            LogOwnershipLost(workItem);
+        }
+
+        return true;
     }
 
     private async Task<bool> ProcessClaimedAsync(
@@ -132,11 +141,11 @@ public sealed class ImportJobProcessor
         {
             _logger.LogError(
                 exception,
-                "Import job {ImportJobId} attempt {AttemptNumber} stopped unexpectedly; lease recovery will apply the attempt limit.",
+                "Import job {ImportJobId} attempt {AttemptNumber} stopped unexpectedly; lease recovery will retry after a short cooldown, within the attempt limit.",
                 workItem.Job.Id,
                 workItem.AttemptNumber
             );
-            return true;
+            return false;
         }
 
         if (ownershipLost.IsCancellationRequested)

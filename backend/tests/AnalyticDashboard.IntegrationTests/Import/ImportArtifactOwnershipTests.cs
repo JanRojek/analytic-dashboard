@@ -470,6 +470,9 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         public Task<bool> TryRenewLeaseAsync(ImportJobWorkItem workItem, CancellationToken cancellationToken) =>
             _inner.TryRenewLeaseAsync(workItem, cancellationToken);
 
+        public Task<bool> TryAbandonAsync(ImportJobWorkItem workItem, CancellationToken cancellationToken) =>
+            _inner.TryAbandonAsync(workItem, cancellationToken);
+
         public Task<bool> RecoverNextExpiredAsync(CancellationToken cancellationToken) =>
             _inner.RecoverNextExpiredAsync(cancellationToken);
     }

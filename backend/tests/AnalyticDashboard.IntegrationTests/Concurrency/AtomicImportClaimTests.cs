@@ -141,7 +141,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task Claim_ShouldSkipLockedJob_AndAllowMultipleRunningJobsInSameProject()
+    public async Task Claim_ShouldSkipLockedJob_AndDeferAnotherClaimForTheSameOwner()
     {
         using var timeout = CreateDeadline();
         var cancellationToken = timeout.Token;
@@ -175,13 +175,28 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                 await transaction.RollbackAsync(cancellationToken);
             }
 
+            Assert.Null(await repository.ClaimNextPendingAsync(cancellationToken));
+            var running = Assert.Single(claimingContext.ImportJobs.Local);
+            var version = Assert.Single(claimingContext.DatasetVersions.Local);
+            var dataset = Assert.Single(claimingContext.Datasets.Local);
+            Assert.True(await repository.TryFailAsync(
+                new ImportJobWorkItem(
+                    running,
+                    version,
+                    dataset,
+                    running.AttemptNumber
+                ),
+                "Release the owner slot after the first claim.",
+                cancellationToken
+            ));
+
             var first = await repository.ClaimNextPendingAsync(cancellationToken);
 
             Assert.NotNull(first);
             Assert.Equal(seed.Jobs[0].Id, first.Job.Id);
             Assert.Equal(1L, first.AttemptNumber);
             Assert.Null(claimingContext.Database.CurrentTransaction);
-            Assert.Equal(2, await claimingContext.ImportJobs.CountAsync(
+            Assert.Equal(1, await claimingContext.ImportJobs.CountAsync(
                 item => item.Status == ImportJobStatus.Running,
                 cancellationToken
             ));

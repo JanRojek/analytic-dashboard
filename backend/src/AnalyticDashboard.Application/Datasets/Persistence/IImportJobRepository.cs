@@ -40,6 +40,12 @@ public interface IImportJobRepository
         CancellationToken cancellationToken
     );
 
+    // Conversion and heartbeat must have stopped before abandoning a lease.
+    Task<bool> TryAbandonAsync(
+        ImportJobWorkItem workItem,
+        CancellationToken cancellationToken
+    );
+
     Task<bool> RecoverNextExpiredAsync(
         CancellationToken cancellationToken
     );

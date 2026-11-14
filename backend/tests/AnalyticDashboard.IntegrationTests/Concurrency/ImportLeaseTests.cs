@@ -691,6 +691,107 @@ public sealed class ImportLeaseTests : IClassFixture<ApiFixture>
         }
     }
 
+    [Fact]
+    public async Task UnexpectedFailure_ShouldStopHeartbeat_BeforeStartingTheShortRecoveryCooldown()
+    {
+        using var deadline = CreateDeadline();
+        var cancellationToken = deadline.Token;
+        var seed = await SeedAsync(cancellationToken);
+        try
+        {
+            var clock = new PulseTimeProvider();
+            var gate = new AbandonGate();
+            var storage = new ReadFailureStorage(
+                Storage,
+                new InvalidOperationException("Unexpected importer failure.")
+            );
+            await using var provider = CreateProcessingProvider(storage, clock, gate);
+            await using var scope = provider.CreateAsyncScope();
+            await using var observer = CreateContext();
+            var before = await ServerNowAsync(observer, cancellationToken);
+            var processing = scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
+                .ProcessNextAsync(cancellationToken);
+            try
+            {
+                await gate.Reached.Task.WaitAsync(cancellationToken);
+
+                Assert.Equal(0, clock.ActiveTimers);
+                clock.Pulse();
+            }
+            finally
+            {
+                gate.Release.TrySetResult();
+                Assert.True(await processing.WaitAsync(cancellationToken));
+            }
+
+            var saved = await ReadJobAsync(seed, cancellationToken);
+            var after = await ServerNowAsync(observer, cancellationToken);
+            Assert.Equal(ImportJobStatus.Running, saved.Status);
+            Assert.Equal(1L, saved.AttemptNumber);
+            Assert.NotNull(saved.LeaseExpiresAtUtc);
+            Assert.InRange(saved.LeaseExpiresAtUtc.Value, before.AddSeconds(20), after.AddSeconds(20));
+            Assert.Null(saved.CompletedAtUtc);
+            Assert.Equal(DatasetVersionStatus.Pending, (await ReadVersionAsync(seed, cancellationToken)).Status);
+            Assert.False(await CreateRepository(observer).RecoverNextExpiredAsync(cancellationToken));
+            Assert.Null(await CreateRepository(observer).ClaimNextPendingAsync(cancellationToken));
+            Assert.True(await Storage.ExistsAsync(seed.Job.SourceStorageKey, cancellationToken));
+
+            await ExpireAsync(seed, cancellationToken);
+            Assert.True(await CreateRepository(observer).RecoverNextExpiredAsync(cancellationToken));
+            var retry = Assert.IsType<ImportJobWorkItem>(
+                await CreateRepository(observer).ClaimNextPendingAsync(cancellationToken)
+            );
+            Assert.Equal(2L, retry.AttemptNumber);
+        }
+        finally
+        {
+            await CleanupAsync(seed);
+        }
+    }
+
+    [Fact]
+    public async Task Abandon_ShouldNeverExtendAShortLease_OrChangeAnotherAttempt()
+    {
+        using var deadline = CreateDeadline();
+        var cancellationToken = deadline.Token;
+        var seed = await SeedAsync(cancellationToken);
+        try
+        {
+            await using var context = CreateContext();
+            var repository = CreateRepository(context);
+            var old = Assert.IsType<ImportJobWorkItem>(
+                await repository.ClaimNextPendingAsync(cancellationToken)
+            );
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE import_jobs SET "LeaseExpiresAtUtc" = clock_timestamp() + interval '5 seconds'
+                WHERE "Id" = {old.Job.Id}
+                """, cancellationToken);
+            var shorter = await ReadJobAsync(seed, cancellationToken);
+
+            Assert.True(await repository.TryAbandonAsync(old, cancellationToken));
+
+            AssertJobEqual(shorter, await ReadJobAsync(seed, cancellationToken));
+            await ExpireAsync(seed, cancellationToken);
+            var expired = await ReadJobAsync(seed, cancellationToken);
+            Assert.False(await repository.TryAbandonAsync(old, cancellationToken));
+            AssertJobEqual(expired, await ReadJobAsync(seed, cancellationToken));
+            Assert.True(await repository.RecoverNextExpiredAsync(cancellationToken));
+            var current = Assert.IsType<ImportJobWorkItem>(
+                await repository.ClaimNextPendingAsync(cancellationToken)
+            );
+            var currentState = await ReadJobAsync(seed, cancellationToken);
+
+            Assert.False(await repository.TryAbandonAsync(old, cancellationToken));
+
+            Assert.Equal(2L, current.AttemptNumber);
+            AssertJobEqual(currentState, await ReadJobAsync(seed, cancellationToken));
+        }
+        finally
+        {
+            await CleanupAsync(seed);
+        }
+    }
+
     private IFileStorage Storage => _fixture.Services.GetRequiredService<IFileStorage>();
 
     private string ConnectionString
@@ -851,6 +952,17 @@ public sealed class ImportLeaseTests : IClassFixture<ApiFixture>
     {
         private readonly List<PulseTimer> _timers = [];
 
+        public int ActiveTimers
+        {
+            get
+            {
+                lock (_timers)
+                {
+                    return _timers.Count(timer => timer.IsActive);
+                }
+            }
+        }
+
         public override ITimer CreateTimer(
             TimerCallback callback,
             object? state,
@@ -884,6 +996,17 @@ public sealed class ImportLeaseTests : IClassFixture<ApiFixture>
             private readonly TimerCallback _callback;
             private readonly object? _state;
             private bool _enabled;
+
+            public bool IsActive
+            {
+                get
+                {
+                    lock (_syncRoot)
+                    {
+                        return _enabled;
+                    }
+                }
+            }
 
             public PulseTimer(TimerCallback callback, object? state, TimeSpan dueTime)
             {
@@ -925,6 +1048,26 @@ public sealed class ImportLeaseTests : IClassFixture<ApiFixture>
                 Dispose();
                 return ValueTask.CompletedTask;
             }
+        }
+    }
+
+    private sealed class AbandonGate : DbCommandInterceptor
+    {
+        public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask<int> NonQueryExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            int result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("LEAST(", StringComparison.Ordinal))
+            {
+                Reached.TrySetResult();
+                await Release.Task.WaitAsync(cancellationToken);
+            }
+            return result;
         }
     }
 
