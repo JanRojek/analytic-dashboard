@@ -181,9 +181,16 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
                     NullLogger<ImportJobProcessor>.Instance
                 );
 
-                await Assert.ThrowsAsync<IOException>(() =>
-                    processor.ProcessNextAsync(CancellationToken)
-                );
+                if (commitSucceeded)
+                {
+                    Assert.True(await processor.ProcessNextAsync(CancellationToken));
+                }
+                else
+                {
+                    await Assert.ThrowsAsync<IOException>(() =>
+                        processor.ProcessNextAsync(CancellationToken)
+                    );
+                }
             }
 
             Assert.Equal(0, guarded.DeleteCalls);
@@ -423,14 +430,36 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         public Task<IReadOnlyList<ImportJob>> GetRunningAsync(CancellationToken cancellationToken) =>
             _inner.GetRunningAsync(cancellationToken);
 
-        public async Task SaveChangesAsync(CancellationToken cancellationToken)
+        public async Task<ImportJobCompletionOutcome> CompleteAsync(
+            ImportJobWorkItem workItem,
+            string storageKey,
+            int rowCount,
+            int columnCount,
+            CancellationToken cancellationToken)
         {
             if (_commitSucceeded)
             {
-                await _inner.SaveChangesAsync(cancellationToken);
+                await _inner.CompleteAsync(workItem, storageKey, rowCount, columnCount, cancellationToken);
             }
 
             throw new IOException("Simulated loss of database acknowledgement.");
         }
+
+        public Task<bool> IsCompletedAsync(
+            ImportJobWorkItem workItem,
+            string storageKey,
+            int rowCount,
+            int columnCount,
+            CancellationToken cancellationToken) =>
+            _inner.IsCompletedAsync(workItem, storageKey, rowCount, columnCount, cancellationToken);
+
+        public Task<bool> TryFailAsync(
+            ImportJobWorkItem workItem,
+            string errorMessage,
+            CancellationToken cancellationToken) =>
+            _inner.TryFailAsync(workItem, errorMessage, cancellationToken);
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken) =>
+            _inner.SaveChangesAsync(cancellationToken);
     }
 }

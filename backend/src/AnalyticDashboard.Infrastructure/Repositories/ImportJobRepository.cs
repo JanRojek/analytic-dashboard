@@ -1,5 +1,6 @@
 using System.Data;
 
+using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
@@ -10,11 +11,14 @@ namespace AnalyticDashboard.Infrastructure.Repositories;
 public sealed class ImportJobRepository : IImportJobRepository
 {
     private readonly AppDbContext _dbContext;
+    private readonly IProjectWriteTransactionFactory _transactionFactory;
 
     public ImportJobRepository(
-        AppDbContext dbContext)
+        AppDbContext dbContext,
+        IProjectWriteTransactionFactory transactionFactory)
     {
         _dbContext = dbContext;
+        _transactionFactory = transactionFactory;
     }
 
     public async Task<ImportJobWorkItem?> ClaimNextPendingAsync(
@@ -98,6 +102,167 @@ public sealed class ImportJobRepository : IImportJobRepository
         );
     }
 
+    public async Task<ImportJobCompletionOutcome> CompleteAsync(
+        ImportJobWorkItem workItem,
+        string storageKey,
+        int rowCount,
+        int columnCount,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _transactionFactory.BeginAsync(
+            workItem.Dataset.ProjectId,
+            cancellationToken
+        );
+
+        if (transaction is null)
+        {
+            return ImportJobCompletionOutcome.OwnershipLost;
+        }
+
+        var job = await GetOwnedRunningJobAsync(workItem, cancellationToken);
+        if (job is null)
+        {
+            var completed = await IsCompletedAsync(
+                workItem,
+                storageKey,
+                rowCount,
+                columnCount,
+                cancellationToken
+            );
+
+            return completed
+                ? ImportJobCompletionOutcome.AlreadyCompleted
+                : ImportJobCompletionOutcome.OwnershipLost;
+        }
+
+        var version = await _dbContext.DatasetVersions
+            .AsNoTracking()
+            .SingleAsync(version => version.Id == job.DatasetVersionId, cancellationToken);
+
+        version.MarkReady(storageKey, rowCount, columnCount);
+        job.MarkCompleted();
+
+        var versionChanges = await _dbContext.DatasetVersions
+            .Where(item => item.Id == version.Id && item.Status == DatasetVersionStatus.Pending)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(item => item.StorageKey, version.StorageKey)
+                    .SetProperty(item => item.RowCount, version.RowCount)
+                    .SetProperty(item => item.ColumnCount, version.ColumnCount)
+                    .SetProperty(item => item.Status, version.Status),
+                cancellationToken
+            );
+
+        var datasetChanges = await _dbContext.Datasets
+            .Where(dataset => dataset.Id == version.DatasetId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(dataset => dataset.CurrentVersionId, version.Id),
+                cancellationToken
+            );
+
+        var jobChanges = await _dbContext.ImportJobs
+            .Where(item =>
+                item.Id == job.Id
+                && item.AttemptNumber == workItem.AttemptNumber
+                && item.Status == ImportJobStatus.Running)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(item => item.Status, job.Status)
+                    .SetProperty(item => item.CompletedAtUtc, job.CompletedAtUtc),
+                cancellationToken
+            );
+
+        if (versionChanges != 1 || datasetChanges != 1 || jobChanges != 1)
+        {
+            throw new InvalidOperationException("Import completion did not update all required records.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return ImportJobCompletionOutcome.Completed;
+    }
+
+    public Task<bool> IsCompletedAsync(
+        ImportJobWorkItem workItem,
+        string storageKey,
+        int rowCount,
+        int columnCount,
+        CancellationToken cancellationToken)
+    {
+        // A later import may already be current; recognize this publication by its immutable version and artifact.
+        return (
+            from job in _dbContext.ImportJobs.AsNoTracking()
+            join version in _dbContext.DatasetVersions.AsNoTracking()
+                on job.DatasetVersionId equals version.Id
+            where job.Id == workItem.Job.Id
+                && job.AttemptNumber == workItem.AttemptNumber
+                && job.Status == ImportJobStatus.Completed
+                && version.Status == DatasetVersionStatus.Ready
+                && version.StorageKey == storageKey
+                && version.RowCount == rowCount
+                && version.ColumnCount == columnCount
+            select job.Id
+        ).AnyAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryFailAsync(
+        ImportJobWorkItem workItem,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _transactionFactory.BeginAsync(
+            workItem.Dataset.ProjectId,
+            cancellationToken
+        );
+
+        if (transaction is null)
+        {
+            return false;
+        }
+
+        var job = await GetOwnedRunningJobAsync(workItem, cancellationToken);
+        if (job is null)
+        {
+            return false;
+        }
+
+        var version = await _dbContext.DatasetVersions
+            .AsNoTracking()
+            .SingleAsync(version => version.Id == job.DatasetVersionId, cancellationToken);
+
+        version.MarkFailed();
+        job.MarkFailed(errorMessage);
+
+        var versionChanges = await _dbContext.DatasetVersions
+            .Where(item => item.Id == version.Id && item.Status == DatasetVersionStatus.Pending)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(item => item.Status, version.Status),
+                cancellationToken
+            );
+
+        var jobChanges = await _dbContext.ImportJobs
+            .Where(item =>
+                item.Id == job.Id
+                && item.AttemptNumber == workItem.AttemptNumber
+                && item.Status == ImportJobStatus.Running)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(item => item.Status, job.Status)
+                    .SetProperty(item => item.ErrorMessage, job.ErrorMessage)
+                    .SetProperty(item => item.CompletedAtUtc, job.CompletedAtUtc),
+                cancellationToken
+            );
+
+        if (versionChanges != 1 || jobChanges != 1)
+        {
+            throw new InvalidOperationException("Import failure did not update all required records.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return true;
+    }
+
     public async Task<ImportJob?> GetLatestByDatasetIdAsync(
         Guid datasetId,
         CancellationToken cancellationToken)
@@ -128,5 +293,24 @@ public sealed class ImportJobRepository : IImportJobRepository
         await _dbContext.SaveChangesAsync(
             cancellationToken
         );
+    }
+
+    private async Task<ImportJob?> GetOwnedRunningJobAsync(
+        ImportJobWorkItem workItem,
+        CancellationToken cancellationToken)
+    {
+        var jobs = await _dbContext.ImportJobs
+            .FromSqlInterpolated($"""
+                SELECT job.*
+                FROM import_jobs AS job
+                WHERE job."Id" = {workItem.Job.Id}
+                  AND job."AttemptNumber" = {workItem.AttemptNumber}
+                  AND job."Status" = {ImportJobStatus.Running.ToString()}
+                FOR UPDATE OF job
+                """)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return jobs.SingleOrDefault();
     }
 }

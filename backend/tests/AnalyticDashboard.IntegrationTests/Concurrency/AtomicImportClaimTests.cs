@@ -44,14 +44,14 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                 cancellationToken
             );
 
-            var winnerTask = new ImportJobRepository(winnerContext)
+            var winnerTask = CreateRepository(winnerContext)
                 .ClaimNextPendingAsync(cancellationToken);
             ImportJobWorkItem? winner;
             try
             {
                 await gate.Reached.Task.WaitAsync(cancellationToken);
 
-                var loser = await new ImportJobRepository(loserContext)
+                var loser = await CreateRepository(loserContext)
                     .ClaimNextPendingAsync(cancellationToken);
 
                 Assert.Null(loser);
@@ -105,7 +105,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
             var gate = new SqlGate(ClaimSqlMarker);
             await using var firstContext = CreateContext(gate);
             await using var secondContext = CreateContext();
-            var firstTask = new ImportJobRepository(firstContext)
+            var firstTask = CreateRepository(firstContext)
                 .ClaimNextPendingAsync(cancellationToken);
 
             ImportJobWorkItem? first;
@@ -113,7 +113,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
             {
                 await gate.Reached.Task.WaitAsync(cancellationToken);
 
-                var second = await new ImportJobRepository(secondContext)
+                var second = await CreateRepository(secondContext)
                     .ClaimNextPendingAsync(cancellationToken);
 
                 Assert.NotNull(second);
@@ -149,7 +149,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
         {
             await using var lockingContext = CreateContext();
             await using var claimingContext = CreateContext();
-            var repository = new ImportJobRepository(claimingContext);
+            var repository = CreateRepository(claimingContext);
             await using (var transaction = await lockingContext.Database.BeginTransactionAsync(
                 cancellationToken
             ))
@@ -207,7 +207,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
             await using var context = CreateContext();
             var tracked = await context.ImportJobs.SingleAsync(cancellationToken);
             Assert.Equal(7L, tracked.AttemptNumber);
-            var repository = new ImportJobRepository(context);
+            var repository = CreateRepository(context);
 
             var claimed = await repository.ClaimNextPendingAsync(cancellationToken);
 
@@ -264,7 +264,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                 seed.Jobs[0].Id,
                 cancellationToken
             );
-            var claiming = new ImportJobRepository(context)
+            var claiming = CreateRepository(context)
                 .ClaimNextPendingAsync(cancellationToken);
             try
             {
@@ -282,7 +282,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                 await ReadJobAsync(observer, seed.Jobs[0].Id, cancellationToken)
             );
             Assert.Null(context.Database.CurrentTransaction);
-            var successful = await new ImportJobRepository(observer)
+            var successful = await CreateRepository(observer)
                 .ClaimNextPendingAsync(cancellationToken);
             Assert.NotNull(successful);
             Assert.Equal(1L, successful.AttemptNumber);
@@ -324,7 +324,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                 .ProcessID;
             var deletePid = ((NpgsqlConnection)deleteContext.Database.GetDbConnection())
                 .ProcessID;
-            var repository = new ImportJobRepository(claimContext);
+            var repository = CreateRepository(claimContext);
 
             if (claimFirst)
             {
@@ -436,6 +436,14 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
 
             Assert.Equal(DatasetDeletionOutcome.ImportInProgress, outcome);
         }
+    }
+
+    private static ImportJobRepository CreateRepository(AppDbContext context)
+    {
+        return new ImportJobRepository(
+            context,
+            new ProjectWriteTransactionFactory(context)
+        );
     }
 
     private AppDbContext CreateContext(DbCommandInterceptor? interceptor = null)

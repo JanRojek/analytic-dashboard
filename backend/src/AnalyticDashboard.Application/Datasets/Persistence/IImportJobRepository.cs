@@ -8,6 +8,28 @@ public interface IImportJobRepository
         CancellationToken cancellationToken
     );
 
+    Task<ImportJobCompletionOutcome> CompleteAsync(
+        ImportJobWorkItem workItem,
+        string storageKey,
+        int rowCount,
+        int columnCount,
+        CancellationToken cancellationToken
+    );
+
+    Task<bool> IsCompletedAsync(
+        ImportJobWorkItem workItem,
+        string storageKey,
+        int rowCount,
+        int columnCount,
+        CancellationToken cancellationToken
+    );
+
+    Task<bool> TryFailAsync(
+        ImportJobWorkItem workItem,
+        string errorMessage,
+        CancellationToken cancellationToken
+    );
+
     Task<ImportJob?> GetLatestByDatasetIdAsync(
         Guid datasetId,
         CancellationToken cancellationToken

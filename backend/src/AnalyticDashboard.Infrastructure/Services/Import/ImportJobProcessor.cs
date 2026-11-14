@@ -56,41 +56,78 @@ public sealed class ImportJobProcessor
         }
         catch (Exception exception)
         {
-            version.MarkFailed();
-
-            job.MarkFailed(
-                CreateErrorMessage(exception)
-            );
-
-            await _importJobRepository.SaveChangesAsync(
+            var failed = await _importJobRepository.TryFailAsync(
+                workItem,
+                CreateErrorMessage(exception),
                 cancellationToken
             );
 
-            _logger.LogWarning(
-                exception,
-                "Import job {ImportJobId} failed.",
-                job.Id
-            );
+            if (failed)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Import job {ImportJobId} attempt {AttemptNumber} failed.",
+                    job.Id,
+                    workItem.AttemptNumber
+                );
+            }
+            else
+            {
+                LogOwnershipLost(workItem);
+            }
 
             return true;
         }
 
-        version.MarkReady(
-            importResult.StorageKey,
-            importResult.RowCount,
-            importResult.ColumnCount
-        );
+        try
+        {
+            var outcome = await _importJobRepository.CompleteAsync(
+                workItem,
+                importResult.StorageKey,
+                importResult.RowCount,
+                importResult.ColumnCount,
+                cancellationToken
+            );
 
-        dataset.PublishVersion(
-            version.Id
-        );
+            if (outcome == ImportJobCompletionOutcome.OwnershipLost)
+            {
+                LogOwnershipLost(workItem);
+            }
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Verify the exact committed result; never retry publication or delete a possibly published artifact.
+            var completed = await _importJobRepository.IsCompletedAsync(
+                workItem,
+                importResult.StorageKey,
+                importResult.RowCount,
+                importResult.ColumnCount,
+                cancellationToken
+            );
 
-        job.MarkCompleted();
+            if (!completed)
+            {
+                throw;
+            }
 
-        // A failed acknowledgement does not prove that publication was rolled back.
-        await _importJobRepository.SaveChangesAsync(cancellationToken);
+            _logger.LogWarning(
+                exception,
+                "Import job {ImportJobId} attempt {AttemptNumber} completion was confirmed after a database error.",
+                job.Id,
+                workItem.AttemptNumber
+            );
+        }
 
         return true;
+    }
+
+    private void LogOwnershipLost(ImportJobWorkItem workItem)
+    {
+        _logger.LogInformation(
+            "Import job {ImportJobId} attempt {AttemptNumber} no longer owns the job; its result was not applied.",
+            workItem.Job.Id,
+            workItem.AttemptNumber
+        );
     }
 
     private static string CreateErrorMessage(
