@@ -35,11 +35,12 @@ public interface IImportJobRepository
         CancellationToken cancellationToken
     );
 
-    Task<IReadOnlyList<ImportJob>> GetRunningAsync(
+    Task<bool> TryRenewLeaseAsync(
+        ImportJobWorkItem workItem,
         CancellationToken cancellationToken
     );
 
-    Task SaveChangesAsync(
+    Task<bool> RecoverNextExpiredAsync(
         CancellationToken cancellationToken
     );
 }

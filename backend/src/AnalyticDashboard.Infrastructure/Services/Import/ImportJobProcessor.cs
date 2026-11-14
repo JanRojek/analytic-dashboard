@@ -1,5 +1,11 @@
 ﻿using AnalyticDashboard.Application.Datasets.Persistence;
+
+using DuckDB.NET.Data;
+using DuckDB.NET.Native;
+
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AnalyticDashboard.Infrastructure.Services.Import;
 
@@ -9,15 +15,24 @@ public sealed class ImportJobProcessor
 
     private readonly IImportJobRepository _importJobRepository;
     private readonly DuckDbCsvImporter _csvImporter;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ImportJobOptions _options;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<ImportJobProcessor> _logger;
 
     public ImportJobProcessor(
         IImportJobRepository importJobRepository,
         DuckDbCsvImporter csvImporter,
+        IServiceScopeFactory scopeFactory,
+        IOptions<ImportJobOptions> options,
+        TimeProvider timeProvider,
         ILogger<ImportJobProcessor> logger)
     {
         _importJobRepository = importJobRepository;
         _csvImporter = csvImporter;
+        _scopeFactory = scopeFactory;
+        _options = options.Value;
+        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -33,28 +48,63 @@ public sealed class ImportJobProcessor
             return false;
         }
 
-        var job = workItem.Job;
-        var version = workItem.Version;
-        var dataset = workItem.Dataset;
+        using var ownershipLost = new CancellationTokenSource();
+        using var conversionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var heartbeat = RunHeartbeatAsync(
+            workItem,
+            ownershipLost,
+            conversionCancellation,
+            heartbeatCancellation.Token
+        );
 
-        var resultStorageDirectory = $"datasets/{dataset.Id:N}/versions/{version.Id:N}/attempts";
+        try
+        {
+            return await ProcessClaimedAsync(
+                workItem,
+                ownershipLost.Token,
+                conversionCancellation.Token,
+                cancellationToken
+            );
+        }
+        finally
+        {
+            await heartbeatCancellation.CancelAsync();
+            await heartbeat;
+        }
+    }
 
+    private async Task<bool> ProcessClaimedAsync(
+        ImportJobWorkItem workItem,
+        CancellationToken ownershipLost,
+        CancellationToken conversionToken,
+        CancellationToken cancellationToken)
+    {
+        var resultStorageDirectory =
+            $"datasets/{workItem.Dataset.Id:N}/versions/{workItem.Version.Id:N}/attempts";
         DuckDbCsvImportResult importResult;
 
         try
         {
-            importResult = await _csvImporter.ImportAsync(
-                job.SourceStorageKey,
-                resultStorageDirectory,
-                cancellationToken
+            // The provider executes native queries synchronously; keep heartbeat independent of conversion.
+            importResult = await Task.Run(
+                () => _csvImporter.ImportAsync(
+                    workItem.Job.SourceStorageKey,
+                    resultStorageDirectory,
+                    conversionToken
+                ),
+                conversionToken
             );
+            conversionToken.ThrowIfCancellationRequested();
         }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+        catch (Exception) when (conversionToken.IsCancellationRequested)
         {
-            throw;
+            cancellationToken.ThrowIfCancellationRequested();
+            LogOwnershipLost(workItem);
+            return true;
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException
+            or DuckDBException { ErrorType: DuckDBErrorType.InvalidInput or DuckDBErrorType.Conversion })
         {
             var failed = await _importJobRepository.TryFailAsync(
                 workItem,
@@ -66,8 +116,8 @@ public sealed class ImportJobProcessor
             {
                 _logger.LogWarning(
                     exception,
-                    "Import job {ImportJobId} attempt {AttemptNumber} failed.",
-                    job.Id,
+                    "Import job {ImportJobId} attempt {AttemptNumber} failed permanently.",
+                    workItem.Job.Id,
                     workItem.AttemptNumber
                 );
             }
@@ -76,6 +126,22 @@ public sealed class ImportJobProcessor
                 LogOwnershipLost(workItem);
             }
 
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Import job {ImportJobId} attempt {AttemptNumber} stopped unexpectedly; lease recovery will apply the attempt limit.",
+                workItem.Job.Id,
+                workItem.AttemptNumber
+            );
+            return true;
+        }
+
+        if (ownershipLost.IsCancellationRequested)
+        {
+            LogOwnershipLost(workItem);
             return true;
         }
 
@@ -88,7 +154,6 @@ public sealed class ImportJobProcessor
                 importResult.ColumnCount,
                 cancellationToken
             );
-
             if (outcome == ImportJobCompletionOutcome.OwnershipLost)
             {
                 LogOwnershipLost(workItem);
@@ -96,15 +161,16 @@ public sealed class ImportJobProcessor
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // Verify the exact committed result; never retry publication or delete a possibly published artifact.
-            var completed = await _importJobRepository.IsCompletedAsync(
+            // A broken original connection cannot verify its commit. Read in a fresh scope without republishing.
+            await using var verificationScope = _scopeFactory.CreateAsyncScope();
+            var repository = verificationScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
+            var completed = await repository.IsCompletedAsync(
                 workItem,
                 importResult.StorageKey,
                 importResult.RowCount,
                 importResult.ColumnCount,
                 cancellationToken
             );
-
             if (!completed)
             {
                 throw;
@@ -113,12 +179,56 @@ public sealed class ImportJobProcessor
             _logger.LogWarning(
                 exception,
                 "Import job {ImportJobId} attempt {AttemptNumber} completion was confirmed after a database error.",
-                job.Id,
+                workItem.Job.Id,
                 workItem.AttemptNumber
             );
         }
 
         return true;
+    }
+
+    private async Task RunHeartbeatAsync(
+        ImportJobWorkItem workItem,
+        CancellationTokenSource ownershipLost,
+        CancellationTokenSource conversionCancellation,
+        CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(_options.HeartbeatInterval, _timeProvider);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                try
+                {
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                    timeout.CancelAfter(_options.HeartbeatInterval);
+                    await using var scope = _scopeFactory.CreateAsyncScope();
+                    var repository = scope.ServiceProvider.GetRequiredService<IImportJobRepository>();
+                    if (!await repository.TryRenewLeaseAsync(workItem, timeout.Token))
+                    {
+                        await ownershipLost.CancelAsync();
+                        await conversionCancellation.CancelAsync();
+                        return;
+                    }
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Import job {ImportJobId} attempt {AttemptNumber} heartbeat failed; ownership is not yet known to be lost.",
+                        workItem.Job.Id,
+                        workItem.AttemptNumber
+                    );
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
     }
 
     private void LogOwnershipLost(ImportJobWorkItem workItem)

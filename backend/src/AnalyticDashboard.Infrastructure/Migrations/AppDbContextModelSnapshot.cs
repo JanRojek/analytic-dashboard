@@ -152,6 +152,9 @@ namespace AnalyticDashboard.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<DateTime?>("LeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("SourceFileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -174,6 +177,9 @@ namespace AnalyticDashboard.Infrastructure.Migrations
 
                     b.HasIndex("DatasetVersionId")
                         .IsUnique();
+
+                    b.HasIndex("LeaseExpiresAtUtc", "Id")
+                        .HasFilter("\"Status\" = 'Running'");
 
                     b.HasIndex("Status", "CreatedAtUtc", "Id");
 

@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -363,6 +364,9 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                     storage,
                     NullLogger<DuckDbCsvImporter>.Instance
                 ),
+                scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                scope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
+                scope.ServiceProvider.GetRequiredService<TimeProvider>(),
                 NullLogger<ImportJobProcessor>.Instance
             );
 
@@ -412,6 +416,9 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                     gate,
                     NullLogger<DuckDbCsvImporter>.Instance
                 ),
+                scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                scope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
+                scope.ServiceProvider.GetRequiredService<TimeProvider>(),
                 NullLogger<ImportJobProcessor>.Instance
             );
             var processing = processor.ProcessNextAsync(cancellationToken);
@@ -866,7 +873,8 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
     {
         return new ImportJobRepository(
             context,
-            new ProjectWriteTransactionFactory(context)
+            new ProjectWriteTransactionFactory(context),
+            Options.Create(new ImportJobOptions())
         );
     }
 
@@ -1159,7 +1167,7 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
             {
                 Reached.TrySetResult();
                 await Release.Task.WaitAsync(cancellationToken);
-                throw new IOException("Controlled source read failure after ownership changed.");
+                throw new FileNotFoundException("Controlled source read failure after ownership changed.");
             }
             return await _inner.OpenReadAsync(storageKey, cancellationToken);
         }

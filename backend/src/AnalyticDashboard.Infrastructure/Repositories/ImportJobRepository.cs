@@ -4,7 +4,9 @@ using AnalyticDashboard.Application.Common.Persistence;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
+using AnalyticDashboard.Infrastructure.Services.Import;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AnalyticDashboard.Infrastructure.Repositories;
 
@@ -12,13 +14,16 @@ public sealed class ImportJobRepository : IImportJobRepository
 {
     private readonly AppDbContext _dbContext;
     private readonly IProjectWriteTransactionFactory _transactionFactory;
+    private readonly ImportJobOptions _options;
 
     public ImportJobRepository(
         AppDbContext dbContext,
-        IProjectWriteTransactionFactory transactionFactory)
+        IProjectWriteTransactionFactory transactionFactory,
+        IOptions<ImportJobOptions> options)
     {
         _dbContext = dbContext;
         _transactionFactory = transactionFactory;
+        _options = options.Value;
     }
 
     public async Task<ImportJobWorkItem?> ClaimNextPendingAsync(
@@ -39,6 +44,7 @@ public sealed class ImportJobRepository : IImportJobRepository
                     JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
                     JOIN projects AS project ON project."Id" = dataset."ProjectId"
                     WHERE pending_job."Status" = {ImportJobStatus.Pending.ToString()}
+                      AND pending_job."AttemptNumber" < {_options.MaxAttempts}
                     ORDER BY pending_job."CreatedAtUtc", pending_job."Id"
                     LIMIT 1
                     FOR NO KEY UPDATE OF project SKIP LOCKED
@@ -50,6 +56,7 @@ public sealed class ImportJobRepository : IImportJobRepository
                     JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
                     JOIN candidate_project AS project ON project."Id" = dataset."ProjectId"
                     WHERE pending_job."Status" = {ImportJobStatus.Pending.ToString()}
+                      AND pending_job."AttemptNumber" < {_options.MaxAttempts}
                     ORDER BY pending_job."CreatedAtUtc", pending_job."Id"
                     LIMIT 1
                     FOR UPDATE OF pending_job SKIP LOCKED
@@ -57,10 +64,14 @@ public sealed class ImportJobRepository : IImportJobRepository
                 UPDATE import_jobs AS job
                 SET "Status" = {ImportJobStatus.Running.ToString()},
                     "StartedAtUtc" = clock_timestamp(),
+                    "LeaseExpiresAtUtc" = clock_timestamp() + {_options.LeaseDuration},
+                    "CompletedAtUtc" = NULL,
+                    "ErrorMessage" = NULL,
                     "AttemptNumber" = job."AttemptNumber" + 1
                 FROM candidate_job AS candidate
                 WHERE job."Id" = candidate."Id"
                   AND job."Status" = {ImportJobStatus.Pending.ToString()}
+                  AND job."AttemptNumber" < {_options.MaxAttempts}
                 RETURNING job.*
                 """)
             .AsNoTracking()
@@ -168,6 +179,7 @@ public sealed class ImportJobRepository : IImportJobRepository
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(item => item.Status, job.Status)
+                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
                     .SetProperty(item => item.CompletedAtUtc, job.CompletedAtUtc),
                 cancellationToken
             );
@@ -248,6 +260,7 @@ public sealed class ImportJobRepository : IImportJobRepository
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(item => item.Status, job.Status)
+                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
                     .SetProperty(item => item.ErrorMessage, job.ErrorMessage)
                     .SetProperty(item => item.CompletedAtUtc, job.CompletedAtUtc),
                 cancellationToken
@@ -279,20 +292,117 @@ public sealed class ImportJobRepository : IImportJobRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<ImportJob>> GetRunningAsync(
+    public async Task<bool> TryRenewLeaseAsync(
+        ImportJobWorkItem workItem,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.ImportJobs
-            .Where(job => job.Status == ImportJobStatus.Running)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task SaveChangesAsync(
-        CancellationToken cancellationToken)
-    {
-        await _dbContext.SaveChangesAsync(
+        await using var transaction = await _transactionFactory.BeginAsync(
+            workItem.Dataset.ProjectId,
             cancellationToken
         );
+
+        if (transaction is null)
+        {
+            return false;
+        }
+
+        var changed = await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE import_jobs
+            SET "LeaseExpiresAtUtc" = clock_timestamp() + {_options.LeaseDuration}
+            WHERE "Id" = {workItem.Job.Id}
+              AND "AttemptNumber" = {workItem.AttemptNumber}
+              AND "Status" = {ImportJobStatus.Running.ToString()}
+              AND "LeaseExpiresAtUtc" > clock_timestamp()
+            """, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return changed == 1;
+    }
+
+    public async Task<bool> RecoverNextExpiredAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted,
+            cancellationToken
+        );
+
+        var recovered = await _dbContext.ImportJobs
+            .FromSqlInterpolated($"""
+                WITH candidate_project AS MATERIALIZED (
+                    SELECT project."Id"
+                    FROM import_jobs AS expired_job
+                    JOIN dataset_versions AS version ON version."Id" = expired_job."DatasetVersionId"
+                    JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
+                    JOIN projects AS project ON project."Id" = dataset."ProjectId"
+                    WHERE (expired_job."Status" = {ImportJobStatus.Running.ToString()}
+                           AND (expired_job."LeaseExpiresAtUtc" IS NULL OR expired_job."LeaseExpiresAtUtc" <= clock_timestamp()))
+                       OR (expired_job."Status" = {ImportJobStatus.Pending.ToString()}
+                           AND expired_job."AttemptNumber" >= {_options.MaxAttempts})
+                    ORDER BY expired_job."LeaseExpiresAtUtc" NULLS FIRST, expired_job."Id"
+                    LIMIT 1
+                    FOR NO KEY UPDATE OF project SKIP LOCKED
+                ),
+                candidate_job AS MATERIALIZED (
+                    SELECT expired_job."Id"
+                    FROM import_jobs AS expired_job
+                    JOIN dataset_versions AS version ON version."Id" = expired_job."DatasetVersionId"
+                    JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
+                    JOIN candidate_project AS project ON project."Id" = dataset."ProjectId"
+                    WHERE (expired_job."Status" = {ImportJobStatus.Running.ToString()}
+                           AND (expired_job."LeaseExpiresAtUtc" IS NULL OR expired_job."LeaseExpiresAtUtc" <= clock_timestamp()))
+                       OR (expired_job."Status" = {ImportJobStatus.Pending.ToString()}
+                           AND expired_job."AttemptNumber" >= {_options.MaxAttempts})
+                    ORDER BY expired_job."LeaseExpiresAtUtc" NULLS FIRST, expired_job."Id"
+                    LIMIT 1
+                    FOR UPDATE OF expired_job SKIP LOCKED
+                )
+                UPDATE import_jobs AS job
+                SET "Status" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
+                                    THEN {ImportJobStatus.Failed.ToString()} ELSE {ImportJobStatus.Pending.ToString()} END,
+                    "LeaseExpiresAtUtc" = NULL,
+                    "StartedAtUtc" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
+                                         THEN job."StartedAtUtc" ELSE NULL END,
+                    "CompletedAtUtc" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
+                                           THEN clock_timestamp() ELSE NULL END,
+                    "ErrorMessage" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
+                                          THEN 'Import attempt limit reached after worker lease expired.' ELSE NULL END
+                FROM candidate_job AS candidate
+                WHERE job."Id" = candidate."Id"
+                  AND ((job."Status" = {ImportJobStatus.Running.ToString()}
+                        AND (job."LeaseExpiresAtUtc" IS NULL OR job."LeaseExpiresAtUtc" <= clock_timestamp()))
+                       OR (job."Status" = {ImportJobStatus.Pending.ToString()}
+                           AND job."AttemptNumber" >= {_options.MaxAttempts}))
+                RETURNING job.*
+                """)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var job = recovered.SingleOrDefault();
+        if (job is null)
+        {
+            return false;
+        }
+
+        if (job.Status == ImportJobStatus.Failed)
+        {
+            var changed = await _dbContext.DatasetVersions
+                .Where(version => version.Id == job.DatasetVersionId && version.Status == DatasetVersionStatus.Pending)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(version => version.Status, DatasetVersionStatus.Failed),
+                    cancellationToken
+                );
+
+            if (changed != 1)
+            {
+                throw new InvalidOperationException("Expired import did not have a pending dataset version.");
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return true;
     }
 
     private async Task<ImportJob?> GetOwnedRunningJobAsync(
@@ -306,6 +416,7 @@ public sealed class ImportJobRepository : IImportJobRepository
                 WHERE job."Id" = {workItem.Job.Id}
                   AND job."AttemptNumber" = {workItem.AttemptNumber}
                   AND job."Status" = {ImportJobStatus.Running.ToString()}
+                  AND job."LeaseExpiresAtUtc" > clock_timestamp()
                 FOR UPDATE OF job
                 """)
             .AsNoTracking()

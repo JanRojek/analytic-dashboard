@@ -9,6 +9,7 @@ using AnalyticDashboard.Infrastructure.Services.Import;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using AnalyticDashboard.Application.Profiling;
 using AnalyticDashboard.Infrastructure.Auth.Email;
@@ -106,9 +107,23 @@ public static class DependencyInjection
 
         services.AddScoped<DuckDbCsvImporter>();
 
+        services.TryAddSingleton(TimeProvider.System);
+
+        services.AddOptions<ImportJobOptions>()
+            .Bind(configuration.GetSection("ImportJobs"))
+            .Validate(options => options.LeaseDuration >= TimeSpan.FromSeconds(3)
+                && options.LeaseDuration <= TimeSpan.FromHours(1),
+                "ImportJobs:LeaseDuration must be between 3 seconds and 1 hour.")
+            .Validate(options => options.HeartbeatInterval >= TimeSpan.FromSeconds(1)
+                && options.HeartbeatInterval <= options.LeaseDuration / 3,
+                "ImportJobs:HeartbeatInterval must be at least 1 second and at most one third of LeaseDuration.")
+            .Validate(options => options.MaxAttempts is >= 1 and <= 100,
+                "ImportJobs:MaxAttempts must be between 1 and 100.")
+            .ValidateOnStart();
+
         services.AddScoped<ImportJobProcessor>();
 
-        services.AddScoped<ImportJobRecoveryService>();
+        services.AddSingleton<ImportJobRecoveryService>();
 
         services.AddScoped<IDatasetQueryReader, DuckDbDatasetQueryReader>();
 
@@ -142,6 +157,8 @@ public static class DependencyInjection
         if (workerEnabled)
         {
             services.AddHostedService<ImportJobWorker>();
+            services.AddHostedService(serviceProvider =>
+                serviceProvider.GetRequiredService<ImportJobRecoveryService>());
         }
 
         return services;

@@ -14,6 +14,8 @@ public sealed class ImportJob
 
     public long AttemptNumber { get; private set; }
 
+    public DateTime? LeaseExpiresAtUtc { get; private set; }
+
     public string? ErrorMessage { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
@@ -66,6 +68,7 @@ public sealed class ImportJob
         }
 
         Status = ImportJobStatus.Completed;
+        LeaseExpiresAtUtc = null;
         CompletedAtUtc = DateTime.UtcNow;
     }
 
@@ -89,6 +92,7 @@ public sealed class ImportJob
         }
 
         Status = ImportJobStatus.Failed;
+        LeaseExpiresAtUtc = null;
         ErrorMessage = errorMessage.Trim();
         CompletedAtUtc = DateTime.UtcNow;
     }

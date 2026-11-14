@@ -103,6 +103,13 @@ public sealed class DuckDbCsvImporter
         await using var command =
             connection.CreateCommand();
 
+        using var cancellationRegistration = cancellationToken.Register(
+            static state => ((DuckDBCommand)state!).Cancel(),
+            command
+        );
+
+        cancellationToken.ThrowIfCancellationRequested();
+
         command.CommandText = """
             CREATE TABLE imported_dataset AS
             SELECT *
@@ -124,6 +131,8 @@ public sealed class DuckDbCsvImporter
         );
 
         command.Parameters.Clear();
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         command.CommandText = """
             SELECT COUNT(*)
@@ -163,6 +172,8 @@ public sealed class DuckDbCsvImporter
                 COMPRESSION zstd
             );
             """;
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         command.Parameters.Add(
             new DuckDBParameter(

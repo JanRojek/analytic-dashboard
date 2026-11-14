@@ -11,6 +11,7 @@ using AnalyticDashboard.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace AnalyticDashboard.IntegrationTests.Import;
 
@@ -178,6 +179,9 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
                 var processor = new ImportJobProcessor(
                     new FailingFinalizationRepository(repository, commitSucceeded),
                     new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance),
+                    processingScope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
+                    processingScope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
+                    processingScope.ServiceProvider.GetRequiredService<TimeProvider>(),
                     NullLogger<ImportJobProcessor>.Instance
                 );
 
@@ -222,7 +226,14 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
             {
                 var recovery = verificationScope.ServiceProvider
                     .GetRequiredService<ImportJobRecoveryService>();
-                await recovery.RecoverInterruptedAsync(CancellationToken);
+                await verification.ImportJobs.Where(item => item.Id == job.Id)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(item => item.AttemptNumber, 3)
+                            .SetProperty(item => item.LeaseExpiresAtUtc, DateTime.UnixEpoch),
+                        CancellationToken
+                    );
+                await recovery.RecoverExpiredAsync(CancellationToken);
                 Assert.True(await storage.ExistsAsync(published.StorageKey, CancellationToken));
                 Assert.True(await storage.ExistsAsync(attemptKey, CancellationToken));
             }
@@ -427,9 +438,6 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         public Task<ImportJob?> GetLatestByDatasetIdAsync(Guid datasetId, CancellationToken cancellationToken) =>
             _inner.GetLatestByDatasetIdAsync(datasetId, cancellationToken);
 
-        public Task<IReadOnlyList<ImportJob>> GetRunningAsync(CancellationToken cancellationToken) =>
-            _inner.GetRunningAsync(cancellationToken);
-
         public async Task<ImportJobCompletionOutcome> CompleteAsync(
             ImportJobWorkItem workItem,
             string storageKey,
@@ -459,7 +467,10 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
             CancellationToken cancellationToken) =>
             _inner.TryFailAsync(workItem, errorMessage, cancellationToken);
 
-        public Task SaveChangesAsync(CancellationToken cancellationToken) =>
-            _inner.SaveChangesAsync(cancellationToken);
+        public Task<bool> TryRenewLeaseAsync(ImportJobWorkItem workItem, CancellationToken cancellationToken) =>
+            _inner.TryRenewLeaseAsync(workItem, cancellationToken);
+
+        public Task<bool> RecoverNextExpiredAsync(CancellationToken cancellationToken) =>
+            _inner.RecoverNextExpiredAsync(cancellationToken);
     }
 }

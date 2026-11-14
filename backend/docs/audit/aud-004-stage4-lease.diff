@@ -1,0 +1,2760 @@
+diff --git a/src/AnalyticDashboard.Domain/Entities/ImportJob.cs b/src/AnalyticDashboard.Domain/Entities/ImportJob.cs
+--- a/src/AnalyticDashboard.Domain/Entities/ImportJob.cs
++++ b/src/AnalyticDashboard.Domain/Entities/ImportJob.cs
+@@ -14,6 +14,8 @@
+ 
+     public long AttemptNumber { get; private set; }
+ 
++    public DateTime? LeaseExpiresAtUtc { get; private set; }
++
+     public string? ErrorMessage { get; private set; }
+ 
+     public DateTime CreatedAtUtc { get; private set; }
+@@ -66,6 +68,7 @@
+         }
+ 
+         Status = ImportJobStatus.Completed;
++        LeaseExpiresAtUtc = null;
+         CompletedAtUtc = DateTime.UtcNow;
+     }
+ 
+@@ -89,6 +92,7 @@
+         }
+ 
+         Status = ImportJobStatus.Failed;
++        LeaseExpiresAtUtc = null;
+         ErrorMessage = errorMessage.Trim();
+         CompletedAtUtc = DateTime.UtcNow;
+     }
+diff --git a/src/AnalyticDashboard.Application/Datasets/Persistence/IImportJobRepository.cs b/src/AnalyticDashboard.Application/Datasets/Persistence/IImportJobRepository.cs
+--- a/src/AnalyticDashboard.Application/Datasets/Persistence/IImportJobRepository.cs
++++ b/src/AnalyticDashboard.Application/Datasets/Persistence/IImportJobRepository.cs
+@@ -35,11 +35,12 @@
+         CancellationToken cancellationToken
+     );
+ 
+-    Task<IReadOnlyList<ImportJob>> GetRunningAsync(
++    Task<bool> TryRenewLeaseAsync(
++        ImportJobWorkItem workItem,
+         CancellationToken cancellationToken
+     );
+ 
+-    Task SaveChangesAsync(
++    Task<bool> RecoverNextExpiredAsync(
+         CancellationToken cancellationToken
+     );
+ }
+diff --git a/src/AnalyticDashboard.Application/Datasets/Persistence/IDatasetVersionRepository.cs b/src/AnalyticDashboard.Application/Datasets/Persistence/IDatasetVersionRepository.cs
+--- a/src/AnalyticDashboard.Application/Datasets/Persistence/IDatasetVersionRepository.cs
++++ b/src/AnalyticDashboard.Application/Datasets/Persistence/IDatasetVersionRepository.cs
+@@ -10,11 +10,6 @@
+         CancellationToken cancellationToken
+     );
+ 
+-    Task<DatasetVersion?> GetByIdForUpdateAsync(
+-        Guid versionId,
+-        CancellationToken cancellationToken
+-    );
+-
+     Task<IReadOnlyList<DatasetVersion>> GetByIdsAsync(
+         IReadOnlyCollection<Guid> versionIds,
+         CancellationToken cancellationToken
+diff --git a/src/AnalyticDashboard.Infrastructure/Repositories/ImportJobRepository.cs b/src/AnalyticDashboard.Infrastructure/Repositories/ImportJobRepository.cs
+--- a/src/AnalyticDashboard.Infrastructure/Repositories/ImportJobRepository.cs
++++ b/src/AnalyticDashboard.Infrastructure/Repositories/ImportJobRepository.cs
+@@ -4,7 +4,9 @@
+ using AnalyticDashboard.Application.Datasets.Persistence;
+ using AnalyticDashboard.Domain.Entities;
+ using AnalyticDashboard.Infrastructure.Data;
++using AnalyticDashboard.Infrastructure.Services.Import;
+ using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.Options;
+ 
+ namespace AnalyticDashboard.Infrastructure.Repositories;
+ 
+@@ -12,13 +14,16 @@
+ {
+     private readonly AppDbContext _dbContext;
+     private readonly IProjectWriteTransactionFactory _transactionFactory;
++    private readonly ImportJobOptions _options;
+ 
+     public ImportJobRepository(
+         AppDbContext dbContext,
+-        IProjectWriteTransactionFactory transactionFactory)
++        IProjectWriteTransactionFactory transactionFactory,
++        IOptions<ImportJobOptions> options)
+     {
+         _dbContext = dbContext;
+         _transactionFactory = transactionFactory;
++        _options = options.Value;
+     }
+ 
+     public async Task<ImportJobWorkItem?> ClaimNextPendingAsync(
+@@ -39,6 +44,7 @@
+                     JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
+                     JOIN projects AS project ON project."Id" = dataset."ProjectId"
+                     WHERE pending_job."Status" = {ImportJobStatus.Pending.ToString()}
++                      AND pending_job."AttemptNumber" < {_options.MaxAttempts}
+                     ORDER BY pending_job."CreatedAtUtc", pending_job."Id"
+                     LIMIT 1
+                     FOR NO KEY UPDATE OF project SKIP LOCKED
+@@ -50,6 +56,7 @@
+                     JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
+                     JOIN candidate_project AS project ON project."Id" = dataset."ProjectId"
+                     WHERE pending_job."Status" = {ImportJobStatus.Pending.ToString()}
++                      AND pending_job."AttemptNumber" < {_options.MaxAttempts}
+                     ORDER BY pending_job."CreatedAtUtc", pending_job."Id"
+                     LIMIT 1
+                     FOR UPDATE OF pending_job SKIP LOCKED
+@@ -57,10 +64,14 @@
+                 UPDATE import_jobs AS job
+                 SET "Status" = {ImportJobStatus.Running.ToString()},
+                     "StartedAtUtc" = clock_timestamp(),
++                    "LeaseExpiresAtUtc" = clock_timestamp() + {_options.LeaseDuration},
++                    "CompletedAtUtc" = NULL,
++                    "ErrorMessage" = NULL,
+                     "AttemptNumber" = job."AttemptNumber" + 1
+                 FROM candidate_job AS candidate
+                 WHERE job."Id" = candidate."Id"
+                   AND job."Status" = {ImportJobStatus.Pending.ToString()}
++                  AND job."AttemptNumber" < {_options.MaxAttempts}
+                 RETURNING job.*
+                 """)
+             .AsNoTracking()
+@@ -168,6 +179,7 @@
+             .ExecuteUpdateAsync(
+                 setters => setters
+                     .SetProperty(item => item.Status, job.Status)
++                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
+                     .SetProperty(item => item.CompletedAtUtc, job.CompletedAtUtc),
+                 cancellationToken
+             );
+@@ -248,6 +260,7 @@
+             .ExecuteUpdateAsync(
+                 setters => setters
+                     .SetProperty(item => item.Status, job.Status)
++                    .SetProperty(item => item.LeaseExpiresAtUtc, (DateTime?)null)
+                     .SetProperty(item => item.ErrorMessage, job.ErrorMessage)
+                     .SetProperty(item => item.CompletedAtUtc, job.CompletedAtUtc),
+                 cancellationToken
+@@ -279,20 +292,117 @@
+             .FirstOrDefaultAsync(cancellationToken);
+     }
+ 
+-    public async Task<IReadOnlyList<ImportJob>> GetRunningAsync(
++    public async Task<bool> TryRenewLeaseAsync(
++        ImportJobWorkItem workItem,
+         CancellationToken cancellationToken)
+     {
+-        return await _dbContext.ImportJobs
+-            .Where(job => job.Status == ImportJobStatus.Running)
+-            .ToListAsync(cancellationToken);
++        await using var transaction = await _transactionFactory.BeginAsync(
++            workItem.Dataset.ProjectId,
++            cancellationToken
++        );
++
++        if (transaction is null)
++        {
++            return false;
++        }
++
++        var changed = await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
++            UPDATE import_jobs
++            SET "LeaseExpiresAtUtc" = clock_timestamp() + {_options.LeaseDuration}
++            WHERE "Id" = {workItem.Job.Id}
++              AND "AttemptNumber" = {workItem.AttemptNumber}
++              AND "Status" = {ImportJobStatus.Running.ToString()}
++              AND "LeaseExpiresAtUtc" > clock_timestamp()
++            """, cancellationToken);
++
++        await transaction.CommitAsync(cancellationToken);
++
++        return changed == 1;
+     }
+ 
+-    public async Task SaveChangesAsync(
++    public async Task<bool> RecoverNextExpiredAsync(
+         CancellationToken cancellationToken)
+     {
+-        await _dbContext.SaveChangesAsync(
++        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
++            IsolationLevel.ReadCommitted,
+             cancellationToken
+         );
++
++        var recovered = await _dbContext.ImportJobs
++            .FromSqlInterpolated($"""
++                WITH candidate_project AS MATERIALIZED (
++                    SELECT project."Id"
++                    FROM import_jobs AS expired_job
++                    JOIN dataset_versions AS version ON version."Id" = expired_job."DatasetVersionId"
++                    JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
++                    JOIN projects AS project ON project."Id" = dataset."ProjectId"
++                    WHERE (expired_job."Status" = {ImportJobStatus.Running.ToString()}
++                           AND (expired_job."LeaseExpiresAtUtc" IS NULL OR expired_job."LeaseExpiresAtUtc" <= clock_timestamp()))
++                       OR (expired_job."Status" = {ImportJobStatus.Pending.ToString()}
++                           AND expired_job."AttemptNumber" >= {_options.MaxAttempts})
++                    ORDER BY expired_job."LeaseExpiresAtUtc" NULLS FIRST, expired_job."Id"
++                    LIMIT 1
++                    FOR NO KEY UPDATE OF project SKIP LOCKED
++                ),
++                candidate_job AS MATERIALIZED (
++                    SELECT expired_job."Id"
++                    FROM import_jobs AS expired_job
++                    JOIN dataset_versions AS version ON version."Id" = expired_job."DatasetVersionId"
++                    JOIN datasets AS dataset ON dataset."Id" = version."DatasetId"
++                    JOIN candidate_project AS project ON project."Id" = dataset."ProjectId"
++                    WHERE (expired_job."Status" = {ImportJobStatus.Running.ToString()}
++                           AND (expired_job."LeaseExpiresAtUtc" IS NULL OR expired_job."LeaseExpiresAtUtc" <= clock_timestamp()))
++                       OR (expired_job."Status" = {ImportJobStatus.Pending.ToString()}
++                           AND expired_job."AttemptNumber" >= {_options.MaxAttempts})
++                    ORDER BY expired_job."LeaseExpiresAtUtc" NULLS FIRST, expired_job."Id"
++                    LIMIT 1
++                    FOR UPDATE OF expired_job SKIP LOCKED
++                )
++                UPDATE import_jobs AS job
++                SET "Status" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
++                                    THEN {ImportJobStatus.Failed.ToString()} ELSE {ImportJobStatus.Pending.ToString()} END,
++                    "LeaseExpiresAtUtc" = NULL,
++                    "StartedAtUtc" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
++                                         THEN job."StartedAtUtc" ELSE NULL END,
++                    "CompletedAtUtc" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
++                                           THEN clock_timestamp() ELSE NULL END,
++                    "ErrorMessage" = CASE WHEN job."AttemptNumber" >= {_options.MaxAttempts}
++                                          THEN 'Import attempt limit reached after worker lease expired.' ELSE NULL END
++                FROM candidate_job AS candidate
++                WHERE job."Id" = candidate."Id"
++                  AND ((job."Status" = {ImportJobStatus.Running.ToString()}
++                        AND (job."LeaseExpiresAtUtc" IS NULL OR job."LeaseExpiresAtUtc" <= clock_timestamp()))
++                       OR (job."Status" = {ImportJobStatus.Pending.ToString()}
++                           AND job."AttemptNumber" >= {_options.MaxAttempts}))
++                RETURNING job.*
++                """)
++            .AsNoTracking()
++            .ToListAsync(cancellationToken);
++
++        var job = recovered.SingleOrDefault();
++        if (job is null)
++        {
++            return false;
++        }
++
++        if (job.Status == ImportJobStatus.Failed)
++        {
++            var changed = await _dbContext.DatasetVersions
++                .Where(version => version.Id == job.DatasetVersionId && version.Status == DatasetVersionStatus.Pending)
++                .ExecuteUpdateAsync(
++                    setters => setters.SetProperty(version => version.Status, DatasetVersionStatus.Failed),
++                    cancellationToken
++                );
++
++            if (changed != 1)
++            {
++                throw new InvalidOperationException("Expired import did not have a pending dataset version.");
++            }
++        }
++
++        await transaction.CommitAsync(cancellationToken);
++
++        return true;
+     }
+ 
+     private async Task<ImportJob?> GetOwnedRunningJobAsync(
+@@ -306,6 +416,7 @@
+                 WHERE job."Id" = {workItem.Job.Id}
+                   AND job."AttemptNumber" = {workItem.AttemptNumber}
+                   AND job."Status" = {ImportJobStatus.Running.ToString()}
++                  AND job."LeaseExpiresAtUtc" > clock_timestamp()
+                 FOR UPDATE OF job
+                 """)
+             .AsNoTracking()
+diff --git a/src/AnalyticDashboard.Infrastructure/Repositories/DatasetVersionRepository.cs b/src/AnalyticDashboard.Infrastructure/Repositories/DatasetVersionRepository.cs
+--- a/src/AnalyticDashboard.Infrastructure/Repositories/DatasetVersionRepository.cs
++++ b/src/AnalyticDashboard.Infrastructure/Repositories/DatasetVersionRepository.cs
+@@ -31,17 +31,6 @@
+             );
+     }
+ 
+-    public async Task<DatasetVersion?> GetByIdForUpdateAsync(
+-        Guid versionId,
+-        CancellationToken cancellationToken)
+-    {
+-        return await _dbContext.DatasetVersions
+-            .SingleOrDefaultAsync(version =>
+-                version.Id == versionId,
+-                cancellationToken
+-            );
+-    }
+-
+     public async Task<IReadOnlyList<DatasetVersion>> GetByIdsAsync(
+         IReadOnlyCollection<Guid> versionIds,
+         CancellationToken cancellationToken)
+diff --git a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobProcessor.cs b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobProcessor.cs
+--- a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobProcessor.cs
++++ b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobProcessor.cs
+@@ -1,5 +1,11 @@
+ ﻿using AnalyticDashboard.Application.Datasets.Persistence;
++
++using DuckDB.NET.Data;
++using DuckDB.NET.Native;
++
++using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Logging;
++using Microsoft.Extensions.Options;
+ 
+ namespace AnalyticDashboard.Infrastructure.Services.Import;
+ 
+@@ -9,15 +15,24 @@
+ 
+     private readonly IImportJobRepository _importJobRepository;
+     private readonly DuckDbCsvImporter _csvImporter;
++    private readonly IServiceScopeFactory _scopeFactory;
++    private readonly ImportJobOptions _options;
++    private readonly TimeProvider _timeProvider;
+     private readonly ILogger<ImportJobProcessor> _logger;
+ 
+     public ImportJobProcessor(
+         IImportJobRepository importJobRepository,
+         DuckDbCsvImporter csvImporter,
++        IServiceScopeFactory scopeFactory,
++        IOptions<ImportJobOptions> options,
++        TimeProvider timeProvider,
+         ILogger<ImportJobProcessor> logger)
+     {
+         _importJobRepository = importJobRepository;
+         _csvImporter = csvImporter;
++        _scopeFactory = scopeFactory;
++        _options = options.Value;
++        _timeProvider = timeProvider;
+         _logger = logger;
+     }
+ 
+@@ -33,28 +48,63 @@
+             return false;
+         }
+ 
+-        var job = workItem.Job;
+-        var version = workItem.Version;
+-        var dataset = workItem.Dataset;
++        using var ownershipLost = new CancellationTokenSource();
++        using var conversionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
++        using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
++        var heartbeat = RunHeartbeatAsync(
++            workItem,
++            ownershipLost,
++            conversionCancellation,
++            heartbeatCancellation.Token
++        );
+ 
+-        var resultStorageDirectory = $"datasets/{dataset.Id:N}/versions/{version.Id:N}/attempts";
++        try
++        {
++            return await ProcessClaimedAsync(
++                workItem,
++                ownershipLost.Token,
++                conversionCancellation.Token,
++                cancellationToken
++            );
++        }
++        finally
++        {
++            await heartbeatCancellation.CancelAsync();
++            await heartbeat;
++        }
++    }
+ 
++    private async Task<bool> ProcessClaimedAsync(
++        ImportJobWorkItem workItem,
++        CancellationToken ownershipLost,
++        CancellationToken conversionToken,
++        CancellationToken cancellationToken)
++    {
++        var resultStorageDirectory =
++            $"datasets/{workItem.Dataset.Id:N}/versions/{workItem.Version.Id:N}/attempts";
+         DuckDbCsvImportResult importResult;
+ 
+         try
+         {
+-            importResult = await _csvImporter.ImportAsync(
+-                job.SourceStorageKey,
+-                resultStorageDirectory,
+-                cancellationToken
++            // The provider executes native queries synchronously; keep heartbeat independent of conversion.
++            importResult = await Task.Run(
++                () => _csvImporter.ImportAsync(
++                    workItem.Job.SourceStorageKey,
++                    resultStorageDirectory,
++                    conversionToken
++                ),
++                conversionToken
+             );
++            conversionToken.ThrowIfCancellationRequested();
+         }
+-        catch (OperationCanceledException)
+-            when (cancellationToken.IsCancellationRequested)
++        catch (Exception) when (conversionToken.IsCancellationRequested)
+         {
+-            throw;
++            cancellationToken.ThrowIfCancellationRequested();
++            LogOwnershipLost(workItem);
++            return true;
+         }
+-        catch (Exception exception)
++        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException
++            or DuckDBException { ErrorType: DuckDBErrorType.InvalidInput or DuckDBErrorType.Conversion })
+         {
+             var failed = await _importJobRepository.TryFailAsync(
+                 workItem,
+@@ -66,8 +116,8 @@
+             {
+                 _logger.LogWarning(
+                     exception,
+-                    "Import job {ImportJobId} attempt {AttemptNumber} failed.",
+-                    job.Id,
++                    "Import job {ImportJobId} attempt {AttemptNumber} failed permanently.",
++                    workItem.Job.Id,
+                     workItem.AttemptNumber
+                 );
+             }
+@@ -78,7 +128,23 @@
+ 
+             return true;
+         }
++        catch (Exception exception)
++        {
++            _logger.LogError(
++                exception,
++                "Import job {ImportJobId} attempt {AttemptNumber} stopped unexpectedly; lease recovery will apply the attempt limit.",
++                workItem.Job.Id,
++                workItem.AttemptNumber
++            );
++            return true;
++        }
+ 
++        if (ownershipLost.IsCancellationRequested)
++        {
++            LogOwnershipLost(workItem);
++            return true;
++        }
++
+         try
+         {
+             var outcome = await _importJobRepository.CompleteAsync(
+@@ -88,7 +154,6 @@
+                 importResult.ColumnCount,
+                 cancellationToken
+             );
+-
+             if (outcome == ImportJobCompletionOutcome.OwnershipLost)
+             {
+                 LogOwnershipLost(workItem);
+@@ -96,15 +161,16 @@
+         }
+         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+         {
+-            // Verify the exact committed result; never retry publication or delete a possibly published artifact.
+-            var completed = await _importJobRepository.IsCompletedAsync(
++            // A broken original connection cannot verify its commit. Read in a fresh scope without republishing.
++            await using var verificationScope = _scopeFactory.CreateAsyncScope();
++            var repository = verificationScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
++            var completed = await repository.IsCompletedAsync(
+                 workItem,
+                 importResult.StorageKey,
+                 importResult.RowCount,
+                 importResult.ColumnCount,
+                 cancellationToken
+             );
+-
+             if (!completed)
+             {
+                 throw;
+@@ -113,7 +179,7 @@
+             _logger.LogWarning(
+                 exception,
+                 "Import job {ImportJobId} attempt {AttemptNumber} completion was confirmed after a database error.",
+-                job.Id,
++                workItem.Job.Id,
+                 workItem.AttemptNumber
+             );
+         }
+@@ -121,6 +187,50 @@
+         return true;
+     }
+ 
++    private async Task RunHeartbeatAsync(
++        ImportJobWorkItem workItem,
++        CancellationTokenSource ownershipLost,
++        CancellationTokenSource conversionCancellation,
++        CancellationToken stoppingToken)
++    {
++        using var timer = new PeriodicTimer(_options.HeartbeatInterval, _timeProvider);
++        try
++        {
++            while (await timer.WaitForNextTickAsync(stoppingToken))
++            {
++                try
++                {
++                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
++                    timeout.CancelAfter(_options.HeartbeatInterval);
++                    await using var scope = _scopeFactory.CreateAsyncScope();
++                    var repository = scope.ServiceProvider.GetRequiredService<IImportJobRepository>();
++                    if (!await repository.TryRenewLeaseAsync(workItem, timeout.Token))
++                    {
++                        await ownershipLost.CancelAsync();
++                        await conversionCancellation.CancelAsync();
++                        return;
++                    }
++                }
++                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
++                {
++                    return;
++                }
++                catch (Exception exception)
++                {
++                    _logger.LogWarning(
++                        exception,
++                        "Import job {ImportJobId} attempt {AttemptNumber} heartbeat failed; ownership is not yet known to be lost.",
++                        workItem.Job.Id,
++                        workItem.AttemptNumber
++                    );
++                }
++            }
++        }
++        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
++        {
++        }
++    }
++
+     private void LogOwnershipLost(ImportJobWorkItem workItem)
+     {
+         _logger.LogInformation(
+diff --git a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobWorker.cs b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobWorker.cs
+--- a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobWorker.cs
++++ b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobWorker.cs
+@@ -22,29 +22,6 @@
+     protected override async Task ExecuteAsync(
+         CancellationToken stoppingToken)
+     {
+-        try
+-        {
+-            await using var recoveryScope = _scopeFactory.CreateAsyncScope();
+-
+-            var recoveryService = recoveryScope.ServiceProvider
+-                .GetRequiredService<ImportJobRecoveryService>();
+-
+-            await recoveryService.RecoverInterruptedAsync(stoppingToken);
+-        }
+-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+-        {
+-            return;
+-        }
+-        catch (Exception exception)
+-        {
+-            _logger.LogError(
+-                exception,
+-                "Unexpected failure during import jobs recovery."
+-            );
+-
+-            throw;
+-        }
+-
+         while (!stoppingToken.IsCancellationRequested)
+         {
+             try
+diff --git a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobRecoveryService.cs b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobRecoveryService.cs
+--- a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobRecoveryService.cs
++++ b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobRecoveryService.cs
+@@ -1,47 +1,65 @@
+ using AnalyticDashboard.Application.Datasets.Persistence;
+ 
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.Hosting;
++using Microsoft.Extensions.Logging;
++using Microsoft.Extensions.Options;
++
+ namespace AnalyticDashboard.Infrastructure.Services.Import;
+ 
+-public sealed class ImportJobRecoveryService
++public sealed class ImportJobRecoveryService : BackgroundService
+ {
+-    private readonly IImportJobRepository _importJobRepository;
+-    private readonly IDatasetVersionRepository _versionRepository;
++    private const int RecoveryBatchSize = 100;
+ 
++    private readonly IServiceScopeFactory _scopeFactory;
++    private readonly ImportJobOptions _options;
++    private readonly TimeProvider _timeProvider;
++    private readonly ILogger<ImportJobRecoveryService> _logger;
++
+     public ImportJobRecoveryService(
+-        IImportJobRepository importJobRepository,
+-        IDatasetVersionRepository versionRepository)
++        IServiceScopeFactory scopeFactory,
++        IOptions<ImportJobOptions> options,
++        TimeProvider timeProvider,
++        ILogger<ImportJobRecoveryService> logger)
+     {
+-        _importJobRepository = importJobRepository;
+-        _versionRepository = versionRepository;
++        _scopeFactory = scopeFactory;
++        _options = options.Value;
++        _timeProvider = timeProvider;
++        _logger = logger;
+     }
+ 
+-    public async Task RecoverInterruptedAsync(
++    public async Task RecoverExpiredAsync(
+         CancellationToken cancellationToken)
+     {
+-        var runningJobs = await _importJobRepository.GetRunningAsync(
+-            cancellationToken
+-        );
+-
+-        foreach (var job in runningJobs)
++        for (var index = 0; index < RecoveryBatchSize; index++)
+         {
+-            var datasetVersion = await _versionRepository.GetByIdForUpdateAsync(
+-                job.DatasetVersionId,
+-                cancellationToken
+-            );
+-
+-            if (datasetVersion is null)
++            await using var scope = _scopeFactory.CreateAsyncScope();
++            var repository = scope.ServiceProvider.GetRequiredService<IImportJobRepository>();
++            if (!await repository.RecoverNextExpiredAsync(cancellationToken))
+             {
+-                throw new InvalidOperationException(
+-                    $"Dataset version {job.DatasetVersionId} not found."
+-                );
++                break;
+             }
+-
+-            datasetVersion.MarkFailed();
+-            job.MarkFailed("Import interrupted by application restart.");
++        }
++    }
+ 
+-            await _importJobRepository.SaveChangesAsync(
+-                cancellationToken
+-            );
++    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
++    {
++        using var timer = new PeriodicTimer(_options.HeartbeatInterval, _timeProvider);
++        do
++        {
++            try
++            {
++                await RecoverExpiredAsync(stoppingToken);
++            }
++            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
++            {
++                return;
++            }
++            catch (Exception exception)
++            {
++                _logger.LogWarning(exception, "Import lease recovery failed; it will be retried on the next pass.");
++            }
+         }
++        while (await timer.WaitForNextTickAsync(stoppingToken));
+     }
+ }
+diff --git a/src/AnalyticDashboard.Infrastructure/Services/Import/DuckDbCsvImporter.cs b/src/AnalyticDashboard.Infrastructure/Services/Import/DuckDbCsvImporter.cs
+--- a/src/AnalyticDashboard.Infrastructure/Services/Import/DuckDbCsvImporter.cs
++++ b/src/AnalyticDashboard.Infrastructure/Services/Import/DuckDbCsvImporter.cs
+@@ -103,6 +103,13 @@
+         await using var command =
+             connection.CreateCommand();
+ 
++        using var cancellationRegistration = cancellationToken.Register(
++            static state => ((DuckDBCommand)state!).Cancel(),
++            command
++        );
++
++        cancellationToken.ThrowIfCancellationRequested();
++
+         command.CommandText = """
+             CREATE TABLE imported_dataset AS
+             SELECT *
+@@ -125,6 +132,8 @@
+ 
+         command.Parameters.Clear();
+ 
++        cancellationToken.ThrowIfCancellationRequested();
++
+         command.CommandText = """
+             SELECT COUNT(*)
+             FROM imported_dataset;
+@@ -164,6 +173,8 @@
+             );
+             """;
+ 
++        cancellationToken.ThrowIfCancellationRequested();
++
+         command.Parameters.Add(
+             new DuckDBParameter(
+                 "parquetPath",
+diff --git a/src/AnalyticDashboard.Infrastructure/DependencyInjection.cs b/src/AnalyticDashboard.Infrastructure/DependencyInjection.cs
+--- a/src/AnalyticDashboard.Infrastructure/DependencyInjection.cs
++++ b/src/AnalyticDashboard.Infrastructure/DependencyInjection.cs
+@@ -9,6 +9,7 @@
+ using Microsoft.EntityFrameworkCore;
+ using Microsoft.Extensions.Configuration;
+ using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.DependencyInjection.Extensions;
+ using Microsoft.Extensions.Hosting;
+ using AnalyticDashboard.Application.Profiling;
+ using AnalyticDashboard.Infrastructure.Auth.Email;
+@@ -106,9 +107,23 @@
+ 
+         services.AddScoped<DuckDbCsvImporter>();
+ 
++        services.TryAddSingleton(TimeProvider.System);
++
++        services.AddOptions<ImportJobOptions>()
++            .Bind(configuration.GetSection("ImportJobs"))
++            .Validate(options => options.LeaseDuration >= TimeSpan.FromSeconds(3)
++                && options.LeaseDuration <= TimeSpan.FromHours(1),
++                "ImportJobs:LeaseDuration must be between 3 seconds and 1 hour.")
++            .Validate(options => options.HeartbeatInterval >= TimeSpan.FromSeconds(1)
++                && options.HeartbeatInterval <= options.LeaseDuration / 3,
++                "ImportJobs:HeartbeatInterval must be at least 1 second and at most one third of LeaseDuration.")
++            .Validate(options => options.MaxAttempts is >= 1 and <= 100,
++                "ImportJobs:MaxAttempts must be between 1 and 100.")
++            .ValidateOnStart();
++
+         services.AddScoped<ImportJobProcessor>();
+ 
+-        services.AddScoped<ImportJobRecoveryService>();
++        services.AddSingleton<ImportJobRecoveryService>();
+ 
+         services.AddScoped<IDatasetQueryReader, DuckDbDatasetQueryReader>();
+ 
+@@ -142,6 +157,8 @@
+         if (workerEnabled)
+         {
+             services.AddHostedService<ImportJobWorker>();
++            services.AddHostedService(serviceProvider =>
++                serviceProvider.GetRequiredService<ImportJobRecoveryService>());
+         }
+ 
+         return services;
+diff --git a/src/AnalyticDashboard.Infrastructure/Data/Configurations/ImportJobConfiguration.cs b/src/AnalyticDashboard.Infrastructure/Data/Configurations/ImportJobConfiguration.cs
+--- a/src/AnalyticDashboard.Infrastructure/Data/Configurations/ImportJobConfiguration.cs
++++ b/src/AnalyticDashboard.Infrastructure/Data/Configurations/ImportJobConfiguration.cs
+@@ -41,6 +41,8 @@
+ 
+         builder.Property(job => job.StartedAtUtc);
+ 
++        builder.Property(job => job.LeaseExpiresAtUtc);
++
+         builder.Property(job => job.CompletedAtUtc);
+ 
+         builder
+@@ -53,6 +55,13 @@
+             .HasIndex(job => job.DatasetVersionId)
+             .IsUnique();
+ 
++        builder.HasIndex(job => new
++            {
++                job.LeaseExpiresAtUtc,
++                job.Id
++            })
++            .HasFilter("\"Status\" = 'Running'");
++
+         builder
+             .HasIndex(job => new
+             {
+diff --git a/src/AnalyticDashboard.Infrastructure/Migrations/AppDbContextModelSnapshot.cs b/src/AnalyticDashboard.Infrastructure/Migrations/AppDbContextModelSnapshot.cs
+--- a/src/AnalyticDashboard.Infrastructure/Migrations/AppDbContextModelSnapshot.cs
++++ b/src/AnalyticDashboard.Infrastructure/Migrations/AppDbContextModelSnapshot.cs
+@@ -152,6 +152,9 @@
+                         .HasMaxLength(2000)
+                         .HasColumnType("character varying(2000)");
+ 
++                    b.Property<DateTime?>("LeaseExpiresAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
+                     b.Property<string>("SourceFileName")
+                         .IsRequired()
+                         .HasMaxLength(255)
+@@ -175,6 +178,9 @@
+                     b.HasIndex("DatasetVersionId")
+                         .IsUnique();
+ 
++                    b.HasIndex("LeaseExpiresAtUtc", "Id")
++                        .HasFilter("\"Status\" = 'Running'");
++
+                     b.HasIndex("Status", "CreatedAtUtc", "Id");
+ 
+                     b.ToTable("import_jobs", (string)null);
+diff --git a/src/AnalyticDashboard.Api/appsettings.json b/src/AnalyticDashboard.Api/appsettings.json
+--- a/src/AnalyticDashboard.Api/appsettings.json
++++ b/src/AnalyticDashboard.Api/appsettings.json
+@@ -6,6 +6,11 @@
+     }
+   },
+   "AllowedHosts": "*",
++  "ImportJobs": {
++    "LeaseDuration": "00:02:00",
++    "HeartbeatInterval": "00:00:20",
++    "MaxAttempts": 3
++  },
+   "AuthRateLimiting": {
+     "Login": { "PermitLimit": 10, "WindowSeconds": 60 },
+     "Register": { "PermitLimit": 3, "WindowSeconds": 600 },
+diff --git a/tests/AnalyticDashboard.IntegrationTests/Concurrency/AtomicImportClaimTests.cs b/tests/AnalyticDashboard.IntegrationTests/Concurrency/AtomicImportClaimTests.cs
+--- a/tests/AnalyticDashboard.IntegrationTests/Concurrency/AtomicImportClaimTests.cs
++++ b/tests/AnalyticDashboard.IntegrationTests/Concurrency/AtomicImportClaimTests.cs
+@@ -5,11 +5,13 @@
+ using AnalyticDashboard.Domain.Entities;
+ using AnalyticDashboard.Infrastructure.Data;
+ using AnalyticDashboard.Infrastructure.Repositories;
++using AnalyticDashboard.Infrastructure.Services.Import;
+ using AnalyticDashboard.Infrastructure.Storage;
+ 
+ using Microsoft.EntityFrameworkCore;
+ using Microsoft.EntityFrameworkCore.Diagnostics;
+ using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.Options;
+ 
+ using Npgsql;
+ 
+@@ -233,7 +235,7 @@
+                 await ReadJobAsync(context, tracked.Id, cancellationToken)
+             );
+             tracked.MarkFailed("Test failure after claim");
+-            await repository.SaveChangesAsync(cancellationToken);
++            await context.SaveChangesAsync(cancellationToken);
+             Assert.Equal(
+                 8L,
+                 (await ReadJobAsync(context, tracked.Id, cancellationToken)).AttemptNumber
+@@ -442,7 +444,8 @@
+     {
+         return new ImportJobRepository(
+             context,
+-            new ProjectWriteTransactionFactory(context)
++            new ProjectWriteTransactionFactory(context),
++            Options.Create(new ImportJobOptions { MaxAttempts = 10 })
+         );
+     }
+ 
+diff --git a/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportFinalizationTests.cs b/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportFinalizationTests.cs
+--- a/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportFinalizationTests.cs
++++ b/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportFinalizationTests.cs
+@@ -13,6 +13,7 @@
+ using Microsoft.EntityFrameworkCore.Diagnostics;
+ using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Logging.Abstractions;
++using Microsoft.Extensions.Options;
+ 
+ using Npgsql;
+ 
+@@ -363,6 +364,9 @@
+                     storage,
+                     NullLogger<DuckDbCsvImporter>.Instance
+                 ),
++                scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
++                scope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
++                scope.ServiceProvider.GetRequiredService<TimeProvider>(),
+                 NullLogger<ImportJobProcessor>.Instance
+             );
+ 
+@@ -412,6 +416,9 @@
+                     gate,
+                     NullLogger<DuckDbCsvImporter>.Instance
+                 ),
++                scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
++                scope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
++                scope.ServiceProvider.GetRequiredService<TimeProvider>(),
+                 NullLogger<ImportJobProcessor>.Instance
+             );
+             var processing = processor.ProcessNextAsync(cancellationToken);
+@@ -866,7 +873,8 @@
+     {
+         return new ImportJobRepository(
+             context,
+-            new ProjectWriteTransactionFactory(context)
++            new ProjectWriteTransactionFactory(context),
++            Options.Create(new ImportJobOptions())
+         );
+     }
+ 
+@@ -1159,7 +1167,7 @@
+             {
+                 Reached.TrySetResult();
+                 await Release.Task.WaitAsync(cancellationToken);
+-                throw new IOException("Controlled source read failure after ownership changed.");
++                throw new FileNotFoundException("Controlled source read failure after ownership changed.");
+             }
+             return await _inner.OpenReadAsync(storageKey, cancellationToken);
+         }
+diff --git a/tests/AnalyticDashboard.IntegrationTests/Import/ImportArtifactOwnershipTests.cs b/tests/AnalyticDashboard.IntegrationTests/Import/ImportArtifactOwnershipTests.cs
+--- a/tests/AnalyticDashboard.IntegrationTests/Import/ImportArtifactOwnershipTests.cs
++++ b/tests/AnalyticDashboard.IntegrationTests/Import/ImportArtifactOwnershipTests.cs
+@@ -11,6 +11,7 @@
+ using Microsoft.EntityFrameworkCore;
+ using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Logging.Abstractions;
++using Microsoft.Extensions.Options;
+ 
+ namespace AnalyticDashboard.IntegrationTests.Import;
+ 
+@@ -178,6 +179,9 @@
+                 var processor = new ImportJobProcessor(
+                     new FailingFinalizationRepository(repository, commitSucceeded),
+                     new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance),
++                    processingScope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
++                    processingScope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
++                    processingScope.ServiceProvider.GetRequiredService<TimeProvider>(),
+                     NullLogger<ImportJobProcessor>.Instance
+                 );
+ 
+@@ -222,7 +226,14 @@
+             {
+                 var recovery = verificationScope.ServiceProvider
+                     .GetRequiredService<ImportJobRecoveryService>();
+-                await recovery.RecoverInterruptedAsync(CancellationToken);
++                await verification.ImportJobs.Where(item => item.Id == job.Id)
++                    .ExecuteUpdateAsync(
++                        setters => setters
++                            .SetProperty(item => item.AttemptNumber, 3)
++                            .SetProperty(item => item.LeaseExpiresAtUtc, DateTime.UnixEpoch),
++                        CancellationToken
++                    );
++                await recovery.RecoverExpiredAsync(CancellationToken);
+                 Assert.True(await storage.ExistsAsync(published.StorageKey, CancellationToken));
+                 Assert.True(await storage.ExistsAsync(attemptKey, CancellationToken));
+             }
+@@ -427,9 +438,6 @@
+         public Task<ImportJob?> GetLatestByDatasetIdAsync(Guid datasetId, CancellationToken cancellationToken) =>
+             _inner.GetLatestByDatasetIdAsync(datasetId, cancellationToken);
+ 
+-        public Task<IReadOnlyList<ImportJob>> GetRunningAsync(CancellationToken cancellationToken) =>
+-            _inner.GetRunningAsync(cancellationToken);
+-
+         public async Task<ImportJobCompletionOutcome> CompleteAsync(
+             ImportJobWorkItem workItem,
+             string storageKey,
+@@ -459,7 +467,10 @@
+             CancellationToken cancellationToken) =>
+             _inner.TryFailAsync(workItem, errorMessage, cancellationToken);
+ 
+-        public Task SaveChangesAsync(CancellationToken cancellationToken) =>
+-            _inner.SaveChangesAsync(cancellationToken);
++        public Task<bool> TryRenewLeaseAsync(ImportJobWorkItem workItem, CancellationToken cancellationToken) =>
++            _inner.TryRenewLeaseAsync(workItem, cancellationToken);
++
++        public Task<bool> RecoverNextExpiredAsync(CancellationToken cancellationToken) =>
++            _inner.RecoverNextExpiredAsync(cancellationToken);
+     }
+ }
+diff --git a/tests/AnalyticDashboard.IntegrationTests/Import/ImportJobRecoveryServiceTests.cs b/tests/AnalyticDashboard.IntegrationTests/Import/ImportJobRecoveryServiceTests.cs
+--- a/tests/AnalyticDashboard.IntegrationTests/Import/ImportJobRecoveryServiceTests.cs
++++ b/tests/AnalyticDashboard.IntegrationTests/Import/ImportJobRecoveryServiceTests.cs
+@@ -21,7 +21,7 @@
+     }
+ 
+     [Fact]
+-    public async Task RecoverInterruptedAsync_ShouldFailRunningJobWithoutDeletingUnownedParquet()
++    public async Task RecoverExpiredAsync_ShouldFailExhaustedJobWithoutDeletingUnownedParquet()
+     {
+         var userId = Guid.NewGuid();
+ 
+@@ -62,7 +62,8 @@
+ 
+             dbContext.Entry(importJob).Property(job => job.Status).CurrentValue = ImportJobStatus.Running;
+             dbContext.Entry(importJob).Property(job => job.StartedAtUtc).CurrentValue = DateTime.UtcNow;
+-            dbContext.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 1;
++            dbContext.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 3;
++            dbContext.Entry(importJob).Property(job => job.LeaseExpiresAtUtc).CurrentValue = DateTime.UnixEpoch;
+ 
+             await dbContext.SaveChangesAsync(
+                 CancellationToken
+@@ -99,7 +100,7 @@
+                 var recoveryService = scope.ServiceProvider
+                     .GetRequiredService<ImportJobRecoveryService>();
+ 
+-                await recoveryService.RecoverInterruptedAsync(
++                await recoveryService.RecoverExpiredAsync(
+                     CancellationToken
+                 );
+             }
+diff --git a/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobOptions.cs b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobOptions.cs
+new file mode 100644
+--- /dev/null
++++ b/src/AnalyticDashboard.Infrastructure/Services/Import/ImportJobOptions.cs
+@@ -0,0 +1,10 @@
++namespace AnalyticDashboard.Infrastructure.Services.Import;
++
++public sealed class ImportJobOptions
++{
++    public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(2);
++
++    public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(20);
++
++    public int MaxAttempts { get; set; } = 3;
++}
+diff --git a/src/AnalyticDashboard.Infrastructure/Migrations/20261114195122_AddImportJobLease.cs b/src/AnalyticDashboard.Infrastructure/Migrations/20261114195122_AddImportJobLease.cs
+new file mode 100644
+--- /dev/null
++++ b/src/AnalyticDashboard.Infrastructure/Migrations/20261114195122_AddImportJobLease.cs
+@@ -0,0 +1,46 @@
++﻿using System;
++using Microsoft.EntityFrameworkCore.Migrations;
++
++#nullable disable
++
++namespace AnalyticDashboard.Infrastructure.Migrations
++{
++    /// <inheritdoc />
++    public partial class AddImportJobLease : Migration
++    {
++        /// <inheritdoc />
++        protected override void Up(MigrationBuilder migrationBuilder)
++        {
++            migrationBuilder.AddColumn<DateTime>(
++                name: "LeaseExpiresAtUtc",
++                table: "import_jobs",
++                type: "timestamp with time zone",
++                nullable: true);
++
++            // Pre-lease workers must be stopped before this migration; their Running jobs can then be recovered.
++            migrationBuilder.Sql("""
++                UPDATE import_jobs
++                SET "LeaseExpiresAtUtc" = clock_timestamp()
++                WHERE "Status" = 'Running';
++                """);
++
++            migrationBuilder.CreateIndex(
++                name: "IX_import_jobs_LeaseExpiresAtUtc_Id",
++                table: "import_jobs",
++                columns: new[] { "LeaseExpiresAtUtc", "Id" },
++                filter: "\"Status\" = 'Running'");
++        }
++
++        /// <inheritdoc />
++        protected override void Down(MigrationBuilder migrationBuilder)
++        {
++            migrationBuilder.DropIndex(
++                name: "IX_import_jobs_LeaseExpiresAtUtc_Id",
++                table: "import_jobs");
++
++            migrationBuilder.DropColumn(
++                name: "LeaseExpiresAtUtc",
++                table: "import_jobs");
++        }
++    }
++}
+diff --git a/src/AnalyticDashboard.Infrastructure/Migrations/20261114195122_AddImportJobLease.Designer.cs b/src/AnalyticDashboard.Infrastructure/Migrations/20261114195122_AddImportJobLease.Designer.cs
+new file mode 100644
+--- /dev/null
++++ b/src/AnalyticDashboard.Infrastructure/Migrations/20261114195122_AddImportJobLease.Designer.cs
+@@ -0,0 +1,549 @@
++﻿// <auto-generated />
++using System;
++using System.Collections.Generic;
++using AnalyticDashboard.Infrastructure.Data;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.EntityFrameworkCore.Infrastructure;
++using Microsoft.EntityFrameworkCore.Migrations;
++using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
++using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
++
++#nullable disable
++
++namespace AnalyticDashboard.Infrastructure.Migrations
++{
++    [DbContext(typeof(AppDbContext))]
++    [Migration("20261114195122_AddImportJobLease")]
++    partial class AddImportJobLease
++    {
++        /// <inheritdoc />
++        protected override void BuildTargetModel(ModelBuilder modelBuilder)
++        {
++#pragma warning disable 612, 618
++            modelBuilder
++                .HasAnnotation("ProductVersion", "10.0.10")
++                .HasAnnotation("Relational:MaxIdentifierLength", 63);
++
++            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
++            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Dashboard", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<Guid>("ProjectId")
++                        .HasColumnType("uuid");
++
++                    b.Property<long>("Revision")
++                        .IsConcurrencyToken()
++                        .HasColumnType("bigint");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("ProjectId");
++
++                    b.ToTable("Dashboards", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Dataset", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid?>("CurrentVersionId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.Property<Guid>("ProjectId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("CurrentVersionId");
++
++                    b.HasIndex("ProjectId", "CreatedAtUtc", "Id")
++                        .IsDescending(false, true, false);
++
++                    b.ToTable("datasets", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.DatasetVersion", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int?>("ColumnCount")
++                        .HasColumnType("integer");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("DatasetId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("OriginalFileName")
++                        .IsRequired()
++                        .HasMaxLength(255)
++                        .HasColumnType("character varying(255)");
++
++                    b.Property<int?>("RowCount")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("Status")
++                        .IsRequired()
++                        .HasMaxLength(20)
++                        .HasColumnType("character varying(20)");
++
++                    b.Property<string>("StorageKey")
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<int>("VersionNumber")
++                        .HasColumnType("integer");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("DatasetId", "VersionNumber")
++                        .IsUnique();
++
++                    b.HasIndex("DatasetId", "CreatedAtUtc", "Id")
++                        .IsDescending(false, true, false);
++
++                    b.ToTable("dataset_versions", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.ImportJob", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<long>("AttemptNumber")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("bigint")
++                        .HasDefaultValue(0L);
++
++                    b.Property<DateTime?>("CompletedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("DatasetVersionId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("ErrorMessage")
++                        .HasMaxLength(2000)
++                        .HasColumnType("character varying(2000)");
++
++                    b.Property<DateTime?>("LeaseExpiresAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("SourceFileName")
++                        .IsRequired()
++                        .HasMaxLength(255)
++                        .HasColumnType("character varying(255)");
++
++                    b.Property<string>("SourceStorageKey")
++                        .IsRequired()
++                        .HasMaxLength(500)
++                        .HasColumnType("character varying(500)");
++
++                    b.Property<DateTime?>("StartedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("Status")
++                        .IsRequired()
++                        .HasMaxLength(20)
++                        .HasColumnType("character varying(20)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("DatasetVersionId")
++                        .IsUnique();
++
++                    b.HasIndex("LeaseExpiresAtUtc", "Id")
++                        .HasFilter("\"Status\" = 'Running'");
++
++                    b.HasIndex("Status", "CreatedAtUtc", "Id");
++
++                    b.ToTable("import_jobs", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Project", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("Name")
++                        .IsRequired()
++                        .HasMaxLength(100)
++                        .HasColumnType("citext");
++
++                    b.Property<Guid>("OwnerId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("OwnerId", "Name")
++                        .IsUnique()
++                        .HasDatabaseName("IX_projects_OwnerId_Name");
++
++                    b.HasIndex("OwnerId", "CreatedAtUtc", "Id")
++                        .IsDescending(false, true, false)
++                        .HasDatabaseName("IX_projects_OwnerId_CreatedAtUtc_Id");
++
++                    b.ToTable("projects", null, t =>
++                        {
++                            t.HasCheckConstraint("CK_projects_Name_MaxLength", "char_length(\"Name\"::text) <= 100");
++
++                            t.HasCheckConstraint("CK_projects_Name_NotBlank", "btrim(\"Name\"::text, E' \\u0009\\u000A\\u000B\\u000C\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000') <> ''");
++
++                            t.HasCheckConstraint("CK_projects_Name_Trimmed", "\"Name\"::text = btrim(\"Name\"::text, E' \\u0009\\u000A\\u000B\\u000C\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000')");
++
++                            t.HasCheckConstraint("CK_projects_OwnerId_NotEmpty", "\"OwnerId\" <> '00000000-0000-0000-0000-000000000000'::uuid");
++                        });
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Widget", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("Aggregation")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("DashboardId")
++                        .HasColumnType("uuid");
++
++                    b.Property<Guid?>("DatasetId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("GroupByColumn")
++                        .IsRequired()
++                        .HasMaxLength(255)
++                        .HasColumnType("character varying(255)");
++
++                    b.Property<string>("MeasureColumn")
++                        .IsRequired()
++                        .HasMaxLength(255)
++                        .HasColumnType("character varying(255)");
++
++                    b.Property<string>("Title")
++                        .IsRequired()
++                        .HasMaxLength(200)
++                        .HasColumnType("character varying(200)");
++
++                    b.Property<string>("Type")
++                        .IsRequired()
++                        .HasColumnType("text");
++
++                    b.ComplexProperty(typeof(Dictionary<string, object>), "Layout", "AnalyticDashboard.Domain.Entities.Widget.Layout#WidgetLayout", b1 =>
++                        {
++                            b1.IsRequired();
++
++                            b1.Property<int>("Height")
++                                .HasColumnType("integer");
++
++                            b1.Property<int>("Width")
++                                .HasColumnType("integer");
++
++                            b1.Property<int>("X")
++                                .HasColumnType("integer");
++
++                            b1.Property<int>("Y")
++                                .HasColumnType("integer");
++                        });
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("DashboardId");
++
++                    b.HasIndex("DatasetId");
++
++                    b.ToTable("Widgets", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Infrastructure.Identity.ApplicationUser", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("AccessFailedCount")
++                        .HasColumnType("integer");
++
++                    b.Property<string>("ConcurrencyStamp")
++                        .IsConcurrencyToken()
++                        .HasColumnType("text");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("DisplayName")
++                        .IsRequired()
++                        .HasMaxLength(100)
++                        .HasColumnType("character varying(100)");
++
++                    b.Property<string>("Email")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<bool>("EmailConfirmed")
++                        .HasColumnType("boolean");
++
++                    b.Property<bool>("LockoutEnabled")
++                        .HasColumnType("boolean");
++
++                    b.Property<DateTimeOffset?>("LockoutEnd")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<string>("NormalizedEmail")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<string>("NormalizedUserName")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<string>("PasswordHash")
++                        .HasColumnType("text");
++
++                    b.Property<string>("PhoneNumber")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.Property<bool>("PhoneNumberConfirmed")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("SecurityStamp")
++                        .HasColumnType("text");
++
++                    b.Property<bool>("TwoFactorEnabled")
++                        .HasColumnType("boolean");
++
++                    b.Property<string>("UserName")
++                        .HasMaxLength(256)
++                        .HasColumnType("character varying(256)");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("NormalizedEmail")
++                        .IsUnique()
++                        .HasDatabaseName("IX_users_NormalizedEmail");
++
++                    b.HasIndex("NormalizedUserName")
++                        .IsUnique()
++                        .HasDatabaseName("UserNameIndex");
++
++                    b.ToTable("users", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Infrastructure.Storage.StorageCleanupJob", b =>
++                {
++                    b.Property<Guid>("Id")
++                        .HasColumnType("uuid");
++
++                    b.Property<int>("AttemptCount")
++                        .HasColumnType("integer");
++
++                    b.Property<DateTime>("CreatedAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.Property<Guid>("DatasetId")
++                        .HasColumnType("uuid");
++
++                    b.Property<DateTime>("NextAttemptAtUtc")
++                        .HasColumnType("timestamp with time zone");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("DatasetId")
++                        .IsUnique();
++
++                    b.HasIndex("NextAttemptAtUtc");
++
++                    b.ToTable("storage_cleanup_jobs", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
++                {
++                    b.Property<int>("Id")
++                        .ValueGeneratedOnAdd()
++                        .HasColumnType("integer");
++
++                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
++
++                    b.Property<string>("ClaimType")
++                        .HasColumnType("text");
++
++                    b.Property<string>("ClaimValue")
++                        .HasColumnType("text");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("Id");
++
++                    b.HasIndex("UserId");
++
++                    b.ToTable("user_claims", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
++                {
++                    b.Property<string>("LoginProvider")
++                        .HasMaxLength(128)
++                        .HasColumnType("character varying(128)");
++
++                    b.Property<string>("ProviderKey")
++                        .HasMaxLength(128)
++                        .HasColumnType("character varying(128)");
++
++                    b.Property<string>("ProviderDisplayName")
++                        .HasColumnType("text");
++
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.HasKey("LoginProvider", "ProviderKey");
++
++                    b.HasIndex("UserId");
++
++                    b.ToTable("user_logins", (string)null);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
++                {
++                    b.Property<Guid>("UserId")
++                        .HasColumnType("uuid");
++
++                    b.Property<string>("LoginProvider")
++                        .HasMaxLength(128)
++                        .HasColumnType("character varying(128)");
++
++                    b.Property<string>("Name")
++                        .HasMaxLength(128)
++                        .HasColumnType("character varying(128)");
++
++                    b.Property<string>("Value")
++                        .HasColumnType("text");
++
++                    b.HasKey("UserId", "LoginProvider", "Name");
++
++                    b.ToTable("user_tokens", (string)null);
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Dashboard", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Domain.Entities.Project", null)
++                        .WithMany()
++                        .HasForeignKey("ProjectId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Dataset", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Domain.Entities.DatasetVersion", null)
++                        .WithMany()
++                        .HasForeignKey("CurrentVersionId")
++                        .OnDelete(DeleteBehavior.NoAction);
++
++                    b.HasOne("AnalyticDashboard.Domain.Entities.Project", null)
++                        .WithMany()
++                        .HasForeignKey("ProjectId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.DatasetVersion", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Domain.Entities.Dataset", null)
++                        .WithMany()
++                        .HasForeignKey("DatasetId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.ImportJob", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Domain.Entities.DatasetVersion", null)
++                        .WithMany()
++                        .HasForeignKey("DatasetVersionId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("AnalyticDashboard.Domain.Entities.Widget", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Domain.Entities.Dashboard", null)
++                        .WithMany()
++                        .HasForeignKey("DashboardId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++
++                    b.HasOne("AnalyticDashboard.Domain.Entities.Dataset", null)
++                        .WithMany()
++                        .HasForeignKey("DatasetId")
++                        .OnDelete(DeleteBehavior.Restrict);
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++
++            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
++                {
++                    b.HasOne("AnalyticDashboard.Infrastructure.Identity.ApplicationUser", null)
++                        .WithMany()
++                        .HasForeignKey("UserId")
++                        .OnDelete(DeleteBehavior.Cascade)
++                        .IsRequired();
++                });
++#pragma warning restore 612, 618
++        }
++    }
++}
+diff --git a/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportLeaseTests.cs b/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportLeaseTests.cs
+new file mode 100644
+--- /dev/null
++++ b/tests/AnalyticDashboard.IntegrationTests/Concurrency/ImportLeaseTests.cs
+@@ -0,0 +1,1153 @@
++using System.Data.Common;
++
++using AnalyticDashboard.Application.Common.Persistence;
++using AnalyticDashboard.Application.Datasets.Persistence;
++using AnalyticDashboard.Application.Storage;
++using AnalyticDashboard.Domain.Entities;
++using AnalyticDashboard.Infrastructure;
++using AnalyticDashboard.Infrastructure.Data;
++using AnalyticDashboard.Infrastructure.Repositories;
++using AnalyticDashboard.Infrastructure.Services.Import;
++
++using DuckDB.NET.Data;
++using DuckDB.NET.Native;
++
++using Microsoft.EntityFrameworkCore;
++using Microsoft.EntityFrameworkCore.Diagnostics;
++using Microsoft.Extensions.Configuration;
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.Logging.Abstractions;
++using Microsoft.Extensions.Options;
++
++namespace AnalyticDashboard.IntegrationTests.Concurrency;
++
++public sealed class ImportLeaseTests : IClassFixture<ApiFixture>
++{
++    private readonly ApiFixture _fixture;
++
++    public ImportLeaseTests(ApiFixture fixture)
++    {
++        _fixture = fixture;
++    }
++
++    [Fact]
++    public async Task ClaimAndHeartbeat_ShouldUsePostgresTime_AndPreserveActiveWorkDuringRecovery()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await using var context = CreateContext();
++            var repository = CreateRepository(context);
++            var before = await ServerNowAsync(context, cancellationToken);
++
++            var attempt = Assert.IsType<ImportJobWorkItem>(
++                await repository.ClaimNextPendingAsync(cancellationToken)
++            );
++
++            var after = await ServerNowAsync(context, cancellationToken);
++            Assert.NotNull(attempt.Job.LeaseExpiresAtUtc);
++            Assert.InRange(
++                attempt.Job.LeaseExpiresAtUtc.Value,
++                before.AddMinutes(2),
++                after.AddMinutes(2)
++            );
++            await context.Database.ExecuteSqlInterpolatedAsync($"""
++                UPDATE import_jobs SET "LeaseExpiresAtUtc" = clock_timestamp() + interval '30 seconds'
++                WHERE "Id" = {seed.Job.Id}
++                """, cancellationToken);
++            var previousLease = (await ReadJobAsync(seed, cancellationToken)).LeaseExpiresAtUtc;
++            before = await ServerNowAsync(context, cancellationToken);
++
++            Assert.True(await repository.TryRenewLeaseAsync(attempt, cancellationToken));
++
++            var renewed = await ReadJobAsync(seed, cancellationToken);
++            Assert.True(renewed.LeaseExpiresAtUtc > previousLease);
++            Assert.InRange(
++                renewed.LeaseExpiresAtUtc!.Value,
++                before.AddMinutes(2),
++                (await ServerNowAsync(context, cancellationToken)).AddMinutes(2)
++            );
++            var recovery = _fixture.Services.GetRequiredService<ImportJobRecoveryService>();
++
++            await recovery.RecoverExpiredAsync(cancellationToken);
++            await recovery.RecoverExpiredAsync(cancellationToken);
++
++            AssertJobEqual(renewed, await ReadJobAsync(seed, cancellationToken));
++            Assert.Null(context.Database.CurrentTransaction);
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task Recovery_ShouldRequeueExpiredWork_AndFenceTheOldAttempt()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await using var oldContext = CreateContext();
++            await using var nextContext = CreateContext();
++            var oldRepository = CreateRepository(oldContext);
++            var old = Assert.IsType<ImportJobWorkItem>(
++                await oldRepository.ClaimNextPendingAsync(cancellationToken)
++            );
++            var oldResult = await CreateResultAsync(seed, cancellationToken);
++            await ExpireAsync(seed, cancellationToken);
++
++            Assert.False(await oldRepository.TryRenewLeaseAsync(old, cancellationToken));
++            Assert.Equal(
++                ImportJobCompletionOutcome.OwnershipLost,
++                await oldRepository.CompleteAsync(
++                    old,
++                    oldResult.StorageKey,
++                    oldResult.RowCount,
++                    oldResult.ColumnCount,
++                    cancellationToken
++                )
++            );
++            Assert.False(await oldRepository.TryFailAsync(old, "Too late", cancellationToken));
++            Assert.True(await CreateRepository(nextContext).RecoverNextExpiredAsync(cancellationToken));
++
++            var pending = await ReadJobAsync(seed, cancellationToken);
++            Assert.Equal(ImportJobStatus.Pending, pending.Status);
++            Assert.Equal(1L, pending.AttemptNumber);
++            Assert.Null(pending.LeaseExpiresAtUtc);
++            Assert.Null(pending.StartedAtUtc);
++            Assert.Null(pending.CompletedAtUtc);
++            Assert.Equal(DatasetVersionStatus.Pending, (await ReadVersionAsync(seed, cancellationToken)).Status);
++
++            var nextRepository = CreateRepository(nextContext);
++            var next = Assert.IsType<ImportJobWorkItem>(
++                await nextRepository.ClaimNextPendingAsync(cancellationToken)
++            );
++            Assert.Equal(2L, next.AttemptNumber);
++            var before = await ReadJobAsync(seed, cancellationToken);
++
++            Assert.False(await oldRepository.TryRenewLeaseAsync(old, cancellationToken));
++            Assert.False(await oldRepository.TryFailAsync(old, "Stale failure", cancellationToken));
++            AssertJobEqual(before, await ReadJobAsync(seed, cancellationToken));
++
++            var nextResult = await CreateResultAsync(seed, cancellationToken);
++            Assert.Equal(
++                ImportJobCompletionOutcome.Completed,
++                await nextRepository.CompleteAsync(
++                    next,
++                    nextResult.StorageKey,
++                    nextResult.RowCount,
++                    nextResult.ColumnCount,
++                    cancellationToken
++                )
++            );
++            Assert.Equal(
++                ImportJobCompletionOutcome.OwnershipLost,
++                await oldRepository.CompleteAsync(
++                    old,
++                    oldResult.StorageKey,
++                    oldResult.RowCount,
++                    oldResult.ColumnCount,
++                    cancellationToken
++                )
++            );
++            Assert.Equal(nextResult.StorageKey, (await ReadVersionAsync(seed, cancellationToken)).StorageKey);
++            Assert.True(await Storage.ExistsAsync(oldResult.StorageKey, cancellationToken));
++            Assert.True(await Storage.ExistsAsync(nextResult.StorageKey, cancellationToken));
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task Recovery_ShouldStopAtTheAttemptLimit_WithoutDeletingArtifacts()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await using var context = CreateContext();
++            var repository = CreateRepository(context);
++            var orphan = await CreateResultAsync(seed, cancellationToken);
++
++            for (var number = 1; number <= 3; number++)
++            {
++                var attempt = Assert.IsType<ImportJobWorkItem>(
++                    await repository.ClaimNextPendingAsync(cancellationToken)
++                );
++                Assert.Equal(number, attempt.AttemptNumber);
++                await ExpireAsync(seed, cancellationToken);
++
++                Assert.True(await repository.RecoverNextExpiredAsync(cancellationToken));
++
++                var saved = await ReadJobAsync(seed, cancellationToken);
++                Assert.Equal(number, saved.AttemptNumber);
++                Assert.Equal(number == 3 ? ImportJobStatus.Failed : ImportJobStatus.Pending, saved.Status);
++            }
++
++            Assert.Null(await repository.ClaimNextPendingAsync(cancellationToken));
++            Assert.False(await repository.RecoverNextExpiredAsync(cancellationToken));
++            var failed = await ReadJobAsync(seed, cancellationToken);
++            Assert.NotNull(failed.CompletedAtUtc);
++            Assert.NotNull(failed.ErrorMessage);
++            Assert.Null(failed.LeaseExpiresAtUtc);
++            Assert.Equal(DatasetVersionStatus.Failed, (await ReadVersionAsync(seed, cancellationToken)).Status);
++            Assert.True(await Storage.ExistsAsync(orphan.StorageKey, cancellationToken));
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task ConcurrentRecovery_ShouldRecoverTheSameExpiredJobExactlyOnce()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await using var claiming = CreateContext();
++            Assert.NotNull(await CreateRepository(claiming).ClaimNextPendingAsync(cancellationToken));
++            await ExpireAsync(seed, cancellationToken);
++            var gate = new RecoveryGate();
++            await using var winner = CreateContext(gate);
++            await using var loser = CreateContext();
++            var first = CreateRepository(winner).RecoverNextExpiredAsync(cancellationToken);
++
++            try
++            {
++                await gate.Reached.Task.WaitAsync(cancellationToken);
++
++                Assert.False(await CreateRepository(loser).RecoverNextExpiredAsync(cancellationToken));
++
++                var unchanged = await ReadJobAsync(seed, cancellationToken);
++                Assert.Equal(ImportJobStatus.Running, unchanged.Status);
++                Assert.Equal(1L, unchanged.AttemptNumber);
++            }
++            finally
++            {
++                gate.Release.TrySetResult();
++                Assert.True(await first.WaitAsync(cancellationToken));
++            }
++
++            Assert.False(await CreateRepository(loser).RecoverNextExpiredAsync(cancellationToken));
++            Assert.Equal(ImportJobStatus.Pending, (await ReadJobAsync(seed, cancellationToken)).Status);
++            var second = Assert.IsType<ImportJobWorkItem>(
++                await CreateRepository(loser).ClaimNextPendingAsync(cancellationToken)
++            );
++            Assert.Equal(2L, second.AttemptNumber);
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Theory]
++    [InlineData("00:00:02", "00:00:01", 3)]
++    [InlineData("00:02:00", "00:00:00", 3)]
++    [InlineData("00:02:00", "00:00:00.0000001", 3)]
++    [InlineData("00:02:00", "00:01:00", 3)]
++    [InlineData("00:02:00", "00:00:20", 0)]
++    public void ImportOptions_ShouldRejectUnsafeConfiguration(
++        string lease,
++        string heartbeat,
++        int attempts)
++    {
++        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
++            new Dictionary<string, string?>
++            {
++                ["ConnectionStrings:Default"] = "Host=localhost;Database=unused",
++                ["ImportJobs:WorkerEnabled"] = "false",
++                ["StorageCleanup:WorkerEnabled"] = "false",
++                ["ImportJobs:LeaseDuration"] = lease,
++                ["ImportJobs:HeartbeatInterval"] = heartbeat,
++                ["ImportJobs:MaxAttempts"] = attempts.ToString(System.Globalization.CultureInfo.InvariantCulture)
++            }
++        ).Build();
++        var services = new ServiceCollection();
++        services.AddLogging();
++        services.AddInfrastructure(configuration);
++        using var provider = services.BuildServiceProvider();
++
++        Assert.Throws<OptionsValidationException>(() =>
++            provider.GetRequiredService<IOptions<ImportJobOptions>>().Value
++        );
++    }
++
++    [Fact]
++    public async Task Heartbeat_ShouldRecoverAfterOneDatabaseFailure_WhileConversionRemainsBlocked()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            var clock = new PulseTimeProvider();
++            var fault = new HeartbeatFault();
++            var storage = new ConversionGate(Storage);
++            await using var provider = CreateProcessingProvider(storage, clock, fault);
++            await using var scope = provider.CreateAsyncScope();
++            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++            var processing = scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(cancellationToken);
++            try
++            {
++                await storage.Reached.Task.WaitAsync(cancellationToken);
++                Assert.Null(context.Database.CurrentTransaction);
++                await using (var shortening = CreateContext())
++                {
++                    await shortening.Database.ExecuteSqlInterpolatedAsync($"""
++                        UPDATE import_jobs SET "LeaseExpiresAtUtc" = clock_timestamp() + interval '30 seconds'
++                        WHERE "Id" = {seed.Job.Id}
++                        """, cancellationToken);
++                }
++                var before = await ReadJobAsync(seed, cancellationToken);
++
++                clock.Pulse();
++                await fault.FirstFailure.Task.WaitAsync(cancellationToken);
++                await WaitForHeartbeatTransactionAsync(seed, cancellationToken);
++
++                AssertJobEqual(before, await ReadJobAsync(seed, cancellationToken));
++                Assert.False(processing.IsCompleted);
++                Assert.False(storage.TokenWasCancelled);
++
++                clock.Pulse();
++                await fault.SecondSuccess.Task.WaitAsync(cancellationToken);
++                await WaitForHeartbeatTransactionAsync(seed, cancellationToken);
++
++                var renewed = await ReadJobAsync(seed, cancellationToken);
++                Assert.True(renewed.LeaseExpiresAtUtc > before.LeaseExpiresAtUtc);
++                Assert.Equal(ImportJobStatus.Running, renewed.Status);
++                Assert.Equal(2, fault.ContextIds.Distinct().Count());
++                Assert.DoesNotContain(context.ContextId.InstanceId, fault.ContextIds);
++                Assert.False(storage.TokenWasCancelled);
++            }
++            finally
++            {
++                storage.Release.TrySetResult();
++                Assert.True(await processing.WaitAsync(cancellationToken));
++            }
++
++            Assert.Equal(ImportJobStatus.Completed, (await ReadJobAsync(seed, cancellationToken)).Status);
++            Assert.True(await Storage.ExistsAsync(storage.SavedKey!, cancellationToken));
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task ConfirmedOwnershipLoss_ShouldCancelConversion_WithoutDeletingEitherAttempt()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            var clock = new PulseTimeProvider();
++            var storage = new ConversionGate(Storage);
++            await using var provider = CreateProcessingProvider(storage, clock);
++            await using var scope = provider.CreateAsyncScope();
++            var processing = scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(cancellationToken);
++            ImportJobWorkItem next;
++            try
++            {
++                await storage.Reached.Task.WaitAsync(cancellationToken);
++                await ExpireAsync(seed, cancellationToken);
++                await using var context = CreateContext();
++                var repository = CreateRepository(context);
++                Assert.True(await repository.RecoverNextExpiredAsync(cancellationToken));
++                next = Assert.IsType<ImportJobWorkItem>(
++                    await repository.ClaimNextPendingAsync(cancellationToken)
++                );
++
++                clock.Pulse();
++                Assert.True(await processing.WaitAsync(cancellationToken));
++
++                Assert.True(storage.TokenWasCancelled);
++                Assert.Equal(2L, next.AttemptNumber);
++                Assert.Equal(ImportJobStatus.Running, (await ReadJobAsync(seed, cancellationToken)).Status);
++                Assert.True(await Storage.ExistsAsync(storage.SavedKey!, cancellationToken));
++                var result = await CreateResultAsync(seed, cancellationToken);
++                Assert.Equal(
++                    ImportJobCompletionOutcome.Completed,
++                    await repository.CompleteAsync(
++                        next,
++                        result.StorageKey,
++                        result.RowCount,
++                        result.ColumnCount,
++                        cancellationToken
++                    )
++                );
++                Assert.Equal(result.StorageKey, (await ReadVersionAsync(seed, cancellationToken)).StorageKey);
++                Assert.True(await Storage.ExistsAsync(result.StorageKey, cancellationToken));
++                Assert.Equal(0, storage.DeleteCalls);
++            }
++            finally
++            {
++                storage.Release.TrySetResult();
++                await processing.WaitAsync(cancellationToken);
++            }
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public async Task HostCancellation_ShouldPreserveArtifacts_BeforeOrAfterPublication(
++        bool afterCommit)
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        using var hostCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            var storage = new ConversionGate(Storage);
++            var commit = new CommitAcknowledgementFault(hostCancellation, throwAfterCommit: false);
++            await using var provider = CreateProcessingProvider(storage, new PulseTimeProvider(), commit);
++            await using var scope = provider.CreateAsyncScope();
++            var processing = scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(hostCancellation.Token);
++            await storage.Reached.Task.WaitAsync(cancellationToken);
++            if (afterCommit)
++            {
++                storage.Release.TrySetResult();
++                Assert.True(await processing.WaitAsync(cancellationToken));
++            }
++            else
++            {
++                await hostCancellation.CancelAsync();
++                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => processing.WaitAsync(cancellationToken));
++            }
++
++            var saved = await ReadJobAsync(seed, cancellationToken);
++            Assert.Equal(afterCommit ? ImportJobStatus.Completed : ImportJobStatus.Running, saved.Status);
++            Assert.True(await Storage.ExistsAsync(storage.SavedKey!, cancellationToken));
++            Assert.Equal(0, storage.DeleteCalls);
++            if (afterCommit)
++            {
++                Assert.Equal(DatasetVersionStatus.Ready, (await ReadVersionAsync(seed, cancellationToken)).Status);
++                Assert.Null(saved.LeaseExpiresAtUtc);
++            }
++            else
++            {
++                await ExpireAsync(seed, cancellationToken);
++                await using var recovery = CreateContext();
++                Assert.True(await CreateRepository(recovery).RecoverNextExpiredAsync(cancellationToken));
++                Assert.Equal(ImportJobStatus.Pending, (await ReadJobAsync(seed, cancellationToken)).Status);
++            }
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public async Task CommitReconciliation_ShouldUseAFreshContext_AndNeverRepublish(
++        bool verificationInitiallyUnavailable)
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            var commit = new CommitAcknowledgementFault();
++            var reads = new VerificationFault(commit, verificationInitiallyUnavailable);
++            await using var provider = CreateProcessingProvider(
++                Storage,
++                new PulseTimeProvider(),
++                commit,
++                reads
++            );
++            await using var scope = provider.CreateAsyncScope();
++            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
++            var processing = scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(cancellationToken);
++
++            if (verificationInitiallyUnavailable)
++            {
++                var error = await Assert.ThrowsAsync<InvalidOperationException>(() => processing);
++                Assert.IsType<Npgsql.NpgsqlException>(error.InnerException);
++            }
++            else
++            {
++                Assert.True(await processing);
++            }
++
++            Assert.Equal(2, commit.CommitCount);
++            Assert.Equal(context.ContextId.InstanceId, commit.PoisonedContextId);
++            Assert.DoesNotContain(context.ContextId.InstanceId, reads.VerificationContextIds);
++            var completed = await ReadJobAsync(seed, cancellationToken);
++            var version = await ReadVersionAsync(seed, cancellationToken);
++            Assert.Equal(ImportJobStatus.Completed, completed.Status);
++            Assert.Equal(DatasetVersionStatus.Ready, version.Status);
++            Assert.NotNull(version.StorageKey);
++            Assert.True(await Storage.ExistsAsync(version.StorageKey, cancellationToken));
++            var receipt = new ImportJobWorkItem(
++                context.ImportJobs.Local.Single(),
++                seed.Version,
++                seed.Dataset,
++                1
++            );
++
++            await using var verificationScope = provider.CreateAsyncScope();
++            var repository = verificationScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
++
++            Assert.True(await repository.IsCompletedAsync(
++                receipt,
++                version.StorageKey,
++                version.RowCount!.Value,
++                version.ColumnCount!.Value,
++                cancellationToken
++            ));
++            Assert.False(await repository.RecoverNextExpiredAsync(cancellationToken));
++            Assert.Null(await repository.ClaimNextPendingAsync(cancellationToken));
++            AssertJobEqual(completed, await ReadJobAsync(seed, cancellationToken));
++            Assert.Equal(2, commit.CommitCount);
++            Assert.True(await Storage.ExistsAsync(version.StorageKey, cancellationToken));
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task RecoveryService_ShouldLeaveActiveWorkAtStartup_AndRecoverExpiryOnALaterTick()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await using var context = CreateContext();
++            Assert.NotNull(await CreateRepository(context).ClaimNextPendingAsync(cancellationToken));
++            var clock = new PulseTimeProvider();
++            var observer = new RecoveryObserver();
++            await using var provider = CreateProcessingProvider(Storage, clock, observer);
++            using var service = new ImportJobRecoveryService(
++                provider.GetRequiredService<IServiceScopeFactory>(),
++                provider.GetRequiredService<IOptions<ImportJobOptions>>(),
++                clock,
++                NullLogger<ImportJobRecoveryService>.Instance
++            );
++
++            await service.StartAsync(cancellationToken);
++            try
++            {
++                await observer.FirstPass.Task.WaitAsync(cancellationToken);
++                Assert.Equal(ImportJobStatus.Running, (await ReadJobAsync(seed, cancellationToken)).Status);
++                await ExpireAsync(seed, cancellationToken);
++
++                clock.Pulse();
++                await observer.SecondPass.Task.WaitAsync(cancellationToken);
++                await WaitForHeartbeatTransactionAsync(seed, cancellationToken);
++
++                Assert.Equal(ImportJobStatus.Pending, (await ReadJobAsync(seed, cancellationToken)).Status);
++                Assert.Equal(DatasetVersionStatus.Pending, (await ReadVersionAsync(seed, cancellationToken)).Status);
++            }
++            finally
++            {
++                await service.StopAsync(cancellationToken);
++            }
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public async Task ImportFailure_ShouldRetryOnlyUnexpectedErrors(
++        bool permanentMissingFile)
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            Exception failure = permanentMissingFile
++                ? new FileNotFoundException("Missing source.")
++                : new InvalidOperationException("Unexpected conversion failure.");
++            var storage = new ReadFailureStorage(Storage, failure);
++            await using var provider = CreateProcessingProvider(storage, new PulseTimeProvider());
++            await using var scope = provider.CreateAsyncScope();
++
++            Assert.True(await scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(cancellationToken));
++
++            var saved = await ReadJobAsync(seed, cancellationToken);
++            Assert.Equal(permanentMissingFile ? ImportJobStatus.Failed : ImportJobStatus.Running, saved.Status);
++            if (!permanentMissingFile)
++            {
++                await ExpireAsync(seed, cancellationToken);
++            }
++            await using var context = CreateContext();
++
++            Assert.Equal(!permanentMissingFile, await CreateRepository(context).RecoverNextExpiredAsync(cancellationToken));
++
++            Assert.Equal(permanentMissingFile ? ImportJobStatus.Failed : ImportJobStatus.Pending,
++                (await ReadJobAsync(seed, cancellationToken)).Status);
++            Assert.Equal(permanentMissingFile ? DatasetVersionStatus.Failed : DatasetVersionStatus.Pending,
++                (await ReadVersionAsync(seed, cancellationToken)).Status);
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task InvalidCsv_ShouldFailPermanently_WithoutARecoveryLoop()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await Storage.DeleteAsync(seed.Job.SourceStorageKey, cancellationToken);
++            await using var bytes = new MemoryStream(new byte[] { 0xff, 0xfe, 0, 0, 0xff });
++            await Storage.SaveAsync(seed.Job.SourceStorageKey, bytes, cancellationToken);
++            await using var provider = CreateProcessingProvider(Storage, new PulseTimeProvider());
++            await using var scope = provider.CreateAsyncScope();
++
++            Assert.True(await scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(cancellationToken));
++
++            var saved = await ReadJobAsync(seed, cancellationToken);
++            Assert.Equal(ImportJobStatus.Failed, saved.Status);
++            Assert.Equal(1L, saved.AttemptNumber);
++            Assert.Null(saved.LeaseExpiresAtUtc);
++            Assert.Equal(DatasetVersionStatus.Failed, (await ReadVersionAsync(seed, cancellationToken)).Status);
++            await using var context = CreateContext();
++            Assert.False(await CreateRepository(context).RecoverNextExpiredAsync(cancellationToken));
++            Assert.Null(await CreateRepository(context).ClaimNextPendingAsync(cancellationToken));
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    [Fact]
++    public async Task NativeImporterBug_ShouldRemainRetryable_InsteadOfBeingClassifiedAsInvalidCsv()
++    {
++        using var deadline = CreateDeadline();
++        var cancellationToken = deadline.Token;
++        var seed = await SeedAsync(cancellationToken);
++        try
++        {
++            await using var connection = new DuckDBConnection("DataSource=:memory:");
++            await connection.OpenAsync(cancellationToken);
++            await using var command = connection.CreateCommand();
++            command.CommandText = "SELECT * FROM missing_importer_table";
++            var failure = await Assert.ThrowsAsync<DuckDBException>(() =>
++                command.ExecuteNonQueryAsync(cancellationToken)
++            );
++            Assert.Contains("missing_importer_table", failure.Message, StringComparison.Ordinal);
++            Assert.NotEqual(DuckDBErrorType.InvalidInput, failure.ErrorType);
++            Assert.NotEqual(DuckDBErrorType.Conversion, failure.ErrorType);
++            var storage = new ReadFailureStorage(
++                Storage,
++                failure
++            );
++            await using var provider = CreateProcessingProvider(storage, new PulseTimeProvider());
++            await using var scope = provider.CreateAsyncScope();
++
++            Assert.True(await scope.ServiceProvider.GetRequiredService<ImportJobProcessor>()
++                .ProcessNextAsync(cancellationToken));
++
++            Assert.Equal(ImportJobStatus.Running, (await ReadJobAsync(seed, cancellationToken)).Status);
++            await ExpireAsync(seed, cancellationToken);
++            await using var context = CreateContext();
++            Assert.True(await CreateRepository(context).RecoverNextExpiredAsync(cancellationToken));
++            Assert.Equal(ImportJobStatus.Pending, (await ReadJobAsync(seed, cancellationToken)).Status);
++            Assert.Equal(DatasetVersionStatus.Pending, (await ReadVersionAsync(seed, cancellationToken)).Status);
++        }
++        finally
++        {
++            await CleanupAsync(seed);
++        }
++    }
++
++    private IFileStorage Storage => _fixture.Services.GetRequiredService<IFileStorage>();
++
++    private string ConnectionString
++    {
++        get
++        {
++            using var scope = _fixture.Services.CreateScope();
++            return scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.GetConnectionString()!;
++        }
++    }
++
++    private AppDbContext CreateContext(IInterceptor? interceptor = null)
++    {
++        var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(ConnectionString);
++        if (interceptor is not null)
++        {
++            options.AddInterceptors(interceptor);
++        }
++        return new AppDbContext(options.Options);
++    }
++
++    private static ImportJobRepository CreateRepository(AppDbContext context)
++    {
++        return new ImportJobRepository(
++            context,
++            new ProjectWriteTransactionFactory(context),
++            Options.Create(new ImportJobOptions())
++        );
++    }
++
++    private static CancellationTokenSource CreateDeadline()
++    {
++        var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
++        deadline.CancelAfter(TimeSpan.FromSeconds(30));
++        return deadline;
++    }
++
++    private async Task<Seed> SeedAsync(CancellationToken cancellationToken)
++    {
++        var project = new Project(
++            Guid.NewGuid(),
++            "Lease project"
++        );
++        var dataset = new Dataset(
++            project.Id,
++            "Lease dataset"
++        );
++        var version = new DatasetVersion(
++            dataset.Id,
++            1,
++            "source.csv"
++        );
++        var job = new ImportJob(
++            version.Id,
++            "source.csv",
++            $"datasets/{dataset.Id:N}/imports/{version.Id:N}/source.csv"
++        );
++        await using var context = CreateContext();
++        context.AddRange(project, dataset, version, job);
++        await context.SaveChangesAsync(cancellationToken);
++        await using var source = new MemoryStream("Country,Amount\nPL,10\nDE,20\n"u8.ToArray());
++        await Storage.SaveAsync(job.SourceStorageKey, source, cancellationToken);
++        return new Seed(project, dataset, version, job);
++    }
++
++    private async Task ExpireAsync(Seed seed, CancellationToken cancellationToken)
++    {
++        await using var context = CreateContext();
++        await context.Database.ExecuteSqlInterpolatedAsync($"""
++            UPDATE import_jobs SET "LeaseExpiresAtUtc" = clock_timestamp() - interval '1 second'
++            WHERE "Id" = {seed.Job.Id}
++            """, cancellationToken);
++    }
++
++    private async Task<ImportJob> ReadJobAsync(Seed seed, CancellationToken cancellationToken)
++    {
++        await using var context = CreateContext();
++        return await context.ImportJobs.AsNoTracking().SingleAsync(job => job.Id == seed.Job.Id, cancellationToken);
++    }
++
++    private async Task<DatasetVersion> ReadVersionAsync(Seed seed, CancellationToken cancellationToken)
++    {
++        await using var context = CreateContext();
++        return await context.DatasetVersions.AsNoTracking().SingleAsync(version => version.Id == seed.Version.Id, cancellationToken);
++    }
++
++    private static async Task<DateTime> ServerNowAsync(AppDbContext context, CancellationToken cancellationToken)
++    {
++        var values = await context.Database.SqlQuery<DateTime>($"SELECT clock_timestamp() AS \"Value\"")
++            .ToListAsync(cancellationToken);
++        return Assert.Single(values);
++    }
++
++    private async Task<DuckDbCsvImportResult> CreateResultAsync(Seed seed, CancellationToken cancellationToken)
++    {
++        using var scope = _fixture.Services.CreateScope();
++        return await scope.ServiceProvider.GetRequiredService<DuckDbCsvImporter>().ImportAsync(
++            seed.Job.SourceStorageKey,
++            $"datasets/{seed.Dataset.Id:N}/versions/{seed.Version.Id:N}/attempts",
++            cancellationToken
++        );
++    }
++
++    private async Task CleanupAsync(Seed seed)
++    {
++        await using var context = CreateContext();
++        await context.Projects.Where(project => project.Id == seed.Project.Id).ExecuteDeleteAsync(CancellationToken.None);
++        await Storage.DeleteDirectoryAsync($"datasets/{seed.Dataset.Id:N}", CancellationToken.None);
++    }
++
++    private static void AssertJobEqual(ImportJob expected, ImportJob actual)
++    {
++        Assert.Equal(expected.Status, actual.Status);
++        Assert.Equal(expected.AttemptNumber, actual.AttemptNumber);
++        Assert.Equal(expected.LeaseExpiresAtUtc, actual.LeaseExpiresAtUtc);
++        Assert.Equal(expected.StartedAtUtc, actual.StartedAtUtc);
++        Assert.Equal(expected.CompletedAtUtc, actual.CompletedAtUtc);
++        Assert.Equal(expected.ErrorMessage, actual.ErrorMessage);
++    }
++
++    private sealed record Seed(
++        Project Project,
++        Dataset Dataset,
++        DatasetVersion Version,
++        ImportJob Job
++    );
++
++    private ServiceProvider CreateProcessingProvider(
++        IFileStorage storage,
++        PulseTimeProvider timeProvider,
++        params IInterceptor[] interceptors)
++    {
++        var services = new ServiceCollection();
++        services.AddDbContext<AppDbContext>(options =>
++            options.UseNpgsql(ConnectionString).AddInterceptors(interceptors));
++        services.AddSingleton<IOptions<ImportJobOptions>>(Options.Create(new ImportJobOptions()));
++        services.AddSingleton<TimeProvider>(timeProvider);
++        services.AddSingleton(storage);
++        services.AddSingleton(typeof(Microsoft.Extensions.Logging.ILogger<>), typeof(NullLogger<>));
++        services.AddScoped<IProjectWriteTransactionFactory, ProjectWriteTransactionFactory>();
++        services.AddScoped<IImportJobRepository, ImportJobRepository>();
++        services.AddScoped<DuckDbCsvImporter>();
++        services.AddScoped<ImportJobProcessor>();
++        return services.BuildServiceProvider(validateScopes: true);
++    }
++
++    private async Task WaitForHeartbeatTransactionAsync(Seed seed, CancellationToken cancellationToken)
++    {
++        await using var context = CreateContext();
++        await using var transaction = await new ProjectWriteTransactionFactory(context).BeginAsync(
++            seed.Project.Id,
++            cancellationToken
++        );
++        Assert.NotNull(transaction);
++    }
++
++    private sealed class PulseTimeProvider : TimeProvider
++    {
++        private readonly List<PulseTimer> _timers = [];
++
++        public override ITimer CreateTimer(
++            TimerCallback callback,
++            object? state,
++            TimeSpan dueTime,
++            TimeSpan period)
++        {
++            var timer = new PulseTimer(callback, state, dueTime);
++            lock (_timers)
++            {
++                _timers.Add(timer);
++            }
++            return timer;
++        }
++
++        public void Pulse()
++        {
++            PulseTimer[] timers;
++            lock (_timers)
++            {
++                timers = _timers.ToArray();
++            }
++            foreach (var timer in timers)
++            {
++                timer.Fire();
++            }
++        }
++
++        private sealed class PulseTimer : ITimer
++        {
++            private readonly object _syncRoot = new();
++            private readonly TimerCallback _callback;
++            private readonly object? _state;
++            private bool _enabled;
++
++            public PulseTimer(TimerCallback callback, object? state, TimeSpan dueTime)
++            {
++                _callback = callback;
++                _state = state;
++                _enabled = dueTime != Timeout.InfiniteTimeSpan;
++            }
++
++            public void Fire()
++            {
++                lock (_syncRoot)
++                {
++                    if (_enabled)
++                    {
++                        _callback(_state);
++                    }
++                }
++            }
++
++            public bool Change(TimeSpan dueTime, TimeSpan period)
++            {
++                lock (_syncRoot)
++                {
++                    _enabled = dueTime != Timeout.InfiniteTimeSpan;
++                    return true;
++                }
++            }
++
++            public void Dispose()
++            {
++                lock (_syncRoot)
++                {
++                    _enabled = false;
++                }
++            }
++
++            public ValueTask DisposeAsync()
++            {
++                Dispose();
++                return ValueTask.CompletedTask;
++            }
++        }
++    }
++
++    private sealed class HeartbeatFault : DbCommandInterceptor
++    {
++        public TaskCompletionSource FirstFailure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++        public TaskCompletionSource SecondSuccess { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++        public List<Guid> ContextIds { get; } = [];
++
++        public override ValueTask<int> NonQueryExecutedAsync(
++            DbCommand command,
++            CommandExecutedEventData eventData,
++            int result,
++            CancellationToken cancellationToken = default)
++        {
++            if (command.CommandText.Contains("SET \"LeaseExpiresAtUtc\"", StringComparison.Ordinal))
++            {
++                ContextIds.Add(eventData.Context!.ContextId.InstanceId);
++                if (ContextIds.Count == 1)
++                {
++                    FirstFailure.TrySetResult();
++                    throw new Npgsql.NpgsqlException("Transient heartbeat database failure.", new TimeoutException());
++                }
++                SecondSuccess.TrySetResult();
++            }
++            return ValueTask.FromResult(result);
++        }
++    }
++
++    private sealed class CommitAcknowledgementFault : DbTransactionInterceptor
++    {
++        private readonly CancellationTokenSource? _hostCancellation;
++        private readonly bool _throwAfterCommit;
++        public int CommitCount { get; private set; }
++        public Guid? PoisonedContextId { get; private set; }
++
++        public CommitAcknowledgementFault(
++            CancellationTokenSource? hostCancellation = null,
++            bool throwAfterCommit = true)
++        {
++            _hostCancellation = hostCancellation;
++            _throwAfterCommit = throwAfterCommit;
++        }
++
++        public override Task TransactionCommittedAsync(
++            DbTransaction transaction,
++            TransactionEndEventData eventData,
++            CancellationToken cancellationToken = default)
++        {
++            CommitCount++;
++            if (CommitCount == 2)
++            {
++                PoisonedContextId = eventData.Context!.ContextId.InstanceId;
++                _hostCancellation?.Cancel();
++                if (_throwAfterCommit)
++                {
++                    throw new IOException("Acknowledgement lost after the actual PostgreSQL commit.");
++                }
++            }
++            return Task.CompletedTask;
++        }
++    }
++
++    private sealed class VerificationFault : DbCommandInterceptor
++    {
++        private readonly CommitAcknowledgementFault _commit;
++        private bool _failFreshRead;
++        public List<Guid> VerificationContextIds { get; } = [];
++
++        public VerificationFault(CommitAcknowledgementFault commit, bool failFreshRead)
++        {
++            _commit = commit;
++            _failFreshRead = failFreshRead;
++        }
++
++        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
++            DbCommand command,
++            CommandEventData eventData,
++            InterceptionResult<DbDataReader> result,
++            CancellationToken cancellationToken = default)
++        {
++            if (_commit.PoisonedContextId is { } poisoned)
++            {
++                var current = eventData.Context!.ContextId.InstanceId;
++                if (poisoned == current)
++                {
++                    throw new InvalidOperationException("The original context cannot query after its connection failed.");
++                }
++                if (command.CommandText.Contains("EXISTS", StringComparison.Ordinal)
++                    && command.CommandText.Contains("\"RowCount\"", StringComparison.Ordinal))
++                {
++                    VerificationContextIds.Add(current);
++                    if (_failFreshRead)
++                    {
++                        _failFreshRead = false;
++                        throw new Npgsql.NpgsqlException("Database is temporarily unavailable for verification.", new TimeoutException());
++                    }
++                }
++            }
++            return ValueTask.FromResult(result);
++        }
++    }
++
++    private sealed class RecoveryObserver : DbCommandInterceptor
++    {
++        private int _count;
++        public TaskCompletionSource FirstPass { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++        public TaskCompletionSource SecondPass { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++
++        public override ValueTask<DbDataReader> ReaderExecutedAsync(
++            DbCommand command,
++            CommandExecutedEventData eventData,
++            DbDataReader result,
++            CancellationToken cancellationToken = default)
++        {
++            if (command.CommandText.Contains("FROM import_jobs AS expired_job", StringComparison.Ordinal))
++            {
++                if (Interlocked.Increment(ref _count) == 1)
++                {
++                    FirstPass.TrySetResult();
++                }
++                else
++                {
++                    SecondPass.TrySetResult();
++                }
++            }
++            return ValueTask.FromResult(result);
++        }
++    }
++
++    private sealed class ConversionGate : IFileStorage
++    {
++        private readonly IFileStorage _inner;
++        public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++        public string? SavedKey { get; private set; }
++        public bool TokenWasCancelled { get; private set; }
++        public int DeleteCalls { get; private set; }
++
++        public ConversionGate(IFileStorage inner)
++        {
++            _inner = inner;
++        }
++
++        public async Task SaveAsync(string storageKey, Stream content, CancellationToken cancellationToken)
++        {
++            await _inner.SaveAsync(storageKey, content, cancellationToken);
++            SavedKey = storageKey;
++            Reached.TrySetResult();
++            try
++            {
++                await Release.Task.WaitAsync(cancellationToken);
++            }
++            catch (OperationCanceledException)
++            {
++                TokenWasCancelled = true;
++                throw;
++            }
++        }
++
++        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken) =>
++            _inner.OpenReadAsync(storageKey, cancellationToken);
++
++        public Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken) =>
++            _inner.ExistsAsync(storageKey, cancellationToken);
++
++        public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
++        {
++            DeleteCalls++;
++            return _inner.DeleteAsync(storageKey, cancellationToken);
++        }
++
++        public Task DeleteDirectoryAsync(string storageKey, CancellationToken cancellationToken)
++        {
++            DeleteCalls++;
++            return _inner.DeleteDirectoryAsync(storageKey, cancellationToken);
++        }
++    }
++
++    private sealed class ReadFailureStorage : IFileStorage
++    {
++        private readonly IFileStorage _inner;
++        private readonly Exception _failure;
++
++        public ReadFailureStorage(IFileStorage inner, Exception failure)
++        {
++            _inner = inner;
++            _failure = failure;
++        }
++
++        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken) =>
++            Task.FromException<Stream>(_failure);
++
++        public Task SaveAsync(string storageKey, Stream content, CancellationToken cancellationToken) =>
++            _inner.SaveAsync(storageKey, content, cancellationToken);
++
++        public Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken) =>
++            _inner.ExistsAsync(storageKey, cancellationToken);
++
++        public Task DeleteAsync(string storageKey, CancellationToken cancellationToken) =>
++            _inner.DeleteAsync(storageKey, cancellationToken);
++
++        public Task DeleteDirectoryAsync(string storageKey, CancellationToken cancellationToken) =>
++            _inner.DeleteDirectoryAsync(storageKey, cancellationToken);
++    }
++
++    private sealed class RecoveryGate : DbCommandInterceptor
++    {
++        public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
++
++        public override async ValueTask<DbDataReader> ReaderExecutedAsync(
++            DbCommand command,
++            CommandExecutedEventData eventData,
++            DbDataReader result,
++            CancellationToken cancellationToken = default)
++        {
++            if (command.CommandText.Contains("FROM import_jobs AS expired_job", StringComparison.Ordinal))
++            {
++                Reached.TrySetResult();
++                await Release.Task.WaitAsync(cancellationToken);
++            }
++            return result;
++        }
++    }
++}

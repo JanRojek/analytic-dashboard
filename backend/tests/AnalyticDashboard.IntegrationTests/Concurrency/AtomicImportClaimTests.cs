@@ -5,11 +5,13 @@ using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using AnalyticDashboard.Infrastructure.Repositories;
+using AnalyticDashboard.Infrastructure.Services.Import;
 using AnalyticDashboard.Infrastructure.Storage;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 using Npgsql;
 
@@ -233,7 +235,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                 await ReadJobAsync(context, tracked.Id, cancellationToken)
             );
             tracked.MarkFailed("Test failure after claim");
-            await repository.SaveChangesAsync(cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
             Assert.Equal(
                 8L,
                 (await ReadJobAsync(context, tracked.Id, cancellationToken)).AttemptNumber
@@ -442,7 +444,8 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
     {
         return new ImportJobRepository(
             context,
-            new ProjectWriteTransactionFactory(context)
+            new ProjectWriteTransactionFactory(context),
+            Options.Create(new ImportJobOptions { MaxAttempts = 10 })
         );
     }
 

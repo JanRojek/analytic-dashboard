@@ -41,6 +41,8 @@ public sealed class ImportJobConfiguration
 
         builder.Property(job => job.StartedAtUtc);
 
+        builder.Property(job => job.LeaseExpiresAtUtc);
+
         builder.Property(job => job.CompletedAtUtc);
 
         builder
@@ -52,6 +54,13 @@ public sealed class ImportJobConfiguration
         builder
             .HasIndex(job => job.DatasetVersionId)
             .IsUnique();
+
+        builder.HasIndex(job => new
+            {
+                job.LeaseExpiresAtUtc,
+                job.Id
+            })
+            .HasFilter("\"Status\" = 'Running'");
 
         builder
             .HasIndex(job => new

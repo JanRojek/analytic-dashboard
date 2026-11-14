@@ -21,7 +21,7 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task RecoverInterruptedAsync_ShouldFailRunningJobWithoutDeletingUnownedParquet()
+    public async Task RecoverExpiredAsync_ShouldFailExhaustedJobWithoutDeletingUnownedParquet()
     {
         var userId = Guid.NewGuid();
 
@@ -62,7 +62,8 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
 
             dbContext.Entry(importJob).Property(job => job.Status).CurrentValue = ImportJobStatus.Running;
             dbContext.Entry(importJob).Property(job => job.StartedAtUtc).CurrentValue = DateTime.UtcNow;
-            dbContext.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 1;
+            dbContext.Entry(importJob).Property(job => job.AttemptNumber).CurrentValue = 3;
+            dbContext.Entry(importJob).Property(job => job.LeaseExpiresAtUtc).CurrentValue = DateTime.UnixEpoch;
 
             await dbContext.SaveChangesAsync(
                 CancellationToken
@@ -99,7 +100,7 @@ public sealed class ImportJobRecoveryServiceTests : IClassFixture<ApiFixture>
                 var recoveryService = scope.ServiceProvider
                     .GetRequiredService<ImportJobRecoveryService>();
 
-                await recoveryService.RecoverInterruptedAsync(
+                await recoveryService.RecoverExpiredAsync(
                     CancellationToken
                 );
             }
