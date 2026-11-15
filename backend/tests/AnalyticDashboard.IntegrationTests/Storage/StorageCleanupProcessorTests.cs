@@ -21,7 +21,7 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task ProcessNextAsync_ShouldRemoveJob_WhenStorageDeletionSucceeds()
+    public async Task ProcessNextAsync_ShouldRetainDeletionIntent_WhenStorageDeletionSucceeds()
     {
         var job = new StorageCleanupJob(Guid.NewGuid());
         var storage = new TestFileStorage();
@@ -46,12 +46,17 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
             Assert.Single(storage.DeletedDirectories)
         );
 
-        Assert.False(await context.StorageCleanupJobs
+        Assert.True(await context.StorageCleanupJobs
             .AsNoTracking()
             .AnyAsync(
                 item => item.Id == job.Id,
                 CancellationToken
             ));
+
+        Assert.Equal(0, job.AttemptCount);
+        Assert.True(job.NextAttemptAtUtc > DateTime.UtcNow);
+        Assert.False(await processor.ProcessNextAsync(CancellationToken));
+        Assert.Single(storage.DeletedDirectories);
     }
 
     [Fact]

@@ -11,8 +11,6 @@ namespace AnalyticDashboard.Infrastructure.Services.Import;
 
 public sealed class ImportJobProcessor
 {
-    private const int MaxErrorMessageLength = 2000;
-
     private readonly IImportJobRepository _importJobRepository;
     private readonly DuckDbCsvImporter _csvImporter;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -149,7 +147,6 @@ public sealed class ImportJobProcessor
 
         try
         {
-            // The provider executes native queries synchronously; keep heartbeat independent of conversion.
             importResult = await Task.Run(
                 () => _csvImporter.ImportAsync(
                     workItem.Job.SourceStorageKey,
@@ -235,7 +232,6 @@ public sealed class ImportJobProcessor
                 exception.GetType().Name
             );
 
-            // A broken original connection cannot verify its commit. Read in a fresh scope without republishing.
             await using var verificationScope = _scopeFactory.CreateAsyncScope();
             var repository = verificationScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
             var completed = await repository.IsCompletedAsync(
@@ -324,14 +320,15 @@ public sealed class ImportJobProcessor
     private static string CreateErrorMessage(
         Exception exception)
     {
-        var message = string.IsNullOrWhiteSpace(
-            exception.Message
-        )
-            ? exception.GetType().Name
-            : exception.Message;
-
-        return message.Length <= MaxErrorMessageLength
-            ? message
-            : message[..MaxErrorMessageLength];
+        return exception switch
+        {
+            FileNotFoundException or DirectoryNotFoundException =>
+                "Import source is unavailable.",
+            DuckDBException { ErrorType: DuckDBErrorType.InvalidInput } =>
+                "CSV format is invalid.",
+            DuckDBException { ErrorType: DuckDBErrorType.Conversion } =>
+                "CSV values do not match the detected column types.",
+            _ => "Import failed."
+        };
     }
 }

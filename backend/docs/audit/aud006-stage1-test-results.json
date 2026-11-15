@@ -1,0 +1,216 @@
+{
+  "Date": "2026-11-15",
+  "Build": {
+    "Errors": 0,
+    "Warnings": 0
+  },
+  "Reports": [
+    {
+      "File": "aud006-before-final.trx",
+      "ExpectedFailureBeforeFix": true,
+      "Counters": {
+        "Total": 7,
+        "Executed": 7,
+        "Passed": 0,
+        "Failed": 7,
+        "NotExecuted": 0
+      },
+      "Tests": [
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.Cleanup_ShouldKeepItsIntent_WhenAcknowledgementIsLostAfterTheActualDatabaseWrite",
+          "Outcome": "Failed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: False, loseWriteAcknowledgement: True)",
+          "Outcome": "Failed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: True, loseWriteAcknowledgement: False)",
+          "Outcome": "Failed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: False, loseWriteAcknowledgement: True)",
+          "Outcome": "Failed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: False, loseWriteAcknowledgement: False)",
+          "Outcome": "Failed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: False, loseWriteAcknowledgement: False)",
+          "Outcome": "Failed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: True, loseWriteAcknowledgement: False)",
+          "Outcome": "Failed"
+        }
+      ],
+      "NotExecuted": []
+    },
+    {
+      "File": "aud006-targeted.trx",
+      "ExpectedFailureBeforeFix": false,
+      "Counters": {
+        "Total": 25,
+        "Executed": 25,
+        "Passed": 25,
+        "Failed": 0,
+        "NotExecuted": 0
+      },
+      "Tests": [
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: False, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"invalid_csv\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"completed\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.Cleanup_ShouldKeepItsIntent_WhenAcknowledgementIsLostAfterTheActualDatabaseWrite",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: True, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"host_cancelled\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: False, loseWriteAcknowledgement: True)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"fenced\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"missing\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: True, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: False, loseWriteAcknowledgement: True)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"conversion_error\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: False, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"unexpected\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"directory_missing\")",
+          "Outcome": "Passed"
+        }
+      ],
+      "NotExecuted": []
+    },
+    {
+      "File": "aud006-all_net10.0_20261115205221.trx",
+      "ExpectedFailureBeforeFix": false,
+      "Counters": {
+        "Total": 22,
+        "Executed": 22,
+        "Passed": 22,
+        "Failed": 0,
+        "NotExecuted": 0
+      },
+      "Tests": [],
+      "NotExecuted": []
+    },
+    {
+      "File": "aud006-all_net10.0_20261115205351.trx",
+      "ExpectedFailureBeforeFix": false,
+      "Counters": {
+        "Total": 452,
+        "Executed": 449,
+        "Passed": 449,
+        "Failed": 0,
+        "NotExecuted": 3
+      },
+      "Tests": [
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: False, loseWriteAcknowledgement: True)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: True, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"completed\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: False, loseWriteAcknowledgement: True)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"host_cancelled\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: True, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"missing\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"directory_missing\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"conversion_error\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: False, finishConversionAfterDeletion: False, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"unexpected\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"fenced\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(deleteProject: True, finishConversionAfterDeletion: False, loseWriteAcknowledgement: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Import.ImportDiagnosticsTests.Processing_ShouldIdentifyAttemptOutcomeAndDuration_WithoutLoggingPrivateData(outcome: \"invalid_csv\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Concurrency.ImportStorageLifecycleTests.Cleanup_ShouldKeepItsIntent_WhenAcknowledgementIsLostAfterTheActualDatabaseWrite",
+          "Outcome": "Passed"
+        }
+      ],
+      "NotExecuted": [
+        "AnalyticDashboard.IntegrationTests.Performance.ImportClaimPerformanceTests.Claim_ShouldBeMeasuredAgainstRepresentativeQueueDistributions",
+        "AnalyticDashboard.IntegrationTests.Performance.CsvImportPerformanceTests.Import_ShouldBeMeasuredWithLargeSources_SequentiallyAndInParallel",
+        "AnalyticDashboard.IntegrationTests.Performance.CsvImportPerformanceTests.Tuning_ShouldCompareBoundedConversionAndParquetReads"
+      ]
+    }
+  ]
+}

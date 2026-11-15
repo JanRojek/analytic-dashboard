@@ -8,6 +8,8 @@ namespace AnalyticDashboard.Infrastructure.Storage;
 
 public sealed class StorageCleanupProcessor
 {
+    private static readonly TimeSpan VerificationInterval = TimeSpan.FromHours(1);
+
     private readonly AppDbContext _dbContext;
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<StorageCleanupProcessor> _logger;
@@ -71,12 +73,13 @@ public sealed class StorageCleanupProcessor
             return true;
         }
 
-        _dbContext.StorageCleanupJobs.Remove(job);
+        job.ScheduleVerification(VerificationInterval);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Cleaned up storage for dataset {DatasetId}.",
-            job.DatasetId
+            "Cleaned up storage for dataset {DatasetId}. Retaining deletion intent; next verification at {NextAttemptAtUtc}.",
+            job.DatasetId,
+            job.NextAttemptAtUtc
         );
 
         return true;

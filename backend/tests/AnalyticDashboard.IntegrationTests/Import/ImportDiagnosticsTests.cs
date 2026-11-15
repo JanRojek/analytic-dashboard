@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Storage;
@@ -27,6 +28,9 @@ public sealed class ImportDiagnosticsTests : IClassFixture<ApiFixture>
     [Theory]
     [InlineData("completed")]
     [InlineData("missing")]
+    [InlineData("directory_missing")]
+    [InlineData("invalid_csv")]
+    [InlineData("conversion_error")]
     [InlineData("unexpected")]
     [InlineData("host_cancelled")]
     [InlineData("fenced")]
@@ -71,15 +75,19 @@ public sealed class ImportDiagnosticsTests : IClassFixture<ApiFixture>
             options,
             repositoryLogs
         );
-        var observedStorage = new BeforeReadStorage(storage, async readToken =>
+        var observedStorage = new BeforeReadStorage(storage, cancellation, async (hostCancellation, readToken) =>
         {
             if (outcome == "unexpected")
             {
                 throw new IOException("PRIVATE_CSV_VALUE private-person@example.com");
             }
+            if (outcome == "directory_missing")
+            {
+                throw new DirectoryNotFoundException(@"C:\private\PRIVATE_CSV_VALUE\private-person@example.com.csv");
+            }
             if (outcome == "host_cancelled")
             {
-                await cancellation.CancelAsync();
+                await hostCancellation.CancelAsync();
                 readToken.ThrowIfCancellationRequested();
             }
             if (outcome == "fenced")
@@ -116,7 +124,16 @@ public sealed class ImportDiagnosticsTests : IClassFixture<ApiFixture>
         {
             if (outcome != "missing")
             {
-                await using var source = new MemoryStream("Category,Value\nPRIVATE_CSV_VALUE,10\n"u8.ToArray());
+                var bytes = outcome switch
+                {
+                    "invalid_csv" => new byte[] { 0xff, 0xfe, 0, 0, 0xff },
+                    "conversion_error" => Encoding.UTF8.GetBytes(
+                        "Value\n" + string.Join('\n', Enumerable.Range(0, 40000))
+                        + "\nPRIVATE_CSV_VALUE private-person@example.com\n"
+                    ),
+                    _ => "Category,Value\nPRIVATE_CSV_VALUE,10\n"u8.ToArray()
+                };
+                await using var source = new MemoryStream(bytes);
                 await storage.SaveAsync(job.SourceStorageKey, source, token);
             }
 
@@ -149,7 +166,7 @@ public sealed class ImportDiagnosticsTests : IClassFixture<ApiFixture>
             var expectedMessage = outcome switch
             {
                 "completed" => "completed with",
-                "missing" => "failed permanently",
+                "missing" or "directory_missing" or "invalid_csv" or "conversion_error" => "failed permanently",
                 "unexpected" => "shortened its lease for recovery",
                 "host_cancelled" => "cancelled because the host is stopping",
                 _ => "no longer owns the job"
@@ -171,13 +188,24 @@ public sealed class ImportDiagnosticsTests : IClassFixture<ApiFixture>
             Assert.Equal(outcome switch
             {
                 "completed" => ImportJobStatus.Completed,
-                "missing" => ImportJobStatus.Failed,
+                "missing" or "directory_missing" or "invalid_csv" or "conversion_error" => ImportJobStatus.Failed,
                 _ => ImportJobStatus.Running
             }, savedJob.Status);
             Assert.Equal(outcome == "fenced" ? 2L : 1L, savedJob.AttemptNumber);
-            Assert.Equal(outcome == "completed" ? DatasetVersionStatus.Ready
-                : outcome == "missing" ? DatasetVersionStatus.Failed : DatasetVersionStatus.Pending, savedVersion.Status);
-            Assert.Equal(outcome == "completed" ? version.Id : (Guid?)null, savedDataset.CurrentVersionId);
+            Assert.Equal(savedJob.Status switch
+            {
+                ImportJobStatus.Completed => DatasetVersionStatus.Ready,
+                ImportJobStatus.Failed => DatasetVersionStatus.Failed,
+                _ => DatasetVersionStatus.Pending
+            }, savedVersion.Status);
+            Assert.Equal(outcome == "completed" ? version.Id : null, savedDataset.CurrentVersionId);
+            Assert.Equal(outcome switch
+            {
+                "missing" or "directory_missing" => "Import source is unavailable.",
+                "invalid_csv" => "CSV format is invalid.",
+                "conversion_error" => "CSV values do not match the detected column types.",
+                _ => null
+            }, savedJob.ErrorMessage);
         }
         finally
         {
@@ -254,17 +282,22 @@ public sealed class ImportDiagnosticsTests : IClassFixture<ApiFixture>
     private sealed class BeforeReadStorage : IFileStorage
     {
         private readonly IFileStorage _inner;
-        private readonly Func<CancellationToken, Task> _beforeRead;
+        private readonly CancellationTokenSource _hostCancellation;
+        private readonly Func<CancellationTokenSource, CancellationToken, Task> _beforeRead;
 
-        public BeforeReadStorage(IFileStorage inner, Func<CancellationToken, Task> beforeRead)
+        public BeforeReadStorage(
+            IFileStorage inner,
+            CancellationTokenSource hostCancellation,
+            Func<CancellationTokenSource, CancellationToken, Task> beforeRead)
         {
             _inner = inner;
+            _hostCancellation = hostCancellation;
             _beforeRead = beforeRead;
         }
 
         public async Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
         {
-            await _beforeRead(cancellationToken);
+            await _beforeRead(_hostCancellation, cancellationToken);
             return await _inner.OpenReadAsync(storageKey, cancellationToken);
         }
 
