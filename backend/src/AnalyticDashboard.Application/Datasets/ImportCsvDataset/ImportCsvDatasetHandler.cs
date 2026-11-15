@@ -1,3 +1,6 @@
+using System.Runtime.ExceptionServices;
+
+using AnalyticDashboard.Application.Common.Exceptions;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Application.Storage;
@@ -106,14 +109,14 @@ public sealed class ImportCsvDatasetHandler
             sourceStorageKey
         );
 
+        await _fileStorage.SaveAsync(
+            sourceStorageKey,
+            command.FileStream,
+            cancellationToken
+        );
+
         try
         {
-            await _fileStorage.SaveAsync(
-                sourceStorageKey,
-                command.FileStream,
-                cancellationToken
-            );
-
             await _pendingImportRepository.CreateAsync(
                 dataset,
                 version,
@@ -121,8 +124,10 @@ public sealed class ImportCsvDatasetHandler
                 cancellationToken
             );
         }
-        catch (Exception importException)
+        catch (PendingDatasetImportRolledBackException exception)
         {
+            var importException = exception.InnerException!;
+
             try
             {
                 await _fileStorage.DeleteAsync(
@@ -139,7 +144,7 @@ public sealed class ImportCsvDatasetHandler
                 );
             }
 
-            throw;
+            ExceptionDispatchInfo.Throw(importException);
         }
 
         return new ImportCsvDatasetResult.Accepted(

@@ -1,0 +1,74 @@
+{
+  "Date": "2026-11-15",
+  "Build": {
+    "Errors": 0,
+    "Warnings": 0
+  },
+  "Reports": [
+    {
+      "File": "aud008-all_net10.0_20261115201510.trx",
+      "Counters": {
+        "Total": 22,
+        "Executed": 22,
+        "Passed": 22,
+        "Failed": 0,
+        "NotExecuted": 0
+      },
+      "Tests": [],
+      "NotExecuted": []
+    },
+    {
+      "File": "aud008-all_net10.0_20261115201621.trx",
+      "Counters": {
+        "Total": 442,
+        "Executed": 439,
+        "Passed": 439,
+        "Failed": 0,
+        "NotExecuted": 3
+      },
+      "Tests": [
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldRetainCommittedSource_WhenFreshVerificationIsUnavailable",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldRetainSource_WhenNegativeVerificationPrecedesActualCommit",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldRollbackAllInsertedMetadata_AndRemoveSource(cancelBeforeCommit: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldNotDeleteAnExistingArtifact_WhenSourceCreationFails",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldConfirmActualCommitInAFreshContext_AndKeepSourceUsable(cancelAfterCommit: True)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldRetainSource_WhenRollbackAcknowledgementIsLost",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldRollbackOnActualForeignKeyViolation_AfterProjectDeletion",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldConfirmActualCommitInAFreshContext_AndKeepSourceUsable(cancelAfterCommit: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Datasets.PendingDatasetImportCommitTests.Creation_ShouldRollbackAllInsertedMetadata_AndRemoveSource(cancelBeforeCommit: True)",
+          "Outcome": "Passed"
+        }
+      ],
+      "NotExecuted": [
+        "AnalyticDashboard.IntegrationTests.Performance.ImportClaimPerformanceTests.Claim_ShouldBeMeasuredAgainstRepresentativeQueueDistributions",
+        "AnalyticDashboard.IntegrationTests.Performance.CsvImportPerformanceTests.Tuning_ShouldCompareBoundedConversionAndParquetReads",
+        "AnalyticDashboard.IntegrationTests.Performance.CsvImportPerformanceTests.Import_ShouldBeMeasuredWithLargeSources_SequentiallyAndInParallel"
+      ]
+    }
+  ]
+}
