@@ -5,6 +5,7 @@ using System.Text.Json;
 
 using AnalyticDashboard.Infrastructure.Services.Import;
 using AnalyticDashboard.Infrastructure.Storage;
+using AnalyticDashboard.IntegrationTests.Import;
 
 using DuckDB.NET.Data;
 using DuckDB.NET.Native;
@@ -14,7 +15,7 @@ using Microsoft.Extensions.Options;
 
 namespace AnalyticDashboard.IntegrationTests.Performance;
 
-public sealed class CsvImportPerformanceTests
+public sealed partial class CsvImportPerformanceTests
 {
     private readonly ITestOutputHelper _output;
 
@@ -30,9 +31,19 @@ public sealed class CsvImportPerformanceTests
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken
         );
-        deadline.CancelAfter(TimeSpan.FromMinutes(5));
         var token = deadline.Token;
         var options = new ImportJobOptions();
+        var profile = Environment.GetEnvironmentVariable("APERTURE_CSV_IMPORT_PROFILE") ?? "standard";
+        if (profile is not ("standard" or "capacity"))
+        {
+            throw new ArgumentException("Use standard or capacity for APERTURE_CSV_IMPORT_PROFILE.");
+        }
+        var pipeline = Environment.GetEnvironmentVariable("APERTURE_CSV_IMPORT_PIPELINE") ?? "direct";
+        if (pipeline is not ("direct" or "ctas"))
+        {
+            throw new ArgumentException("Use direct or ctas for APERTURE_CSV_IMPORT_PIPELINE.");
+        }
+        deadline.CancelAfter(TimeSpan.FromMinutes(profile == "capacity" ? 10 : 5));
         var storage = new LocalFileStorage();
         var rootKey = $"tests/import-performance/{Guid.NewGuid():N}";
         var storageRoot = Path.GetFullPath(Path.Combine(
@@ -68,15 +79,37 @@ public sealed class CsvImportPerformanceTests
             await storage.DeleteAsync(warmupKey, token);
             await storage.DeleteDirectoryAsync(rootKey + "/warmup", token);
 
-            foreach (var shape in new[]
-            {
-                (Name: "tall_numeric", Rows: 1000000, Columns: 5, AllowBudgetFailure: false),
-                (Name: "wide_text", Rows: 100000, Columns: 4, AllowBudgetFailure: false),
-                (Name: "wide_text_stress", Rows: 150000, Columns: 4, AllowBudgetFailure: true)
-            })
+            var shapes = profile == "capacity"
+                ? new[]
+                {
+                    (Name: "capacity_500", Rows: 0, Columns: 4, AllowBudgetFailure: false),
+                    (Name: "capacity_1024", Rows: 0, Columns: 4, AllowBudgetFailure: false),
+                    (Name: "capacity_1024_entropy", Rows: 0, Columns: 4, AllowBudgetFailure: false)
+                }
+                : new[]
+                {
+                    (Name: "tall_numeric", Rows: 1000000, Columns: 5, AllowBudgetFailure: false),
+                    (Name: "wide_text", Rows: 100000, Columns: 4, AllowBudgetFailure: false),
+                    (Name: "wide_text_stress", Rows: 150000, Columns: 4, AllowBudgetFailure: true)
+                };
+            foreach (var shape in shapes)
             {
                 var sourcePath = Path.Combine(sourceWorkspace.FullName, shape.Name + ".csv");
-                await WriteSourceAsync(sourcePath, shape.Name, shape.Rows, token);
+                var expectedRows = shape.Rows;
+                if (profile == "capacity")
+                {
+                    var generated = await WriteTuningSourceAsync(
+                        sourcePath,
+                        (shape.Name == "capacity_500" ? 500L : 1024L) * 1048576,
+                        shape.Name.EndsWith("_entropy", StringComparison.Ordinal),
+                        token
+                    );
+                    expectedRows = generated.Rows;
+                }
+                else
+                {
+                    await WriteSourceAsync(sourcePath, shape.Name, shape.Rows, token);
+                }
                 var sourceBytes = new FileInfo(sourcePath).Length;
                 var sourceKey = rootKey + "/" + shape.Name + ".csv";
                 await using (var source = File.OpenRead(sourcePath))
@@ -96,10 +129,11 @@ public sealed class CsvImportPerformanceTests
                             runKey,
                             storageRoot,
                             sourceBytes,
-                            shape.Rows,
+                            expectedRows,
                             shape.Columns,
                             concurrency,
-                            shape.AllowBudgetFailure,
+                            shape.AllowBudgetFailure || pipeline == "ctas",
+                            pipeline == "ctas",
                             options,
                             token
                         );
@@ -109,7 +143,7 @@ public sealed class CsvImportPerformanceTests
                     reports.Add(new
                     {
                         Shape = shape.Name,
-                        RowsPerImport = shape.Rows,
+                        RowsPerImport = expectedRows,
                         SourceBytesPerImport = sourceBytes,
                         Concurrency = concurrency,
                         Samples = samples
@@ -121,6 +155,8 @@ public sealed class CsvImportPerformanceTests
             var report = JsonSerializer.Serialize(new
             {
                 Runtime = Environment.Version.ToString(),
+                Profile = profile,
+                Pipeline = pipeline,
                 NativeDuckDbVersion = nativeVersion,
                 LogicalProcessors = Environment.ProcessorCount,
                 Options = options,
@@ -180,6 +216,7 @@ public sealed class CsvImportPerformanceTests
         int expectedColumns,
         int concurrency,
         bool allowBudgetFailure,
+        bool previousPipeline,
         ImportJobOptions options,
         CancellationToken cancellationToken)
     {
@@ -249,18 +286,35 @@ public sealed class CsvImportPerformanceTests
         {
             var conversions = Enumerable.Range(0, concurrency).Select(index => Task.Run(async () =>
             {
-                var importer = new DuckDbCsvImporter(
-                    new LocalFileStorage(),
-                    NullLogger<DuckDbCsvImporter>.Instance,
-                    Options.Create(options)
-                );
                 try
                 {
-                    var result = await importer.ImportAsync(
-                        sourceKey,
-                        $"{runKey}/{index}",
-                        cancellationToken
-                    );
+                    DuckDbCsvImportResult result;
+                    if (previousPipeline)
+                    {
+                        var importer = new CtasCsvImporterReference(
+                            new LocalFileStorage(),
+                            NullLogger<CtasCsvImporterReference>.Instance,
+                            Options.Create(options)
+                        );
+                        result = await importer.ImportAsync(
+                            sourceKey,
+                            $"{runKey}/{index}",
+                            cancellationToken
+                        );
+                    }
+                    else
+                    {
+                        var importer = new DuckDbCsvImporter(
+                            new LocalFileStorage(),
+                            NullLogger<DuckDbCsvImporter>.Instance,
+                            Options.Create(options)
+                        );
+                        result = await importer.ImportAsync(
+                            sourceKey,
+                            $"{runKey}/{index}",
+                            cancellationToken
+                        );
+                    }
                     return (Result: (DuckDbCsvImportResult?)result, Error: (DuckDBErrorType?)null);
                 }
                 catch (DuckDBException exception) when (

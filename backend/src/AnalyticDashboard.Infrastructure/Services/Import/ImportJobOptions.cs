@@ -6,7 +6,7 @@ public sealed class ImportJobOptions
 
     public int DuckDbThreads { get; set; } = 1;
 
-    public int DuckDbMemoryLimitMb { get; set; } = 256;
+    public int DuckDbMemoryLimitMb { get; set; } = 512;
 
     public int DuckDbMaxTempDirectorySizeMb { get; set; } = 1024;
 

@@ -1,0 +1,90 @@
+{
+  "Passed": 17,
+  "Tests": [
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"quotes_multiline\")",
+      "Outcome": "Passed",
+      "Details": "quotes_multiline: 2 rows; Id:BigInt|Name:Varchar|Text:Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"header_only\")",
+      "Outcome": "Passed",
+      "Details": "header_only: 0 rows; Id:Varchar|Text:Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousRejection_WithoutSavingAResult(scenario: \"late_type\")",
+      "Outcome": "Passed",
+      "Details": "late_type: both rejected with Conversion."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreserveOrderAcrossParquetRowGroups(threads: 4)",
+      "Outcome": "Passed",
+      "Details": "multiple_groups_4: 150000 rows; Id:BigInt|Label:Varchar|Amount:Double; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousRejection_WithoutSavingAResult(scenario: \"late_quotes\")",
+      "Outcome": "Passed",
+      "Details": "late_quotes: both rejected with InvalidInput."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"types\")",
+      "Outcome": "Passed",
+      "Details": "types: 2 rows; Id:BigInt|Flag:Boolean|Whole:BigInt|Number:Double|OnDate:Date|AtTime:Time|AtTimestamp:Timestamp|Zoned:TimestampTz|TextId:Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousRejection_WithoutSavingAResult(scenario: \"late_ragged\")",
+      "Outcome": "Passed",
+      "Details": "late_ragged: both rejected with InvalidInput."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreserveOrderAcrossParquetRowGroups(threads: 1)",
+      "Outcome": "Passed",
+      "Details": "multiple_groups_1: 150000 rows; Id:BigInt|Label:Varchar|Amount:Double; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"nulls\")",
+      "Outcome": "Passed",
+      "Details": "nulls: 3 rows; Id:BigInt|Plain:Varchar|Quoted:Varchar|Whitespace:Varchar|AllNull:Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"float_special\")",
+      "Outcome": "Passed",
+      "Details": "float_special: 7 rows; Id:BigInt|Value:Double; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousAutodetectionOfIrregularRecords(scenario: \"ragged_record\")",
+      "Outcome": "Passed",
+      "Details": "ragged_record: 1999 rows; 0:BigInt|\"valid:Varchar|quoted value\":Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"semicolon\")",
+      "Outcome": "Passed",
+      "Details": "semicolon: 2 rows; Id:BigInt|Value:Varchar|Text:Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"unicode_bom\")",
+      "Outcome": "Passed",
+      "Details": "unicode_bom: 2 rows; Id:BigInt|Miasto:Varchar|Tekst:Varchar; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"tab_crlf\")",
+      "Outcome": "Passed",
+      "Details": "tab_crlf: 2 rows; Id:BigInt|Text:Varchar|Value:BigInt; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousSchemaValuesAndOrder(scenario: \"duplicate_headers\")",
+      "Outcome": "Passed",
+      "Details": "duplicate_headers: 1 rows; Name:Varchar|Name_1:Varchar|name_2:Varchar|column3:Varchar|a-b:Varchar|quoted,header:Boolean; values and order equal."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousRejection_WithoutSavingAResult(scenario: \"invalid_utf8\")",
+      "Outcome": "Passed",
+      "Details": "invalid_utf8: both rejected with InvalidInput."
+    },
+    {
+      "Test": "AnalyticDashboard.IntegrationTests.Import.DuckDbCsvCompatibilityTests.Import_ShouldPreservePreviousAutodetectionOfIrregularRecords(scenario: \"invalid_quotes\")",
+      "Outcome": "Passed",
+      "Details": "invalid_quotes: 1999 rows; 0:BigInt|\"valid:Varchar|quoted value\":Varchar; values and order equal."
+    }
+  ]
+}

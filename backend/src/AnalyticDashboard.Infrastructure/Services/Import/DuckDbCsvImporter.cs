@@ -101,7 +101,8 @@ public sealed class DuckDbCsvImporter
             ["threads"] = _options.DuckDbThreads,
             ["memory_limit"] = $"{_options.DuckDbMemoryLimitMb}MiB",
             ["max_temp_directory_size"] = $"{_options.DuckDbMaxTempDirectorySizeMb}MiB",
-            ["temp_directory"] = Path.Combine(Path.GetDirectoryName(parquetPath)!, "spill")
+            ["temp_directory"] = Path.Combine(Path.GetDirectoryName(parquetPath)!, "spill"),
+            ["preserve_insertion_order"] = true
         };
         await using var connection = new DuckDBConnection(connectionString.ConnectionString);
 
@@ -120,11 +121,19 @@ public sealed class DuckDbCsvImporter
         cancellationToken.ThrowIfCancellationRequested();
 
         command.CommandText = """
-            CREATE TABLE imported_dataset AS
-            SELECT *
-            FROM read_csv_auto(
-                $sourcePath,
-                header = true
+            COPY (
+                SELECT *
+                FROM read_csv_auto(
+                    $sourcePath,
+                    header = true
+                )
+            )
+            TO $parquetPath
+            (
+                FORMAT parquet,
+                COMPRESSION zstd,
+                COMPRESSION_LEVEL 3,
+                ROW_GROUP_SIZE 122880
             );
             """;
 
@@ -134,18 +143,30 @@ public sealed class DuckDbCsvImporter
                 sourcePath
             )
         );
+        command.Parameters.Add(
+            new DuckDBParameter(
+                "parquetPath",
+                parquetPath
+            )
+        );
 
         await command.ExecuteNonQueryAsync(
             cancellationToken
         );
 
         command.Parameters.Clear();
+        command.Parameters.Add(
+            new DuckDBParameter(
+                "parquetPath",
+                parquetPath
+            )
+        );
 
         cancellationToken.ThrowIfCancellationRequested();
 
         command.CommandText = """
-            SELECT COUNT(*)
-            FROM imported_dataset;
+            SELECT num_rows
+            FROM parquet_file_metadata($parquetPath);
             """;
 
         var rowCountValue =
@@ -160,7 +181,7 @@ public sealed class DuckDbCsvImporter
 
         command.CommandText = """
             SELECT *
-            FROM imported_dataset
+            FROM read_parquet($parquetPath)
             LIMIT 0;
             """;
 
@@ -172,28 +193,6 @@ public sealed class DuckDbCsvImporter
         {
             columnCount = reader.FieldCount;
         }
-
-        command.CommandText = """
-            COPY imported_dataset
-            TO $parquetPath
-            (
-                FORMAT parquet,
-                COMPRESSION zstd
-            );
-            """;
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        command.Parameters.Add(
-            new DuckDBParameter(
-                "parquetPath",
-                parquetPath
-            )
-        );
-
-        await command.ExecuteNonQueryAsync(
-            cancellationToken
-        );
 
         return new ImportMetadata(
             rowCount,

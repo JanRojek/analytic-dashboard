@@ -1,0 +1,1642 @@
+{
+  "Header": {
+    "Mode": "balance",
+    "Runtime": "10.0.11",
+    "CpuCount": 12,
+    "AvailableGcMemoryBytes": 33632837632,
+    "ProcessPrivateGuardBytes": 5368709120,
+    "TempDirectoryGuardBytes": 17179869184,
+    "SamplingIntervalMs": 50,
+    "FrameworkDefaults": {
+      "MaxRequestBodyBytes": 30000000,
+      "MultipartBodyBytes": 134217728,
+      "FormMemoryBufferBytes": 65536
+    }
+  },
+  "Samples": [
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 1506.8078,
+        "CpuMs": 1828.125,
+        "BaselinePrivateBytes": 24788992,
+        "PeakPrivateBytes": 280182784,
+        "BaselineWorkingSetBytes": 55578624,
+        "PeakWorkingSetBytes": 216539136,
+        "PeakTrialBytes": 566186478,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 31,
+        "MaxSampleGapMs": 152.2087,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 20949086,
+            "PhasesMs": {
+              "copy_source": 131.7371,
+              "write_parquet": 1325.4511,
+              "metadata": 9.1389,
+              "copy_result": 6.6122
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "6046769390911555498",
+        "DisplacedRows": 0,
+        "RowGroups": 15,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 6.7347,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              7.4697,
+              7.5573,
+              7.7246
+            ],
+            "MedianMs": 7.5573
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              9.1854,
+              9.4804,
+              10.003
+            ],
+            "MedianMs": 9.4804
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              17.5582,
+              17.7487,
+              18.6334
+            ],
+            "MedianMs": 17.7487
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.7711,
+              1.7821,
+              1.8371
+            ],
+            "MedianMs": 1.7821
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              4.5629,
+              4.6375,
+              5.1282
+            ],
+            "MedianMs": 4.6375
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              4.0861,
+              4.1272,
+              4.4635
+            ],
+            "MedianMs": 4.1272
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              27.9252,
+              27.9411,
+              28.5564
+            ],
+            "MedianMs": 27.9411
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              2.2117,
+              2.3405,
+              2.5346
+            ],
+            "MedianMs": 2.3405
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 1537.2491,
+        "CpuMs": 1984.375,
+        "BaselinePrivateBytes": 31105024,
+        "PeakPrivateBytes": 254631936,
+        "BaselineWorkingSetBytes": 78225408,
+        "PeakWorkingSetBytes": 197120000,
+        "PeakTrialBytes": 566186478,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 32,
+        "MaxSampleGapMs": 65.3114,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 20949086,
+            "PhasesMs": {
+              "copy_source": 128.9158,
+              "write_parquet": 1385.2608,
+              "metadata": 1.9755,
+              "copy_result": 6.8698
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 1262.2394,
+        "CpuMs": 1406.25,
+        "BaselinePrivateBytes": 42721280,
+        "PeakPrivateBytes": 253771776,
+        "BaselineWorkingSetBytes": 80715776,
+        "PeakWorkingSetBytes": 196173824,
+        "PeakTrialBytes": 561934462,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 27,
+        "MaxSampleGapMs": 61.515,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 18823078,
+            "PhasesMs": {
+              "copy_source": 160.3809,
+              "write_parquet": 1075.5554,
+              "metadata": 2.2757,
+              "copy_result": 5.9247
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "6046769390911555498",
+        "DisplacedRows": 0,
+        "RowGroups": 15,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 5.6128,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              7.6872,
+              7.8996,
+              8.112
+            ],
+            "MedianMs": 7.8996
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              9.8653,
+              9.895,
+              10.1006
+            ],
+            "MedianMs": 9.895
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              15.9965,
+              16.3159,
+              19.909
+            ],
+            "MedianMs": 16.3159
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.557,
+              1.602,
+              1.6288
+            ],
+            "MedianMs": 1.602
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              3.3604,
+              3.3635,
+              3.6683
+            ],
+            "MedianMs": 3.3635
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              3.7959,
+              3.8908,
+              4.4424
+            ],
+            "MedianMs": 3.8908
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              16.0123,
+              16.9635,
+              17.8177
+            ],
+            "MedianMs": 16.9635
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.6323,
+              1.6945,
+              1.8603
+            ],
+            "MedianMs": 1.6945
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 1140.6536,
+        "CpuMs": 1343.75,
+        "BaselinePrivateBytes": 37916672,
+        "PeakPrivateBytes": 284528640,
+        "BaselineWorkingSetBytes": 83378176,
+        "PeakWorkingSetBytes": 226729984,
+        "PeakTrialBytes": 561934462,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 24,
+        "MaxSampleGapMs": 62.8587,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 18823078,
+            "PhasesMs": {
+              "copy_source": 135.6216,
+              "write_parquet": 979.0024,
+              "metadata": 4.4076,
+              "copy_result": 5.567
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 1606.6527,
+        "CpuMs": 3250,
+        "BaselinePrivateBytes": 44773376,
+        "PeakPrivateBytes": 507207680,
+        "BaselineWorkingSetBytes": 81412096,
+        "PeakWorkingSetBytes": 376221696,
+        "PeakTrialBytes": 1132372956,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 34,
+        "MaxSampleGapMs": 87.3203,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 20949086,
+            "PhasesMs": {
+              "copy_source": 191.3761,
+              "write_parquet": 1338.015,
+              "metadata": 5.3636,
+              "copy_result": 6.2377
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 20949086,
+            "PhasesMs": {
+              "copy_source": 187.5546,
+              "write_parquet": 1391.3003,
+              "metadata": 4.9002,
+              "copy_result": 6.3263
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "6046769390911555498",
+        "DisplacedRows": 0,
+        "RowGroups": 15,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 6.2404,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              7.363,
+              7.4795,
+              7.725
+            ],
+            "MedianMs": 7.4795
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              9.6435,
+              9.913,
+              10.4752
+            ],
+            "MedianMs": 9.913
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              20.6202,
+              21.5705,
+              21.9793
+            ],
+            "MedianMs": 21.5705
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.6847,
+              1.6981,
+              1.8244
+            ],
+            "MedianMs": 1.6981
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              3.5679,
+              3.6783,
+              4.0168
+            ],
+            "MedianMs": 3.6783
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              3.8172,
+              3.9306,
+              4.1862
+            ],
+            "MedianMs": 3.9306
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              17.9058,
+              18.0738,
+              18.188
+            ],
+            "MedianMs": 18.0738
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.8729,
+              1.9673,
+              2.0007
+            ],
+            "MedianMs": 1.9673
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 1551.3397,
+        "CpuMs": 3234.375,
+        "BaselinePrivateBytes": 59740160,
+        "PeakPrivateBytes": 485134336,
+        "BaselineWorkingSetBytes": 97021952,
+        "PeakWorkingSetBytes": 328953856,
+        "PeakTrialBytes": 1132372956,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 33,
+        "MaxSampleGapMs": 88.0635,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 20949086,
+            "PhasesMs": {
+              "copy_source": 174.3767,
+              "write_parquet": 1348.8909,
+              "metadata": 5.0488,
+              "copy_result": 6.2062
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 20949086,
+            "PhasesMs": {
+              "copy_source": 173.6648,
+              "write_parquet": 1342.9658,
+              "metadata": 4.9045,
+              "copy_result": 6.3482
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 1322.4449,
+        "CpuMs": 2671.875,
+        "BaselinePrivateBytes": 40923136,
+        "PeakPrivateBytes": 481894400,
+        "BaselineWorkingSetBytes": 87375872,
+        "PeakWorkingSetBytes": 301010944,
+        "PeakTrialBytes": 1123868924,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 28,
+        "MaxSampleGapMs": 70.125,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 18823078,
+            "PhasesMs": {
+              "copy_source": 230.4566,
+              "write_parquet": 1064.3271,
+              "metadata": 4.8078,
+              "copy_result": 5.4886
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 18823078,
+            "PhasesMs": {
+              "copy_source": 185.2851,
+              "write_parquet": 1069.7971,
+              "metadata": 7.1966,
+              "copy_result": 9.9013
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "6046769390911555498",
+        "DisplacedRows": 0,
+        "RowGroups": 15,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 5.4181,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              7.6331,
+              7.6692,
+              10.526
+            ],
+            "MedianMs": 7.6692
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              9.6805,
+              9.7366,
+              10.2662
+            ],
+            "MedianMs": 9.7366
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              17.1901,
+              17.3216,
+              17.936
+            ],
+            "MedianMs": 17.3216
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.599,
+              1.6267,
+              1.6779
+            ],
+            "MedianMs": 1.6267
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              3.1527,
+              3.4258,
+              3.4847
+            ],
+            "MedianMs": 3.4258
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              3.5592,
+              3.7649,
+              3.8994
+            ],
+            "MedianMs": 3.7649
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              18.2915,
+              18.8504,
+              22.6911
+            ],
+            "MedianMs": 18.8504
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.5967,
+              1.6098,
+              2.1715
+            ],
+            "MedianMs": 1.6098
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 500,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 524288306,
+      "SourceRows": 499890,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 1271.8873,
+        "CpuMs": 2781.25,
+        "BaselinePrivateBytes": 60219392,
+        "PeakPrivateBytes": 483348480,
+        "BaselineWorkingSetBytes": 95436800,
+        "PeakWorkingSetBytes": 353685504,
+        "PeakTrialBytes": 1123868924,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 27,
+        "MaxSampleGapMs": 61.4058,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 18823078,
+            "PhasesMs": {
+              "copy_source": 174.4269,
+              "write_parquet": 1071.0831,
+              "metadata": 4.5957,
+              "copy_result": 8.0077
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 499890,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 18823078,
+            "PhasesMs": {
+              "copy_source": 178.7397,
+              "write_parquet": 1067.6906,
+              "metadata": 3.5085,
+              "copy_result": 7.63
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 2627.0286,
+        "CpuMs": 2875,
+        "BaselinePrivateBytes": 138547200,
+        "PeakPrivateBytes": 339542016,
+        "BaselineWorkingSetBytes": 187899904,
+        "PeakWorkingSetBytes": 289247232,
+        "PeakTrialBytes": 1159463996,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 54,
+        "MaxSampleGapMs": 59.3022,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 42860687,
+            "PhasesMs": {
+              "copy_source": 300.6217,
+              "write_parquet": 2289.9749,
+              "metadata": 5.0124,
+              "copy_result": 13.3483
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "5920448739976211665",
+        "DisplacedRows": 0,
+        "RowGroups": 30,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 12.9031,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              13.1279,
+              13.1945,
+              13.3007
+            ],
+            "MedianMs": 13.1945
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              18.4006,
+              18.5436,
+              18.7227
+            ],
+            "MedianMs": 18.5436
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              18.7942,
+              18.8275,
+              27.8967
+            ],
+            "MedianMs": 18.8275
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              2.3577,
+              2.4269,
+              2.4692
+            ],
+            "MedianMs": 2.4269
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              5.1056,
+              5.3837,
+              5.6278
+            ],
+            "MedianMs": 5.3837
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              5.9182,
+              6.1674,
+              6.457
+            ],
+            "MedianMs": 6.1674
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              19.3548,
+              19.3857,
+              19.594
+            ],
+            "MedianMs": 19.3857
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.8059,
+              2.3526,
+              2.5572
+            ],
+            "MedianMs": 2.3526
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 2873.0891,
+        "CpuMs": 3390.625,
+        "BaselinePrivateBytes": 56774656,
+        "PeakPrivateBytes": 297975808,
+        "BaselineWorkingSetBytes": 95666176,
+        "PeakWorkingSetBytes": 243691520,
+        "PeakTrialBytes": 1159463996,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 59,
+        "MaxSampleGapMs": 76.1186,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 42860687,
+            "PhasesMs": {
+              "copy_source": 335.5006,
+              "write_parquet": 2506.1175,
+              "metadata": 5.1899,
+              "copy_result": 13.0604
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 2187.9111,
+        "CpuMs": 2343.75,
+        "BaselinePrivateBytes": 98017280,
+        "PeakPrivateBytes": 266227712,
+        "BaselineWorkingSetBytes": 143740928,
+        "PeakWorkingSetBytes": 213401600,
+        "PeakTrialBytes": 1150789520,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 45,
+        "MaxSampleGapMs": 66.6269,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 38523449,
+            "PhasesMs": {
+              "copy_source": 281.7249,
+              "write_parquet": 1877.7598,
+              "metadata": 4.4244,
+              "copy_result": 11.7173
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "5920448739976211665",
+        "DisplacedRows": 0,
+        "RowGroups": 30,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 12.1607,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              14.4133,
+              14.4761,
+              14.5888
+            ],
+            "MedianMs": 14.4761
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              19.3412,
+              19.768,
+              20.0326
+            ],
+            "MedianMs": 19.768
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              18.4237,
+              22.6147,
+              22.7756
+            ],
+            "MedianMs": 22.6147
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              2.5511,
+              2.7164,
+              2.7211
+            ],
+            "MedianMs": 2.7164
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              5.0433,
+              5.198,
+              5.3397
+            ],
+            "MedianMs": 5.198
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              6.4563,
+              6.6823,
+              7.3264
+            ],
+            "MedianMs": 6.6823
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              18.9169,
+              19.7938,
+              23.2312
+            ],
+            "MedianMs": 19.7938
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.9803,
+              1.9807,
+              2.1726
+            ],
+            "MedianMs": 1.9807
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 1,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 2134.2573,
+        "CpuMs": 2359.375,
+        "BaselinePrivateBytes": 96849920,
+        "PeakPrivateBytes": 296538112,
+        "BaselineWorkingSetBytes": 144097280,
+        "PeakWorkingSetBytes": 244494336,
+        "PeakTrialBytes": 1150789520,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 44,
+        "MaxSampleGapMs": 62.4862,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 38523449,
+            "PhasesMs": {
+              "copy_source": 283.1637,
+              "write_parquet": 1817.3601,
+              "metadata": 6.9899,
+              "copy_result": 14.2483
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 3053.2345,
+        "CpuMs": 6140.625,
+        "BaselinePrivateBytes": 96849920,
+        "PeakPrivateBytes": 514514944,
+        "BaselineWorkingSetBytes": 144850944,
+        "PeakWorkingSetBytes": 359665664,
+        "PeakTrialBytes": 2318927992,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 63,
+        "MaxSampleGapMs": 79.986,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 42860687,
+            "PhasesMs": {
+              "copy_source": 424.6752,
+              "write_parquet": 2594.8238,
+              "metadata": 4.5263,
+              "copy_result": 12.3607
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 42860687,
+            "PhasesMs": {
+              "copy_source": 341.1016,
+              "write_parquet": 2507.0398,
+              "metadata": 6.1367,
+              "copy_result": 19.5769
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "5920448739976211665",
+        "DisplacedRows": 0,
+        "RowGroups": 30,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 12.2306,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              13.1407,
+              13.7008,
+              13.9874
+            ],
+            "MedianMs": 13.7008
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              18.2696,
+              18.3577,
+              19.2335
+            ],
+            "MedianMs": 18.3577
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              18.4371,
+              18.7855,
+              19.371
+            ],
+            "MedianMs": 18.7855
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              2.4146,
+              2.4508,
+              2.5397
+            ],
+            "MedianMs": 2.4508
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              4.7615,
+              4.7964,
+              5.2743
+            ],
+            "MedianMs": 4.7964
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              5.9695,
+              6.0757,
+              6.6359
+            ],
+            "MedianMs": 6.0757
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              19.025,
+              19.1741,
+              19.6876
+            ],
+            "MedianMs": 19.1741
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              1.9594,
+              2.139,
+              2.1681
+            ],
+            "MedianMs": 2.139
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 3,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 2938.2536,
+        "CpuMs": 5968.75,
+        "BaselinePrivateBytes": 57315328,
+        "PeakPrivateBytes": 547885056,
+        "BaselineWorkingSetBytes": 99262464,
+        "PeakWorkingSetBytes": 396623872,
+        "PeakTrialBytes": 2318927992,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 60,
+        "MaxSampleGapMs": 71.409,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 42860687,
+            "PhasesMs": {
+              "copy_source": 415.0995,
+              "write_parquet": 2489.1359,
+              "metadata": 4.2838,
+              "copy_result": 14.9297
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 42860687,
+            "PhasesMs": {
+              "copy_source": 368.8102,
+              "write_parquet": 2534.0802,
+              "metadata": 4.7424,
+              "copy_result": 15.5944
+            }
+          }
+        ]
+      },
+      "Reads": null
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 0,
+      "Batch": {
+        "ElapsedMs": 2497.6878,
+        "CpuMs": 5031.25,
+        "BaselinePrivateBytes": 140333056,
+        "PeakPrivateBytes": 443912192,
+        "BaselineWorkingSetBytes": 190828544,
+        "PeakWorkingSetBytes": 324845568,
+        "PeakTrialBytes": 2301579040,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 51,
+        "MaxSampleGapMs": 79.8864,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 38523449,
+            "PhasesMs": {
+              "copy_source": 449.6802,
+              "write_parquet": 2019.0418,
+              "metadata": 4.8521,
+              "copy_result": 9.9155
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 38523449,
+            "PhasesMs": {
+              "copy_source": 354.9633,
+              "write_parquet": 2045.5651,
+              "metadata": 5.6147,
+              "copy_result": 10.9153
+            }
+          }
+        ]
+      },
+      "Reads": {
+        "Fingerprint": "5920448739976211665",
+        "DisplacedRows": 0,
+        "RowGroups": 30,
+        "MaxGroupRows": 34641,
+        "Codec": "ZSTD",
+        "FileCopyMs": 9.4331,
+        "Queries": [
+          {
+            "Threads": 1,
+            "Query": "aggregation",
+            "TimingsMs": [
+              14.1092,
+              14.126,
+              14.9533
+            ],
+            "MedianMs": 14.126
+          },
+          {
+            "Threads": 1,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              19.061,
+              19.2781,
+              19.2786
+            ],
+            "MedianMs": 19.2781
+          },
+          {
+            "Threads": 1,
+            "Query": "page_middle",
+            "TimingsMs": [
+              17.8265,
+              17.9995,
+              19.1745
+            ],
+            "MedianMs": 17.9995
+          },
+          {
+            "Threads": 1,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              2.5095,
+              2.5237,
+              2.6665
+            ],
+            "MedianMs": 2.5237
+          },
+          {
+            "Threads": 4,
+            "Query": "aggregation",
+            "TimingsMs": [
+              5.2856,
+              5.3061,
+              5.7353
+            ],
+            "MedianMs": 5.3061
+          },
+          {
+            "Threads": 4,
+            "Query": "numeric_profile",
+            "TimingsMs": [
+              6.1606,
+              6.4184,
+              6.7939
+            ],
+            "MedianMs": 6.4184
+          },
+          {
+            "Threads": 4,
+            "Query": "page_middle",
+            "TimingsMs": [
+              18.4388,
+              18.6927,
+              19.1485
+            ],
+            "MedianMs": 18.6927
+          },
+          {
+            "Threads": 4,
+            "Query": "selective_1percent",
+            "TimingsMs": [
+              2.2597,
+              2.3057,
+              2.3368
+            ],
+            "MedianMs": 2.3057
+          }
+        ]
+      }
+    },
+    {
+      "SourceMiB": 1024,
+      "SourceEntropy": "repeated_hash",
+      "SourceBytes": 1073742622,
+      "SourceRows": 1023642,
+      "Profile": {
+        "Name": "direct_32k",
+        "Direct": true,
+        "MemoryMiB": 256,
+        "RowGroupRows": 32768,
+        "Codec": "zstd",
+        "PreserveOrder": true,
+        "Threads": 1,
+        "Concurrency": 2,
+        "ZstdLevel": 1,
+        "RowGroupMiB": null
+      },
+      "Iteration": 1,
+      "Batch": {
+        "ElapsedMs": 2439.797,
+        "CpuMs": 4921.875,
+        "BaselinePrivateBytes": 70512640,
+        "PeakPrivateBytes": 412524544,
+        "BaselineWorkingSetBytes": 100405248,
+        "PeakWorkingSetBytes": 331649024,
+        "PeakTrialBytes": 2301579040,
+        "PeakSpillBytes": 0,
+        "IncompleteDiskReads": 0,
+        "Observations": 50,
+        "MaxSampleGapMs": 73.6648,
+        "GuardTriggered": false,
+        "Results": [
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 38523449,
+            "PhasesMs": {
+              "copy_source": 408.7807,
+              "write_parquet": 2001.9284,
+              "metadata": 4.3882,
+              "copy_result": 9.7281
+            }
+          },
+          {
+            "Outcome": "completed",
+            "LastPhase": "copy_result",
+            "ErrorType": null,
+            "Rows": 1023642,
+            "Schema": "Id:BIGINT|Category:VARCHAR|Payload:VARCHAR|Value:DOUBLE",
+            "OutputBytes": 38523449,
+            "PhasesMs": {
+              "copy_source": 360.7555,
+              "write_parquet": 2021.0024,
+              "metadata": 5.2152,
+              "copy_result": 12.4295
+            }
+          }
+        ]
+      },
+      "Reads": null
+    }
+  ]
+}
