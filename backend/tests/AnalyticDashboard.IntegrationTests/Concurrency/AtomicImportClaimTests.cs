@@ -11,6 +11,7 @@ using AnalyticDashboard.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 using Npgsql;
@@ -356,7 +357,7 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
                         deleteProject,
                         cancellationToken
                     );
-                    await WaitForBlockerAsync(
+                    await PostgresLockObserver.WaitForBlockerAsync(
                         observer,
                         deletePid,
                         claimPid,
@@ -460,7 +461,8 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
         return new ImportJobRepository(
             context,
             new ProjectWriteTransactionFactory(context),
-            Options.Create(new ImportJobOptions { MaxAttempts = 10 })
+            Options.Create(new ImportJobOptions { MaxAttempts = 10 }),
+            NullLogger<ImportJobRepository>.Instance
         );
     }
 
@@ -603,26 +605,6 @@ public sealed class AtomicImportClaimTests : IClassFixture<ApiFixture>
             Assert.Null(saved.StorageKey);
             Assert.Null(saved.RowCount);
             Assert.Null(saved.ColumnCount);
-        }
-    }
-
-    private static async Task WaitForBlockerAsync(
-        AppDbContext observer,
-        int waitingPid,
-        int blockerPid,
-        CancellationToken cancellationToken)
-    {
-        await observer.Database.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            "SELECT @blocker = ANY(pg_blocking_pids(@waiting))",
-            (NpgsqlConnection)observer.Database.GetDbConnection()
-        );
-        command.Parameters.AddWithValue("blocker", blockerPid);
-        command.Parameters.AddWithValue("waiting", waitingPid);
-
-        while (!Equals(true, await command.ExecuteScalarAsync(cancellationToken)))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
         }
     }
 

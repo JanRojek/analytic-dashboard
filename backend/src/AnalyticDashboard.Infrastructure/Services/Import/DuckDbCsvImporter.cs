@@ -2,6 +2,7 @@
 using AnalyticDashboard.Application.Storage;
 using DuckDB.NET.Data;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AnalyticDashboard.Infrastructure.Services.Import;
 
@@ -9,13 +10,16 @@ public sealed class DuckDbCsvImporter
 {
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<DuckDbCsvImporter> _logger;
+    private readonly ImportJobOptions _options;
 
     public DuckDbCsvImporter(
         IFileStorage fileStorage,
-        ILogger<DuckDbCsvImporter> logger)
+        ILogger<DuckDbCsvImporter> logger,
+        IOptions<ImportJobOptions> options)
     {
         _fileStorage = fileStorage;
         _logger = logger;
+        _options = options.Value;
     }
 
     public async Task<DuckDbCsvImportResult> ImportAsync(
@@ -86,15 +90,20 @@ public sealed class DuckDbCsvImporter
         );
     }
 
-    private static async Task<ImportMetadata> ConvertToParquetAsync(
+    private async Task<ImportMetadata> ConvertToParquetAsync(
         string sourcePath,
         string parquetPath,
         CancellationToken cancellationToken)
     {
-        await using var connection =
-            new DuckDBConnection(
-                "DataSource=:memory:"
-            );
+        var connectionString = new DuckDBConnectionStringBuilder
+        {
+            DataSource = DuckDBConnectionStringBuilder.InMemoryDataSource,
+            ["threads"] = _options.DuckDbThreads,
+            ["memory_limit"] = $"{_options.DuckDbMemoryLimitMb}MiB",
+            ["max_temp_directory_size"] = $"{_options.DuckDbMaxTempDirectorySizeMb}MiB",
+            ["temp_directory"] = Path.Combine(Path.GetDirectoryName(parquetPath)!, "spill")
+        };
+        await using var connection = new DuckDBConnection(connectionString.ConnectionString);
 
         await connection.OpenAsync(
             cancellationToken
@@ -224,9 +233,9 @@ public sealed class DuckDbCsvImporter
         catch (Exception exception)
         {
             _logger.LogWarning(
-                exception,
-                "Failed to delete temporary DuckDB import workspace {DirectoryPath}.",
-                directoryPath
+                "Failed to delete temporary DuckDB import workspace {WorkspaceName}. ErrorType {ErrorType}.",
+                Path.GetFileName(directoryPath),
+                exception.GetType().Name
             );
         }
     }

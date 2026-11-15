@@ -6,33 +6,43 @@ using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using AnalyticDashboard.Infrastructure.Services.Import;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AnalyticDashboard.Infrastructure.Repositories;
 
 public sealed class ImportJobRepository : IImportJobRepository
 {
-    // "APERTURE": all instances must use the same owner claim lock namespace.
     private const long OwnerClaimLockSeed = 0x4150455254555245;
 
     private readonly AppDbContext _dbContext;
     private readonly IProjectWriteTransactionFactory _transactionFactory;
     private readonly ImportJobOptions _options;
+    private readonly ILogger<ImportJobRepository> _logger;
 
     public ImportJobRepository(
         AppDbContext dbContext,
         IProjectWriteTransactionFactory transactionFactory,
-        IOptions<ImportJobOptions> options)
+        IOptions<ImportJobOptions> options,
+        ILogger<ImportJobRepository> logger)
     {
         _dbContext = dbContext;
         _transactionFactory = transactionFactory;
         _options = options.Value;
+        _logger = logger;
     }
 
     public async Task<ImportJobWorkItem?> ClaimNextPendingAsync(
         CancellationToken cancellationToken)
     {
         var skippedOwners = new List<Guid>();
+        var runningOwners =
+            from runningJob in _dbContext.ImportJobs
+            join runningVersion in _dbContext.DatasetVersions on runningJob.DatasetVersionId equals runningVersion.Id
+            join runningDataset in _dbContext.Datasets on runningVersion.DatasetId equals runningDataset.Id
+            join runningProject in _dbContext.Projects on runningDataset.ProjectId equals runningProject.Id
+            where runningJob.Status == ImportJobStatus.Running
+            select runningProject.OwnerId;
 
         while (true)
         {
@@ -49,12 +59,7 @@ public sealed class ImportJobRepository : IImportJobRepository
                 where pendingJob.Status == ImportJobStatus.Pending
                     && pendingJob.AttemptNumber < _options.MaxAttempts
                     && !skippedOwners.Contains(project.OwnerId)
-                    && !(from runningJob in _dbContext.ImportJobs
-                         join runningVersion in _dbContext.DatasetVersions on runningJob.DatasetVersionId equals runningVersion.Id
-                         join runningDataset in _dbContext.Datasets on runningVersion.DatasetId equals runningDataset.Id
-                         join runningProject in _dbContext.Projects on runningDataset.ProjectId equals runningProject.Id
-                         where runningJob.Status == ImportJobStatus.Running && runningProject.OwnerId == project.OwnerId
-                         select runningJob.Id).Any()
+                    && !runningOwners.Contains(project.OwnerId)
                 orderby pendingJob.CreatedAtUtc, pendingJob.Id
                 select project.OwnerId
             ).Take(1).ToListAsync(cancellationToken);
@@ -75,7 +80,6 @@ public sealed class ImportJobRepository : IImportJobRepository
                 continue;
             }
 
-            // Recheck Running in a fresh READ COMMITTED statement after the owner lock, then lock project before job.
             var claimedJobs = await _dbContext.ImportJobs
                 .FromSqlInterpolated($"""
                     WITH candidate_project AS MATERIALIZED (
@@ -253,7 +257,6 @@ public sealed class ImportJobRepository : IImportJobRepository
         int columnCount,
         CancellationToken cancellationToken)
     {
-        // A later import may already be current; recognize this publication by its immutable version and artifact.
         return (
             from job in _dbContext.ImportJobs.AsNoTracking()
             join version in _dbContext.DatasetVersions.AsNoTracking()
@@ -386,7 +389,6 @@ public sealed class ImportJobRepository : IImportJobRepository
             return false;
         }
 
-        // Retain a short cooldown; recovery remains responsible for retry and the attempt limit.
         var changed = await _dbContext.Database.ExecuteSqlInterpolatedAsync($"""
             UPDATE import_jobs
             SET "LeaseExpiresAtUtc" = LEAST("LeaseExpiresAtUtc", clock_timestamp() + {_options.HeartbeatInterval})
@@ -482,6 +484,14 @@ public sealed class ImportJobRepository : IImportJobRepository
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogWarning(
+            "Recovery processed import job {ImportJobId} attempt {AttemptNumber}. Next status {Status}. Reason {RecoveryReason}.",
+            job.Id,
+            job.AttemptNumber,
+            job.Status,
+            job.Status == ImportJobStatus.Failed ? "attempt_limit_reached" : "lease_expired"
+        );
 
         return true;
     }

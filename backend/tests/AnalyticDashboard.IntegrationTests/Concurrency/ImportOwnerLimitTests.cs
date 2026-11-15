@@ -12,6 +12,7 @@ using AnalyticDashboard.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 using Npgsql;
@@ -302,7 +303,7 @@ public sealed class ImportOwnerLimitTests : IClassFixture<ApiFixture>
                     claim = CreateRepository(claiming).ClaimNextPendingAsync(cancellationToken);
                     await gate.Reached.Task.WaitAsync(cancellationToken);
                     deletion = DeleteAsync(deleting, seed, deleteProject, active: true, cancellationToken);
-                    await WaitForBlockerAsync(observer, deletePid, claimPid, cancellationToken);
+                    await PostgresLockObserver.WaitForBlockerAsync(observer, deletePid, claimPid, cancellationToken);
                 }
                 else
                 {
@@ -469,7 +470,7 @@ public sealed class ImportOwnerLimitTests : IClassFixture<ApiFixture>
                 {
                     await gate.Reached.Task.WaitAsync(cancellationToken);
                     renewing = CreateRepository(heartbeatContext).TryRenewLeaseAsync(attempt, cancellationToken);
-                    await WaitForBlockerAsync(
+                    await PostgresLockObserver.WaitForBlockerAsync(
                         observer,
                         ((NpgsqlConnection)heartbeatContext.Database.GetDbConnection()).ProcessID,
                         ((NpgsqlConnection)recoveryContext.Database.GetDbConnection()).ProcessID,
@@ -533,7 +534,8 @@ public sealed class ImportOwnerLimitTests : IClassFixture<ApiFixture>
         return new ImportJobRepository(
             context,
             new ProjectWriteTransactionFactory(context),
-            Options.Create(new ImportJobOptions())
+            Options.Create(new ImportJobOptions()),
+            NullLogger<ImportJobRepository>.Instance
         );
     }
 
@@ -673,26 +675,6 @@ public sealed class ImportOwnerLimitTests : IClassFixture<ApiFixture>
         foreach (var dataset in seed.Datasets)
         {
             await Storage.DeleteDirectoryAsync($"datasets/{dataset.Id:N}", CancellationToken.None);
-        }
-    }
-
-    private static async Task WaitForBlockerAsync(
-        AppDbContext observer,
-        int waitingPid,
-        int blockerPid,
-        CancellationToken cancellationToken)
-    {
-        await observer.Database.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            "SELECT @blocker = ANY(pg_blocking_pids(@waiting))",
-            (NpgsqlConnection)observer.Database.GetDbConnection()
-        );
-        command.Parameters.AddWithValue("blocker", blockerPid);
-        command.Parameters.AddWithValue("waiting", waitingPid);
-        while (!Equals(true, await command.ExecuteScalarAsync(cancellationToken)))
-        {
-            // The PostgreSQL lock relationship, rather than elapsed time, releases this barrier.
-            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
         }
     }
 

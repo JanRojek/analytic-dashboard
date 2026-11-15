@@ -818,7 +818,8 @@ public sealed class ImportLeaseTests : IClassFixture<ApiFixture>
         return new ImportJobRepository(
             context,
             new ProjectWriteTransactionFactory(context),
-            Options.Create(new ImportJobOptions())
+            Options.Create(new ImportJobOptions()),
+            NullLogger<ImportJobRepository>.Instance
         );
     }
 

@@ -48,6 +48,18 @@ public sealed class ImportJobProcessor
             return false;
         }
 
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["ImportJobId"] = workItem.Job.Id,
+            ["AttemptNumber"] = workItem.AttemptNumber
+        });
+        var startedAt = _timeProvider.GetTimestamp();
+        _logger.LogInformation(
+            "Import job {ImportJobId} attempt {AttemptNumber} started.",
+            workItem.Job.Id,
+            workItem.AttemptNumber
+        );
+
         using var ownershipLost = new CancellationTokenSource();
         using var conversionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var heartbeatCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -58,29 +70,71 @@ public sealed class ImportJobProcessor
             heartbeatCancellation.Token
         );
 
-        bool processed;
         try
         {
-            processed = await ProcessClaimedAsync(
-                workItem,
-                ownershipLost.Token,
-                conversionCancellation.Token,
-                cancellationToken
+            bool processed;
+            try
+            {
+                processed = await ProcessClaimedAsync(
+                    workItem,
+                    ownershipLost.Token,
+                    conversionCancellation.Token,
+                    cancellationToken
+                );
+            }
+            finally
+            {
+                await heartbeatCancellation.CancelAsync();
+                await heartbeat;
+            }
+
+            // A heartbeat left running could undo the shorter retry cooldown.
+            if (!processed)
+            {
+                if (await _importJobRepository.TryAbandonAsync(workItem, cancellationToken))
+                {
+                    _logger.LogWarning(
+                        "Import job {ImportJobId} attempt {AttemptNumber} shortened its lease for recovery after an unexpected failure.",
+                        workItem.Job.Id,
+                        workItem.AttemptNumber
+                    );
+                }
+                else
+                {
+                    LogOwnershipLost(workItem);
+                }
+            }
+
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "Import job {ImportJobId} attempt {AttemptNumber} cancelled because the host is stopping.",
+                workItem.Job.Id,
+                workItem.AttemptNumber
             );
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Import job {ImportJobId} attempt {AttemptNumber} stopped before its outcome was confirmed. ErrorType {ErrorType}.",
+                workItem.Job.Id,
+                workItem.AttemptNumber,
+                exception.GetType().Name
+            );
+            throw;
         }
         finally
         {
-            await heartbeatCancellation.CancelAsync();
-            await heartbeat;
+            _logger.LogInformation(
+                "Import job {ImportJobId} attempt {AttemptNumber} finished processing in {ElapsedMilliseconds} ms.",
+                workItem.Job.Id,
+                workItem.AttemptNumber,
+                _timeProvider.GetElapsedTime(startedAt).TotalMilliseconds
+            );
         }
-
-        // A heartbeat left running could undo the shorter retry cooldown.
-        if (!processed && !await _importJobRepository.TryAbandonAsync(workItem, cancellationToken))
-        {
-            LogOwnershipLost(workItem);
-        }
-
-        return true;
     }
 
     private async Task<bool> ProcessClaimedAsync(
@@ -124,10 +178,11 @@ public sealed class ImportJobProcessor
             if (failed)
             {
                 _logger.LogWarning(
-                    exception,
-                    "Import job {ImportJobId} attempt {AttemptNumber} failed permanently.",
+                    "Import job {ImportJobId} attempt {AttemptNumber} failed permanently. ErrorType {ErrorType}. DuckDbErrorType {DuckDbErrorType}.",
                     workItem.Job.Id,
-                    workItem.AttemptNumber
+                    workItem.AttemptNumber,
+                    exception.GetType().Name,
+                    exception is DuckDBException duckDbException ? duckDbException.ErrorType.ToString() : null
                 );
             }
             else
@@ -140,10 +195,12 @@ public sealed class ImportJobProcessor
         catch (Exception exception)
         {
             _logger.LogError(
-                exception,
-                "Import job {ImportJobId} attempt {AttemptNumber} stopped unexpectedly; lease recovery will retry after a short cooldown, within the attempt limit.",
+                "Import job {ImportJobId} attempt {AttemptNumber} failed unexpectedly. " +
+                "ErrorType {ErrorType}. DuckDbErrorType {DuckDbErrorType}.",
                 workItem.Job.Id,
-                workItem.AttemptNumber
+                workItem.AttemptNumber,
+                exception.GetType().Name,
+                exception is DuckDBException duckDbException ? duckDbException.ErrorType.ToString() : null
             );
             return false;
         }
@@ -166,10 +223,18 @@ public sealed class ImportJobProcessor
             if (outcome == ImportJobCompletionOutcome.OwnershipLost)
             {
                 LogOwnershipLost(workItem);
+                return true;
             }
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
+            _logger.LogWarning(
+                "Import job {ImportJobId} attempt {AttemptNumber} finalization failed; verifying its commit in a fresh scope. ErrorType {ErrorType}.",
+                workItem.Job.Id,
+                workItem.AttemptNumber,
+                exception.GetType().Name
+            );
+
             // A broken original connection cannot verify its commit. Read in a fresh scope without republishing.
             await using var verificationScope = _scopeFactory.CreateAsyncScope();
             var repository = verificationScope.ServiceProvider.GetRequiredService<IImportJobRepository>();
@@ -186,12 +251,19 @@ public sealed class ImportJobProcessor
             }
 
             _logger.LogWarning(
-                exception,
                 "Import job {ImportJobId} attempt {AttemptNumber} completion was confirmed after a database error.",
                 workItem.Job.Id,
                 workItem.AttemptNumber
             );
         }
+
+        _logger.LogInformation(
+            "Import job {ImportJobId} attempt {AttemptNumber} completed with {RowCount} rows and {ColumnCount} columns.",
+            workItem.Job.Id,
+            workItem.AttemptNumber,
+            importResult.RowCount,
+            importResult.ColumnCount
+        );
 
         return true;
     }
@@ -227,10 +299,10 @@ public sealed class ImportJobProcessor
                 catch (Exception exception)
                 {
                     _logger.LogWarning(
-                        exception,
-                        "Import job {ImportJobId} attempt {AttemptNumber} heartbeat failed; ownership is not yet known to be lost.",
+                        "Import job {ImportJobId} attempt {AttemptNumber} heartbeat failed; ownership is unconfirmed. ErrorType {ErrorType}.",
                         workItem.Job.Id,
-                        workItem.AttemptNumber
+                        workItem.AttemptNumber,
+                        exception.GetType().Name
                     );
                 }
             }

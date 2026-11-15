@@ -111,6 +111,14 @@ public static class DependencyInjection
 
         services.AddOptions<ImportJobOptions>()
             .Bind(configuration.GetSection("ImportJobs"))
+            .Validate(options => options.MaxConcurrentImports is >= 1 and <= 8,
+                "ImportJobs:MaxConcurrentImports must be between 1 and 8.")
+            .Validate(options => options.DuckDbThreads is >= 1 and <= 4,
+                "ImportJobs:DuckDbThreads must be between 1 and 4 per import.")
+            .Validate(options => options.DuckDbMemoryLimitMb is >= 16 and <= 4096,
+                "ImportJobs:DuckDbMemoryLimitMb must be between 16 and 4096 MiB per import.")
+            .Validate(options => options.DuckDbMaxTempDirectorySizeMb is >= 0 and <= 16384,
+                "ImportJobs:DuckDbMaxTempDirectorySizeMb must be between 0 and 16384 MiB per import.")
             .Validate(options => options.LeaseDuration >= TimeSpan.FromSeconds(3)
                 && options.LeaseDuration <= TimeSpan.FromHours(1),
                 "ImportJobs:LeaseDuration must be between 3 seconds and 1 hour.")

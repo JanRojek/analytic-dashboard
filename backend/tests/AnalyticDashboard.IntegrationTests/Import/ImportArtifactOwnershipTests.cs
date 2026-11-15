@@ -41,7 +41,8 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         var guarded = new ObservedStorage(storage);
         var importer = new DuckDbCsvImporter(
             guarded,
-            NullLogger<DuckDbCsvImporter>.Instance
+            NullLogger<DuckDbCsvImporter>.Instance,
+            Options.Create(new ImportJobOptions())
         );
         var original = "published artifact must remain unchanged"u8.ToArray();
 
@@ -94,11 +95,13 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
         var guarded = new ObservedStorage(storage, resultDirectory + "/");
         var firstImporter = new DuckDbCsvImporter(
             guarded,
-            NullLogger<DuckDbCsvImporter>.Instance
+            NullLogger<DuckDbCsvImporter>.Instance,
+            Options.Create(new ImportJobOptions())
         );
         var secondImporter = new DuckDbCsvImporter(
             guarded,
-            NullLogger<DuckDbCsvImporter>.Instance
+            NullLogger<DuckDbCsvImporter>.Instance,
+            Options.Create(new ImportJobOptions())
         );
 
         try
@@ -178,7 +181,11 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
                     .GetRequiredService<IImportJobRepository>();
                 var processor = new ImportJobProcessor(
                     new FailingFinalizationRepository(repository, commitSucceeded),
-                    new DuckDbCsvImporter(guarded, NullLogger<DuckDbCsvImporter>.Instance),
+                    new DuckDbCsvImporter(
+                        guarded,
+                        NullLogger<DuckDbCsvImporter>.Instance,
+                        Options.Create(new ImportJobOptions())
+                    ),
                     processingScope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
                     processingScope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
                     processingScope.ServiceProvider.GetRequiredService<TimeProvider>(),

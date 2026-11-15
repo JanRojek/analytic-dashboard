@@ -57,7 +57,10 @@ public sealed class ImportJobRecoveryService : BackgroundService
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Import lease recovery failed; it will be retried on the next pass.");
+                _logger.LogWarning(
+                    "Import lease recovery failed; it will be retried on the next pass. ErrorType {ErrorType}.",
+                    exception.GetType().Name
+                );
             }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));

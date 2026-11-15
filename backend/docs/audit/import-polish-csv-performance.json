@@ -1,0 +1,497 @@
+{
+  "Runtime": "10.0.11",
+  "NativeDuckDbVersion": "v1.5.5",
+  "LogicalProcessors": 12,
+  "Options": {
+    "MaxConcurrentImports": 2,
+    "DuckDbThreads": 1,
+    "DuckDbMemoryLimitMb": 256,
+    "DuckDbMaxTempDirectorySizeMb": 1024,
+    "LeaseDuration": "00:02:00",
+    "HeartbeatInterval": "00:00:20",
+    "MaxAttempts": 3
+  },
+  "SamplingIntervalMs": 50,
+  "Scenarios": [
+    {
+      "Shape": "tall_numeric",
+      "RowsPerImport": 1000000,
+      "SourceBytesPerImport": 53834488,
+      "Concurrency": 1,
+      "Samples": [
+        {
+          "ElapsedMs": 866.4584,
+          "CpuMs": 1125,
+          "SuccessfulInputMiBPerSecond": 59.25335658639869,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 66535424,
+          "PeakWorkingSetBytes": 157007872,
+          "BaselinePrivateBytes": 27185152,
+          "PeakPrivateBytes": 161529856,
+          "PeakTransientWorkspaceBytes": 55349218,
+          "PeakSpillBytes": 0,
+          "PeakStoredBytes": 55349218,
+          "OutputBytes": 1514730,
+          "Observations": 19,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 69.0411
+        },
+        {
+          "ElapsedMs": 1711.4212,
+          "CpuMs": 1828.125,
+          "SuccessfulInputMiBPerSecond": 29.9987919645266,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 70389760,
+          "PeakWorkingSetBytes": 161046528,
+          "BaselinePrivateBytes": 27697152,
+          "PeakPrivateBytes": 163659776,
+          "PeakTransientWorkspaceBytes": 55158313,
+          "PeakSpillBytes": 0,
+          "PeakStoredBytes": 55349218,
+          "OutputBytes": 1514730,
+          "Observations": 36,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 75.759
+        },
+        {
+          "ElapsedMs": 1364.6965,
+          "CpuMs": 1843.75,
+          "SuccessfulInputMiBPerSecond": 37.620502831567656,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 72548352,
+          "PeakWorkingSetBytes": 161763328,
+          "BaselinePrivateBytes": 28610560,
+          "PeakPrivateBytes": 164388864,
+          "PeakTransientWorkspaceBytes": 54997224,
+          "PeakSpillBytes": 0,
+          "PeakStoredBytes": 55349218,
+          "OutputBytes": 1514730,
+          "Observations": 29,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.8131
+        }
+      ]
+    },
+    {
+      "Shape": "tall_numeric",
+      "RowsPerImport": 1000000,
+      "SourceBytesPerImport": 53834488,
+      "Concurrency": 2,
+      "Samples": [
+        {
+          "ElapsedMs": 1621.437,
+          "CpuMs": 3562.5,
+          "SuccessfulInputMiBPerSecond": 63.3272443424943,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            },
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 73809920,
+          "PeakWorkingSetBytes": 250347520,
+          "BaselinePrivateBytes": 36446208,
+          "PeakPrivateBytes": 298360832,
+          "PeakTransientWorkspaceBytes": 110346442,
+          "PeakSpillBytes": 0,
+          "PeakStoredBytes": 56863948,
+          "OutputBytes": 3029460,
+          "Observations": 34,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.7721
+        },
+        {
+          "ElapsedMs": 1419.8197,
+          "CpuMs": 2953.125,
+          "SuccessfulInputMiBPerSecond": 72.31984250180565,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            },
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 75444224,
+          "PeakWorkingSetBytes": 260059136,
+          "BaselinePrivateBytes": 34914304,
+          "PeakPrivateBytes": 308363264,
+          "PeakTransientWorkspaceBytes": 110121461,
+          "PeakSpillBytes": 0,
+          "PeakStoredBytes": 56863948,
+          "OutputBytes": 3029460,
+          "Observations": 30,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.3603
+        },
+        {
+          "ElapsedMs": 1523.0995,
+          "CpuMs": 3234.375,
+          "SuccessfulInputMiBPerSecond": 67.41590886541617,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            },
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 76316672,
+          "PeakWorkingSetBytes": 245452800,
+          "BaselinePrivateBytes": 32223232,
+          "PeakPrivateBytes": 292810752,
+          "PeakTransientWorkspaceBytes": 109702048,
+          "PeakSpillBytes": 0,
+          "PeakStoredBytes": 56863948,
+          "OutputBytes": 3029460,
+          "Observations": 32,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.4964
+        }
+      ]
+    },
+    {
+      "Shape": "wide_text",
+      "RowsPerImport": 100000,
+      "SourceBytesPerImport": 104891868,
+      "Concurrency": 1,
+      "Samples": [
+        {
+          "ElapsedMs": 1161.157,
+          "CpuMs": 1453.125,
+          "SuccessfulInputMiBPerSecond": 86.14914306288865,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 75739136,
+          "PeakWorkingSetBytes": 305168384,
+          "BaselinePrivateBytes": 32141312,
+          "PeakPrivateBytes": 318468096,
+          "PeakTransientWorkspaceBytes": 187774031,
+          "PeakSpillBytes": 82739200,
+          "PeakStoredBytes": 109127601,
+          "OutputBytes": 4235733,
+          "Observations": 25,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 62.8758
+        },
+        {
+          "ElapsedMs": 1126.2095,
+          "CpuMs": 1343.75,
+          "SuccessfulInputMiBPerSecond": 88.822444235708,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 76517376,
+          "PeakWorkingSetBytes": 320815104,
+          "BaselinePrivateBytes": 33886208,
+          "PeakPrivateBytes": 322961408,
+          "PeakTransientWorkspaceBytes": 185861596,
+          "PeakSpillBytes": 80969728,
+          "PeakStoredBytes": 109127601,
+          "OutputBytes": 4235733,
+          "Observations": 24,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 64.1502
+        },
+        {
+          "ElapsedMs": 1247.8952,
+          "CpuMs": 1656.25,
+          "SuccessfulInputMiBPerSecond": 80.16112291438785,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 76689408,
+          "PeakWorkingSetBytes": 350326784,
+          "BaselinePrivateBytes": 34619392,
+          "PeakPrivateBytes": 414277632,
+          "PeakTransientWorkspaceBytes": 185894364,
+          "PeakSpillBytes": 81002496,
+          "PeakStoredBytes": 109127601,
+          "OutputBytes": 4235733,
+          "Observations": 26,
+          "IncompleteDiskReads": 1,
+          "MaxSampleGapMs": 63.219
+        }
+      ]
+    },
+    {
+      "Shape": "wide_text",
+      "RowsPerImport": 100000,
+      "SourceBytesPerImport": 104891868,
+      "Concurrency": 2,
+      "Samples": [
+        {
+          "ElapsedMs": 1308.9606,
+          "CpuMs": 2812.5,
+          "SuccessfulInputMiBPerSecond": 152.84292057602744,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            },
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 77488128,
+          "PeakWorkingSetBytes": 547692544,
+          "BaselinePrivateBytes": 33718272,
+          "PeakPrivateBytes": 594259968,
+          "PeakTransientWorkspaceBytes": 375458744,
+          "PeakSpillBytes": 165675008,
+          "PeakStoredBytes": 113363334,
+          "OutputBytes": 8471466,
+          "Observations": 28,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.9132
+        },
+        {
+          "ElapsedMs": 1265.4491,
+          "CpuMs": 2953.125,
+          "SuccessfulInputMiBPerSecond": 158.09830756760522,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            },
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 78929920,
+          "PeakWorkingSetBytes": 645308416,
+          "BaselinePrivateBytes": 35233792,
+          "PeakPrivateBytes": 785436672,
+          "PeakTransientWorkspaceBytes": 378047416,
+          "PeakSpillBytes": 168263680,
+          "PeakStoredBytes": 113363334,
+          "OutputBytes": 8471466,
+          "Observations": 27,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 64.5741
+        },
+        {
+          "ElapsedMs": 1338.7807,
+          "CpuMs": 2921.875,
+          "SuccessfulInputMiBPerSecond": 149.4384860963033,
+          "Outcomes": [
+            {
+              "Status": "completed",
+              "ErrorType": null
+            },
+            {
+              "Status": "completed",
+              "ErrorType": null
+            }
+          ],
+          "BaselineWorkingSetBytes": 255275008,
+          "PeakWorkingSetBytes": 572194816,
+          "BaselinePrivateBytes": 220831744,
+          "PeakPrivateBytes": 600727552,
+          "PeakTransientWorkspaceBytes": 368273013,
+          "PeakSpillBytes": 154468352,
+          "PeakStoredBytes": 113363334,
+          "OutputBytes": 8471466,
+          "Observations": 28,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 65.1513
+        }
+      ]
+    },
+    {
+      "Shape": "wide_text_stress",
+      "RowsPerImport": 150000,
+      "SourceBytesPerImport": 157393350,
+      "Concurrency": 1,
+      "Samples": [
+        {
+          "ElapsedMs": 1291.4624,
+          "CpuMs": 1562.5,
+          "SuccessfulInputMiBPerSecond": 0,
+          "Outcomes": [
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            }
+          ],
+          "BaselineWorkingSetBytes": 85098496,
+          "PeakWorkingSetBytes": 428363776,
+          "BaselinePrivateBytes": 39268352,
+          "PeakPrivateBytes": 480038912,
+          "PeakTransientWorkspaceBytes": 266805702,
+          "PeakSpillBytes": 109740032,
+          "PeakStoredBytes": 157393350,
+          "OutputBytes": 0,
+          "Observations": 27,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.868
+        },
+        {
+          "ElapsedMs": 1173.3173,
+          "CpuMs": 1437.5,
+          "SuccessfulInputMiBPerSecond": 0,
+          "Outcomes": [
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            }
+          ],
+          "BaselineWorkingSetBytes": 275873792,
+          "PeakWorkingSetBytes": 435884032,
+          "BaselinePrivateBytes": 246181888,
+          "PeakPrivateBytes": 486064128,
+          "PeakTransientWorkspaceBytes": 287351238,
+          "PeakSpillBytes": 130252800,
+          "PeakStoredBytes": 157393350,
+          "OutputBytes": 0,
+          "Observations": 25,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.4606
+        },
+        {
+          "ElapsedMs": 1189.823,
+          "CpuMs": 1437.5,
+          "SuccessfulInputMiBPerSecond": 0,
+          "Outcomes": [
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            }
+          ],
+          "BaselineWorkingSetBytes": 282980352,
+          "PeakWorkingSetBytes": 442019840,
+          "BaselinePrivateBytes": 252723200,
+          "PeakPrivateBytes": 487964672,
+          "PeakTransientWorkspaceBytes": 285254086,
+          "PeakSpillBytes": 127893504,
+          "PeakStoredBytes": 157393350,
+          "OutputBytes": 0,
+          "Observations": 25,
+          "IncompleteDiskReads": 1,
+          "MaxSampleGapMs": 63.7612
+        }
+      ]
+    },
+    {
+      "Shape": "wide_text_stress",
+      "RowsPerImport": 150000,
+      "SourceBytesPerImport": 157393350,
+      "Concurrency": 2,
+      "Samples": [
+        {
+          "ElapsedMs": 1523.609,
+          "CpuMs": 3390.625,
+          "SuccessfulInputMiBPerSecond": 0,
+          "Outcomes": [
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            },
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            }
+          ],
+          "BaselineWorkingSetBytes": 289079296,
+          "PeakWorkingSetBytes": 716861440,
+          "BaselinePrivateBytes": 258945024,
+          "PeakPrivateBytes": 822624256,
+          "PeakTransientWorkspaceBytes": 568083340,
+          "PeakSpillBytes": 215973888,
+          "PeakStoredBytes": 157393350,
+          "OutputBytes": 0,
+          "Observations": 32,
+          "IncompleteDiskReads": 2,
+          "MaxSampleGapMs": 63.7756
+        },
+        {
+          "ElapsedMs": 1620.6502,
+          "CpuMs": 3531.25,
+          "SuccessfulInputMiBPerSecond": 0,
+          "Outcomes": [
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            },
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            }
+          ],
+          "BaselineWorkingSetBytes": 311873536,
+          "PeakWorkingSetBytes": 677076992,
+          "BaselinePrivateBytes": 281243648,
+          "PeakPrivateBytes": 746778624,
+          "PeakTransientWorkspaceBytes": 586138508,
+          "PeakSpillBytes": 272203776,
+          "PeakStoredBytes": 157393350,
+          "OutputBytes": 0,
+          "Observations": 34,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 64.1927
+        },
+        {
+          "ElapsedMs": 1472.883,
+          "CpuMs": 3265.625,
+          "SuccessfulInputMiBPerSecond": 0,
+          "Outcomes": [
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            },
+            {
+              "Status": "resource_limit",
+              "ErrorType": "OutOfMemory"
+            }
+          ],
+          "BaselineWorkingSetBytes": 87392256,
+          "PeakWorkingSetBytes": 726237184,
+          "BaselinePrivateBytes": 44089344,
+          "PeakPrivateBytes": 851877888,
+          "PeakTransientWorkspaceBytes": 591086476,
+          "PeakSpillBytes": 276824064,
+          "PeakStoredBytes": 157393350,
+          "OutputBytes": 0,
+          "Observations": 31,
+          "IncompleteDiskReads": 0,
+          "MaxSampleGapMs": 63.8707
+        }
+      ]
+    }
+  ]
+}

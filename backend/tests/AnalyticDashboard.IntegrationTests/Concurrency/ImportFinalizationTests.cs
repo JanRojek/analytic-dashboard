@@ -274,7 +274,7 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                         failImport,
                         cancellationToken
                     );
-                    await WaitForBlockerAsync(observer, finalizerPid, nextOwnerPid, cancellationToken);
+                    await PostgresLockObserver.WaitForBlockerAsync(observer, finalizerPid, nextOwnerPid, cancellationToken);
                 }
                 else
                 {
@@ -292,7 +292,7 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                         oldAttempt.AttemptNumber,
                         cancellationToken
                     );
-                    await WaitForBlockerAsync(observer, nextOwnerPid, finalizerPid, cancellationToken);
+                    await PostgresLockObserver.WaitForBlockerAsync(observer, nextOwnerPid, finalizerPid, cancellationToken);
                 }
             }
             finally
@@ -362,7 +362,8 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                 CreateRepository(context),
                 new DuckDbCsvImporter(
                     storage,
-                    NullLogger<DuckDbCsvImporter>.Instance
+                    NullLogger<DuckDbCsvImporter>.Instance,
+                    Options.Create(new ImportJobOptions())
                 ),
                 scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
                 scope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
@@ -414,7 +415,8 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                 CreateRepository(oldContext),
                 new DuckDbCsvImporter(
                     gate,
-                    NullLogger<DuckDbCsvImporter>.Instance
+                    NullLogger<DuckDbCsvImporter>.Instance,
+                    Options.Create(new ImportJobOptions())
                 ),
                 scope.ServiceProvider.GetRequiredService<IServiceScopeFactory>(),
                 scope.ServiceProvider.GetRequiredService<IOptions<ImportJobOptions>>(),
@@ -510,7 +512,7 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                     deleteProject,
                     cancellationToken
                 );
-                await WaitForBlockerAsync(observer, deletePid, finalizerPid, cancellationToken);
+                await PostgresLockObserver.WaitForBlockerAsync(observer, deletePid, finalizerPid, cancellationToken);
             }
             finally
             {
@@ -592,7 +594,7 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                 );
                 try
                 {
-                    await WaitForBlockerAsync(observer, finalizerPid, ownerPid, cancellationToken);
+                    await PostgresLockObserver.WaitForBlockerAsync(observer, finalizerPid, ownerPid, cancellationToken);
                 }
                 finally
                 {
@@ -623,7 +625,7 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
                         attempt.AttemptNumber,
                         cancellationToken
                     );
-                    await WaitForBlockerAsync(observer, ownerPid, finalizerPid, cancellationToken);
+                    await PostgresLockObserver.WaitForBlockerAsync(observer, ownerPid, finalizerPid, cancellationToken);
                 }
                 finally
                 {
@@ -874,7 +876,8 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
         return new ImportJobRepository(
             context,
             new ProjectWriteTransactionFactory(context),
-            Options.Create(new ImportJobOptions())
+            Options.Create(new ImportJobOptions()),
+            NullLogger<ImportJobRepository>.Instance
         );
     }
 
@@ -1028,25 +1031,6 @@ public sealed class ImportFinalizationTests : IClassFixture<ApiFixture>
             $"datasets/{seed.Dataset.Id:N}",
             CancellationToken.None
         );
-    }
-
-    private static async Task WaitForBlockerAsync(
-        AppDbContext observer,
-        int waitingPid,
-        int blockerPid,
-        CancellationToken cancellationToken)
-    {
-        await observer.Database.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            "SELECT @blocker = ANY(pg_blocking_pids(@waiting))",
-            (NpgsqlConnection)observer.Database.GetDbConnection()
-        );
-        command.Parameters.AddWithValue("blocker", blockerPid);
-        command.Parameters.AddWithValue("waiting", waitingPid);
-        while (!Equals(true, await command.ExecuteScalarAsync(cancellationToken)))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-        }
     }
 
     private sealed record Seed(
