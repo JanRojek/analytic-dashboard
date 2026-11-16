@@ -318,12 +318,13 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
             var cleanup = new StorageCleanupProcessor(
                 context,
                 guarded,
+                scope.ServiceProvider.GetRequiredService<IStorageNamespaceCloser>(),
                 NullLogger<StorageCleanupProcessor>.Instance
             );
 
             Assert.True(await cleanup.ProcessNextAsync(CancellationToken));
 
-            var queued = await context.StorageCleanupJobs.SingleAsync(
+            var queued = await context.StorageCleanupJobs.AsNoTracking().SingleAsync(
                 item => item.DatasetId == removedDataset.Id,
                 CancellationToken
             );
@@ -335,10 +336,12 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
                 (await context.DatasetVersions.AsNoTracking()
                     .SingleAsync(item => item.Id == version.Id, CancellationToken)).Status
             );
-            context.Entry(queued)
-                .Property(item => item.NextAttemptAtUtc)
-                .CurrentValue = DateTime.UtcNow.AddMinutes(-1);
-            await context.SaveChangesAsync(CancellationToken);
+            await context.StorageCleanupJobs
+                .Where(item => item.Id == queued.Id)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.NextAttemptAtUtc, DateTime.UnixEpoch),
+                    CancellationToken
+                );
 
             guarded.AllowDirectoryCleanup = true;
 
@@ -346,6 +349,10 @@ public sealed class ImportArtifactOwnershipTests : IClassFixture<ApiFixture>
 
             Assert.True(await storage.ExistsAsync(publishedKey, CancellationToken));
             Assert.False(await storage.ExistsAsync(removedKey, CancellationToken));
+            Assert.False(await context.StorageCleanupJobs.AnyAsync(
+                item => item.Id == queued.Id,
+                CancellationToken
+            ));
 
             await using var saved = await storage.OpenReadAsync(publishedKey, CancellationToken);
             using var reader = new StreamReader(saved, Encoding.UTF8);

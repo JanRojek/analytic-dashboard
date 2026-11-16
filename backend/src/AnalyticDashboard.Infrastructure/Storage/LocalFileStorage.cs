@@ -1,19 +1,39 @@
-﻿using AnalyticDashboard.Application.Storage;
+using AnalyticDashboard.Application.Storage;
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AnalyticDashboard.Infrastructure.Storage;
 
-public sealed class LocalFileStorage : IFileStorage
+public sealed partial class LocalFileStorage : IFileStorage, IStorageNamespaceCloser
 {
     private readonly string _rootPath;
+    private readonly ILogger<LocalFileStorage> _logger;
 
     public LocalFileStorage()
+        : this(Path.Combine(Directory.GetCurrentDirectory(), "storage"))
     {
-        _rootPath = Path.GetFullPath(
-            Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "storage"
-            )
-        );
+    }
+
+    public LocalFileStorage(ILogger<LocalFileStorage> logger)
+        : this(Path.Combine(Directory.GetCurrentDirectory(), "storage"), logger)
+    {
+    }
+
+    public LocalFileStorage(string rootPath)
+        : this(rootPath, NullLogger<LocalFileStorage>.Instance)
+    {
+    }
+
+    public LocalFileStorage(string rootPath, ILogger<LocalFileStorage> logger)
+    {
+        _rootPath = Path.GetFullPath(rootPath);
+        _logger = logger;
+        if (new DriveInfo(Path.GetPathRoot(_rootPath)!).DriveType == DriveType.Network)
+        {
+            throw new NotSupportedException("Local storage requires a local filesystem; network shares need a verified storage protocol.");
+        }
+        RejectReparsePoints(_rootPath);
     }
 
     public async Task SaveAsync(
@@ -21,52 +41,14 @@ public sealed class LocalFileStorage : IFileStorage
         Stream content,
         CancellationToken cancellationToken)
     {
-        var filePath = ResolvePath(storageKey);
-
-        var directoryPath = Path.GetDirectoryName(
-            filePath
-        );
-
-        if (directoryPath is not null)
+        ResolvePath(storageKey);
+        if (GetDatasetNamespace(storageKey) is { } datasetId)
         {
-            Directory.CreateDirectory(
-                directoryPath
-            );
+            ThrowIfNotOpen(await GetNamespaceStateAsync(datasetId, cancellationToken));
         }
 
-        var outputStream = new FileStream(
-            filePath,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            bufferSize: 81920,
-            FileOptions.Asynchronous
-        );
-
-        try
-        {
-            await using (outputStream)
-            {
-                await content.CopyToAsync(outputStream, cancellationToken);
-            }
-        }
-        catch (Exception writeException)
-        {
-            try
-            {
-                File.Delete(filePath);
-            }
-            catch (Exception cleanupException)
-            {
-                throw new AggregateException(
-                    "Storage write failed and cleanup of its partial file also failed.",
-                    writeException,
-                    cleanupException
-                );
-            }
-
-            throw;
-        }
+        await using var staged = await StageAsync(content, cancellationToken);
+        await InstallAsync(staged, storageKey, cancellationToken);
     }
 
     public Task<Stream> OpenReadAsync(
@@ -137,54 +119,80 @@ public sealed class LocalFileStorage : IFileStorage
         return Task.CompletedTask;
     }
 
-    private string ResolvePath(
-        string storageKey)
+    private string ResolvePath(string storageKey)
     {
         if (string.IsNullOrWhiteSpace(storageKey))
         {
-            throw new ArgumentException(
-                "Storage key cannot be empty.",
-                nameof(storageKey)
-            );
+            throw new ArgumentException("Storage key cannot be empty.", nameof(storageKey));
         }
 
-        var normalizedKey = storageKey.Replace(
-            '/',
-            Path.DirectorySeparatorChar
-        );
-
-        if (Path.IsPathRooted(normalizedKey))
+        var segments = storageKey.Split('/');
+        if (segments.Any(segment => string.IsNullOrWhiteSpace(segment)
+                || segment is "." or ".."
+                || segment.EndsWith(' ') || segment.EndsWith('.')
+                || segment.Any(char.IsControl)
+                || segment.Contains('~') || IsDeviceName(segment)
+                || segment.IndexOfAny(['\\', ':', '<', '>', '"', '|', '?', '*', '\0']) >= 0)
+            || segments[0].Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_' and not '.')
+            || string.Equals(segments[0], ProtocolDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException(
-                "Storage key must be relative.",
-                nameof(storageKey)
-            );
+            throw new ArgumentException("Storage key is not a canonical relative path.", nameof(storageKey));
         }
 
-        var fullPath = Path.GetFullPath(
-            Path.Combine(
-                _rootPath,
-                normalizedKey
-            )
-        );
-
-        var rootPrefix =
-            _rootPath.TrimEnd(
-                Path.DirectorySeparatorChar,
-                Path.AltDirectorySeparatorChar
-            )
-            + Path.DirectorySeparatorChar;
-
-        if (!fullPath.StartsWith(
-                rootPrefix,
-                StringComparison.OrdinalIgnoreCase))
+        GetDatasetNamespace(storageKey);
+        var fullPath = Path.GetFullPath(Path.Combine(_rootPath, Path.Combine(segments)));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!fullPath.StartsWith(_rootPath.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, comparison))
         {
-            throw new ArgumentException(
-                "Storage key points outside the storage root.",
-                nameof(storageKey)
-            );
+            throw new ArgumentException("Storage key points outside the storage root.", nameof(storageKey));
         }
-
+        RejectReparsePoints(fullPath);
         return fullPath;
+    }
+
+    private static bool IsDeviceName(string segment)
+    {
+        var name = segment.Split('.')[0];
+        return name.Equals("CON", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("AUX", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("NUL", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("CONIN$", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("CONOUT$", StringComparison.OrdinalIgnoreCase)
+            || name.Length == 4 && "123456789¹²³".Contains(name[3])
+                && (name.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith("LPT", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Guid? GetDatasetNamespace(string storageKey)
+    {
+        var segments = storageKey.Split('/');
+        if (!string.Equals(segments[0], "datasets", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+        if (segments[0] != "datasets" || segments.Length < 2
+            || !Guid.TryParseExact(segments[1], "N", out var datasetId)
+            || datasetId == Guid.Empty || datasetId.ToString("N") != segments[1])
+        {
+            throw new ArgumentException("Dataset storage keys must use a canonical namespace.", nameof(storageKey));
+        }
+        return datasetId;
+    }
+
+    private static void RejectReparsePoints(string path)
+    {
+        for (var current = path; current is not null; current = Path.GetDirectoryName(current))
+        {
+            try
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new IOException("Reparse points are not supported in local storage paths.");
+                }
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+        }
     }
 }

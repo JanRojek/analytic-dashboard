@@ -30,17 +30,6 @@ public sealed class StorageCleanupJob
 
     private StorageCleanupJob() {}
 
-    public void ScheduleVerification(TimeSpan delay)
-    {
-        if (delay <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(nameof(delay));
-        }
-
-        AttemptCount = 0;
-        NextAttemptAtUtc = DateTime.UtcNow.Add(delay);
-    }
-
     public void ScheduleRetry(TimeSpan delay)
     {
         if (delay < TimeSpan.Zero)

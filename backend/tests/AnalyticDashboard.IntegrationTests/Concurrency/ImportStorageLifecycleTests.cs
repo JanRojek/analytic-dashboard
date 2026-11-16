@@ -1,4 +1,4 @@
-using System.Text;
+using System.Data.Common;
 
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Projects.Persistence;
@@ -27,24 +27,21 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, false)]
-    [InlineData(false, false, true)]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, false)]
-    [InlineData(true, true, false)]
-    public async Task LateArtifact_ShouldRemainCoveredByDeletionIntent_AfterCleanup(
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task LateArtifact_ShouldBeRejected_AfterNamespaceClosureAndCleanup(
         bool deleteProject,
-        bool finishConversionAfterDeletion,
-        bool loseWriteAcknowledgement)
+        bool finishConversionAfterDeletion)
     {
         using var deadline = CreateDeadline();
         var token = deadline.Token;
         var seed = await SeedAsync(token);
+        var datasetDirectory = Path.Combine("storage", "datasets", seed.Dataset.Id.ToString("N"));
         var storage = new DelayedStorage(
             new LocalFileStorage(),
             finishConversionAfterDeletion,
-            loseWriteAcknowledgement,
             token
         );
         await using var processingContext = CreateContext();
@@ -88,48 +85,34 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
 
             await DeleteAsync(seed, deleteProject, token);
             Assert.True(await ProcessCleanupAsync(token));
+            Assert.False(Directory.Exists(datasetDirectory));
             Assert.False(await storage.ExistsAsync(seed.Job.SourceStorageKey, token));
+            Assert.Equal(
+                LocalStorageNamespaceState.Closed,
+                await new LocalFileStorage().GetNamespaceStateAsync(seed.Dataset.Id, token)
+            );
 
             storage.Release.TrySetResult();
             Assert.True(await processing.WaitAsync(token));
 
             var lateKey = Assert.IsType<string>(storage.SavedKey);
-            Assert.True(await storage.ExistsAsync(lateKey, token));
-            await using (var late = await storage.OpenReadAsync(lateKey, token))
-            {
-                var magic = new byte[4];
-                await late.ReadExactlyAsync(magic, token);
-                Assert.Equal("PAR1", Encoding.ASCII.GetString(magic));
-            }
+            Assert.True(storage.InstallationRejected);
+            Assert.False(await storage.ExistsAsync(lateKey, token));
+            Assert.False(Directory.Exists(datasetDirectory));
             await using (var observer = CreateContext())
             {
                 Assert.False(await observer.Datasets.AnyAsync(item => item.Id == seed.Dataset.Id, token));
                 Assert.False(await observer.DatasetVersions.AnyAsync(item => item.Id == seed.Version.Id, token));
                 Assert.False(await observer.ImportJobs.AnyAsync(item => item.Id == seed.Job.Id, token));
                 Assert.Equal(!deleteProject, await observer.Projects.AnyAsync(item => item.Id == seed.Project.Id, token));
-                Assert.True(await observer.StorageCleanupJobs.AnyAsync(
+                Assert.False(await observer.StorageCleanupJobs.AnyAsync(
                     item => item.DatasetId == seed.Dataset.Id,
                     token
                 ));
             }
 
-            await MakeCleanupDueAsync(seed.Dataset.Id, token);
-            Assert.True(await ProcessCleanupAsync(token));
-
-            Assert.False(await storage.ExistsAsync(lateKey, token));
             Assert.False(await storage.ExistsAsync(seed.Job.SourceStorageKey, token));
             Assert.False(await ProcessCleanupAsync(token));
-
-            await MakeCleanupDueAsync(seed.Dataset.Id, token);
-            Assert.True(await ProcessCleanupAsync(token));
-            Assert.False(await storage.ExistsAsync(lateKey, token));
-            await using var final = CreateContext();
-            var intent = await final.StorageCleanupJobs.SingleAsync(
-                item => item.DatasetId == seed.Dataset.Id,
-                token
-            );
-            Assert.Equal(0, intent.AttemptCount);
-            Assert.True(intent.NextAttemptAtUtc > DateTime.UtcNow);
         }
         finally
         {
@@ -148,8 +131,10 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
         }
     }
 
-    [Fact]
-    public async Task Cleanup_ShouldKeepItsIntent_WhenAcknowledgementIsLostAfterTheActualDatabaseWrite()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cleanup_ShouldBeSafeToRetry_WhenDatabaseCompletionFails(bool commitSucceeded)
     {
         using var deadline = CreateDeadline();
         var token = deadline.Token;
@@ -166,11 +151,12 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
             }
             await DeleteAsync(seed, deleteProject: false, token);
 
-            var fault = new CleanupAcknowledgementFault();
+            var fault = new CleanupAcknowledgementFault(commitSucceeded);
             await using (var cleaningContext = CreateContext(fault))
             {
                 var processor = new StorageCleanupProcessor(
                     cleaningContext,
+                    storage,
                     storage,
                     NullLogger<StorageCleanupProcessor>.Instance
                 );
@@ -178,27 +164,30 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
                 var exception = await Assert.ThrowsAsync<IOException>(() => processor.ProcessNextAsync(token));
 
                 Assert.Same(fault.Failure, exception);
-                Assert.Equal(1, fault.SavedCalls);
+                Assert.Equal(commitSucceeded ? 1 : 0, fault.DeletedRows);
             }
             Assert.False(await storage.ExistsAsync(seed.Job.SourceStorageKey, token));
+            Assert.Equal(
+                LocalStorageNamespaceState.Closed,
+                await storage.GetNamespaceStateAsync(seed.Dataset.Id, token)
+            );
 
             var lateKey = $"datasets/{seed.Dataset.Id:N}/versions/{seed.Version.Id:N}/attempts/{Guid.NewGuid():N}.parquet";
             await using (var late = new MemoryStream("unpublished late artifact"u8.ToArray()))
             {
-                await storage.SaveAsync(lateKey, late, token);
+                await Assert.ThrowsAsync<StorageNamespaceClosedException>(
+                    () => storage.SaveAsync(lateKey, late, token)
+                );
             }
             await using (var observer = CreateContext())
             {
-                var intent = await observer.StorageCleanupJobs.SingleAsync(
+                Assert.Equal(!commitSucceeded, await observer.StorageCleanupJobs.AnyAsync(
                     item => item.DatasetId == seed.Dataset.Id,
                     token
-                );
-                Assert.Equal(0, intent.AttemptCount);
-                Assert.True(intent.NextAttemptAtUtc > DateTime.UtcNow);
+                ));
             }
 
-            await MakeCleanupDueAsync(seed.Dataset.Id, token);
-            Assert.True(await ProcessCleanupAsync(token));
+            Assert.Equal(!commitSucceeded, await ProcessCleanupAsync(token));
 
             Assert.False(await storage.ExistsAsync(lateKey, token));
             Assert.False(await ProcessCleanupAsync(token));
@@ -206,6 +195,64 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
         finally
         {
             await CleanupAsync(seed);
+        }
+    }
+
+    [Fact]
+    public async Task Cleanup_ShouldCompleteIdempotently_WhenTwoProcessorsHandleTheSameJob()
+    {
+        using var deadline = CreateDeadline();
+        var token = deadline.Token;
+        var seed = await SeedAsync(token);
+        var gate = new CleanupCompletionGate();
+        await using var firstContext = CreateContext(gate);
+        var storage = new LocalFileStorage();
+        Task<bool>? firstCleanup = null;
+
+        try
+        {
+            await using (var failingContext = CreateContext())
+            {
+                var repository = CreateRepository(failingContext, Options.Create(new ImportJobOptions()));
+                var attempt = Assert.IsType<ImportJobWorkItem>(await repository.ClaimNextPendingAsync(token));
+                Assert.True(await repository.TryFailAsync(attempt, "Invalid CSV.", token));
+            }
+            await DeleteAsync(seed, deleteProject: false, token);
+            var processor = new StorageCleanupProcessor(
+                firstContext,
+                storage,
+                storage,
+                NullLogger<StorageCleanupProcessor>.Instance
+            );
+
+            firstCleanup = processor.ProcessNextAsync(token);
+            await gate.Reached.Task.WaitAsync(token);
+            Assert.True(await ProcessCleanupAsync(token));
+            gate.Release.TrySetResult();
+            Assert.True(await firstCleanup.WaitAsync(token));
+
+            Assert.Equal(0, gate.DeletedRows);
+            Assert.False(await ProcessCleanupAsync(token));
+            Assert.False(await storage.ExistsAsync(seed.Job.SourceStorageKey, token));
+            Assert.Equal(
+                LocalStorageNamespaceState.Closed,
+                await storage.GetNamespaceStateAsync(seed.Dataset.Id, token)
+            );
+        }
+        finally
+        {
+            gate.Release.TrySetResult();
+            try
+            {
+                if (firstCleanup is not null)
+                {
+                    await firstCleanup.WaitAsync(token);
+                }
+            }
+            finally
+            {
+                await CleanupAsync(seed);
+            }
         }
     }
 
@@ -275,22 +322,13 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
     private async Task<bool> ProcessCleanupAsync(CancellationToken cancellationToken)
     {
         await using var context = CreateContext();
+        var storage = new LocalFileStorage();
         return await new StorageCleanupProcessor(
             context,
-            new LocalFileStorage(),
+            storage,
+            storage,
             NullLogger<StorageCleanupProcessor>.Instance
         ).ProcessNextAsync(cancellationToken);
-    }
-
-    private async Task MakeCleanupDueAsync(Guid datasetId, CancellationToken cancellationToken)
-    {
-        await using var context = CreateContext();
-        Assert.Equal(1, await context.StorageCleanupJobs
-            .Where(item => item.DatasetId == datasetId)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(item => item.NextAttemptAtUtc, DateTime.UnixEpoch),
-                cancellationToken
-            ));
     }
 
     private AppDbContext CreateContext(params IInterceptor[] interceptors)
@@ -340,39 +378,42 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
 
     private sealed class DelayedStorage : IFileStorage
     {
-        private readonly IFileStorage _inner;
+        private readonly LocalFileStorage _inner;
         private readonly bool _delayConversion;
-        private readonly bool _loseWriteAcknowledgement;
         private readonly CancellationToken _testToken;
 
         public DelayedStorage(
-            IFileStorage inner,
+            LocalFileStorage inner,
             bool delayConversion,
-            bool loseWriteAcknowledgement,
             CancellationToken testToken)
         {
             _inner = inner;
             _delayConversion = delayConversion;
-            _loseWriteAcknowledgement = loseWriteAcknowledgement;
             _testToken = testToken;
         }
 
         public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public string? SavedKey { get; private set; }
+        public bool InstallationRejected { get; private set; }
 
         public async Task SaveAsync(string storageKey, Stream content, CancellationToken cancellationToken)
         {
             SavedKey = storageKey;
+            await using var staged = await _inner.StageAsync(content, _testToken);
             if (!_delayConversion)
             {
                 Reached.TrySetResult();
                 await Release.Task.WaitAsync(_testToken);
             }
-            await _inner.SaveAsync(storageKey, content, _testToken);
-            if (_loseWriteAcknowledgement)
+            try
             {
-                throw new IOException("Lost acknowledgement after writing a private CSV-derived artifact.");
+                await _inner.InstallAsync(staged, storageKey, _testToken);
+            }
+            catch (StorageNamespaceClosedException)
+            {
+                InstallationRejected = true;
+                throw;
             }
         }
 
@@ -413,18 +454,73 @@ public sealed class ImportStorageLifecycleTests : IClassFixture<ApiFixture>
             _inner.DeleteDirectoryAsync(storageKey, cancellationToken);
     }
 
-    private sealed class CleanupAcknowledgementFault : SaveChangesInterceptor
+    private sealed class CleanupAcknowledgementFault(bool commitSucceeded) : DbCommandInterceptor
     {
-        public IOException Failure { get; } = new("Lost acknowledgement after cleanup scheduling was committed.");
-        public int SavedCalls { get; private set; }
+        public IOException Failure { get; } = new("Cleanup database completion failed.");
+        public int DeletedRows { get; private set; }
 
-        public override ValueTask<int> SavedChangesAsync(
-            SaveChangesCompletedEventData eventData,
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!commitSucceeded && IsCleanupCompletion(command))
+            {
+                throw Failure;
+            }
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<int> NonQueryExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
             int result,
             CancellationToken cancellationToken = default)
         {
-            SavedCalls++;
-            throw Failure;
+            if (IsCleanupCompletion(command))
+            {
+                DeletedRows = result;
+                throw Failure;
+            }
+            return ValueTask.FromResult(result);
         }
     }
+
+    private sealed class CleanupCompletionGate : DbCommandInterceptor
+    {
+        public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int DeletedRows { get; private set; } = -1;
+
+        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (IsCleanupCompletion(command))
+            {
+                Reached.TrySetResult();
+                await Release.Task.WaitAsync(cancellationToken);
+            }
+            return result;
+        }
+
+        public override ValueTask<int> NonQueryExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            int result,
+            CancellationToken cancellationToken = default)
+        {
+            if (IsCleanupCompletion(command))
+            {
+                DeletedRows = result;
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private static bool IsCleanupCompletion(DbCommand command) =>
+        command.CommandText.StartsWith("DELETE FROM storage_cleanup_jobs", StringComparison.Ordinal);
 }

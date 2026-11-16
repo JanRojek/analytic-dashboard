@@ -1,0 +1,12 @@
+{
+  "SourceBytes": 1073741824,
+  "InstalledBytes": 1073741824,
+  "StagingMs": 1608.1101,
+  "InstallationMs": 27.2513,
+  "PeakWorkingSetBytes": 28733440,
+  "FileSystem": "NTFS",
+  "BufferBytes": 81920,
+  "Date": "2026-11-15",
+  "Input": "One generated zero-filled byte stream; not a CSV conversion benchmark.",
+  "Samples": 1
+}

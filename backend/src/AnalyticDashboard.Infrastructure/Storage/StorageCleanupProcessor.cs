@@ -8,19 +8,20 @@ namespace AnalyticDashboard.Infrastructure.Storage;
 
 public sealed class StorageCleanupProcessor
 {
-    private static readonly TimeSpan VerificationInterval = TimeSpan.FromHours(1);
-
     private readonly AppDbContext _dbContext;
     private readonly IFileStorage _fileStorage;
+    private readonly IStorageNamespaceCloser _namespaceCloser;
     private readonly ILogger<StorageCleanupProcessor> _logger;
 
     public StorageCleanupProcessor(
         AppDbContext dbContext,
         IFileStorage fileStorage,
+        IStorageNamespaceCloser namespaceCloser,
         ILogger<StorageCleanupProcessor> logger)
     {
         _dbContext = dbContext;
         _fileStorage = fileStorage;
+        _namespaceCloser = namespaceCloser;
         _logger = logger;
     }
 
@@ -30,6 +31,7 @@ public sealed class StorageCleanupProcessor
         var now = DateTime.UtcNow;
 
         var job = await _dbContext.StorageCleanupJobs
+            .AsNoTracking()
             .Where(job => job.NextAttemptAtUtc <= now)
             .OrderBy(job => job.NextAttemptAtUtc)
             .ThenBy(job => job.Id)
@@ -44,6 +46,11 @@ public sealed class StorageCleanupProcessor
 
         try
         {
+            await _namespaceCloser.CloseNamespaceAsync(
+                job.DatasetId,
+                cancellationToken
+            );
+
             await _fileStorage.DeleteDirectoryAsync(
                 storageKey,
                 cancellationToken
@@ -61,7 +68,14 @@ public sealed class StorageCleanupProcessor
 
             job.ScheduleRetry(delay);
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.StorageCleanupJobs
+                .Where(item => item.Id == job.Id)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(item => item.AttemptCount, job.AttemptCount)
+                        .SetProperty(item => item.NextAttemptAtUtc, job.NextAttemptAtUtc),
+                    cancellationToken
+                );
 
             _logger.LogWarning(
                 exception,
@@ -73,13 +87,13 @@ public sealed class StorageCleanupProcessor
             return true;
         }
 
-        job.ScheduleVerification(VerificationInterval);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.StorageCleanupJobs
+            .Where(item => item.Id == job.Id)
+            .ExecuteDeleteAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Cleaned up storage for dataset {DatasetId}. Retaining deletion intent; next verification at {NextAttemptAtUtc}.",
-            job.DatasetId,
-            job.NextAttemptAtUtc
+            "Closed namespace and cleaned up storage for dataset {DatasetId}.",
+            job.DatasetId
         );
 
         return true;

@@ -1,0 +1,137 @@
+{
+  "Date": "2026-11-15",
+  "Build": {
+    "Errors": 0,
+    "Warnings": 0
+  },
+  "VerifiedPlatform": "Windows 10.0.26200 / NTFS / .NET 10.0.11",
+  "Reports": [
+    {
+      "File": "aud006b1-final_net10.0_20261115224215.trx",
+      "Total": 22,
+      "Executed": 22,
+      "Passed": 22,
+      "Failed": 0,
+      "NotExecuted": [],
+      "NamespaceTests": []
+    },
+    {
+      "File": "aud006b1-final_net10.0_20261115224318.trx",
+      "Total": 478,
+      "Executed": 475,
+      "Passed": 475,
+      "Failed": 0,
+      "NotExecuted": [
+        "AnalyticDashboard.IntegrationTests.Performance.CsvImportPerformanceTests.Import_ShouldBeMeasuredWithLargeSources_SequentiallyAndInParallel",
+        "AnalyticDashboard.IntegrationTests.Performance.CsvImportPerformanceTests.Tuning_ShouldCompareBoundedConversionAndParquetReads",
+        "AnalyticDashboard.IntegrationTests.Performance.ImportClaimPerformanceTests.Claim_ShouldBeMeasuredAgainstRepresentativeQueueDistributions"
+      ],
+      "NamespaceTests": [
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.IncompleteState_ShouldBlockInstallation_AndAllowAnIdempotentClosure(state: \"\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.IncompleteState_ShouldBlockInstallation_AndAllowAnIdempotentClosure(state: \"AP_NS_C\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/not-a-guid/file\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"dataſets/{id}/file\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.InstallAndClose_ShouldSerializeAcrossIndependentProcesses(installFirst: False)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Staging_ShouldNotBlockClosure_WhileItsSourceCopyIsStillRunning",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/{id}/file:stream\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.ClosedNamespace_ShouldSurviveLostAcknowledgement_ProcessDeath_AndPayloadDeletion",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"DATASETS/{id}/file\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/{id}/../other/file\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"tests/CON.txt\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/{id}/file.\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.InstallAndClose_ShouldSerializeAcrossIndependentProcesses(installFirst: True)",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.IncompleteState_ShouldBlockInstallation_AndAllowAnIdempotentClosure(state: \"AP_NS_O1C\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets\\\\{id}\\\\file\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.StagedFile_ShouldNotBeInstalledThroughAnotherStorageInstance",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/{id}/file \")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.IncompleteState_ShouldBlockInstallation_AndAllowAnIdempotentClosure(state: \"damaged!\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"/rooted\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/{id}/NUL\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \".aperture-storage/namespaces/marker\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"datasets/{id}\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.LostInstallationAcknowledgement_ShouldPreserveTheActuallyInstalledArtifact",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"APERT~1/namespaces/marker\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"../escape\")",
+          "Outcome": "Passed"
+        },
+        {
+          "Test": "AnalyticDashboard.IntegrationTests.Storage.LocalStorageNamespaceTests.Installation_ShouldRejectNamespaceAndPathAliases(template: \"C:/rooted\")",
+          "Outcome": "Passed"
+        }
+      ]
+    }
+  ]
+}

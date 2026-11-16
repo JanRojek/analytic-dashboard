@@ -55,7 +55,15 @@ public static class DependencyInjection
 
         services.AddScoped<IPendingDatasetImportRepository, PendingDatasetImportRepository>();
 
-        services.AddScoped<IFileStorage, LocalFileStorage>();
+        services.AddScoped<LocalFileStorage>();
+
+        services.AddScoped<IFileStorage>(
+            serviceProvider => serviceProvider.GetRequiredService<LocalFileStorage>()
+        );
+
+        services.AddScoped<IStorageNamespaceCloser>(
+            serviceProvider => serviceProvider.GetRequiredService<LocalFileStorage>()
+        );
 
         services.AddScoped<IDatasetProfileReader, DuckDbDatasetProfileReader>();
 

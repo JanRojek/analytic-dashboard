@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Support/StorageTestHost/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,6 +28,17 @@
     <ProjectReference Include="..\..\src\AnalyticDashboard.Api\AnalyticDashboard.Api.csproj" />
     <ProjectReference Include="..\..\src\AnalyticDashboard.Domain\AnalyticDashboard.Domain.csproj" />
     <ProjectReference Include="..\..\src\AnalyticDashboard.Infrastructure\AnalyticDashboard.Infrastructure.csproj" />
+    <ProjectReference Include="Support/StorageTestHost/AnalyticDashboard.StorageTestHost.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <Target Name="CopyStorageTestHost" AfterTargets="CopyFilesToOutputDirectory">
+    <ItemGroup>
+      <StorageTestHostFiles Include="Support/StorageTestHost/bin/$(Configuration)/$(TargetFramework)/AnalyticDashboard.StorageTestHost.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(StorageTestHostFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="@(StorageTestHostFiles->'$(OutDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+  </Target>
 
 </Project>

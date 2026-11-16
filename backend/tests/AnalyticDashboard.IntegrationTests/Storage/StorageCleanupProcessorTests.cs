@@ -21,7 +21,7 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
     }
 
     [Fact]
-    public async Task ProcessNextAsync_ShouldRetainDeletionIntent_WhenStorageDeletionSucceeds()
+    public async Task ProcessNextAsync_ShouldCompleteJob_AfterClosingNamespaceAndDeletingStorage()
     {
         var job = new StorageCleanupJob(Guid.NewGuid());
         var storage = new TestFileStorage();
@@ -35,6 +35,7 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
         var processor = new StorageCleanupProcessor(
             context,
             storage,
+            storage,
             NullLogger<StorageCleanupProcessor>.Instance
         );
 
@@ -42,30 +43,37 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
 
         Assert.True(processed);
         Assert.Equal(
+            new[] { "close", "delete" },
+            storage.Operations
+        );
+        Assert.Equal(job.DatasetId, Assert.Single(storage.ClosedNamespaces));
+        Assert.Equal(
             $"datasets/{job.DatasetId:N}",
             Assert.Single(storage.DeletedDirectories)
         );
 
-        Assert.True(await context.StorageCleanupJobs
+        Assert.False(await context.StorageCleanupJobs
             .AsNoTracking()
             .AnyAsync(
                 item => item.Id == job.Id,
                 CancellationToken
             ));
 
-        Assert.Equal(0, job.AttemptCount);
-        Assert.True(job.NextAttemptAtUtc > DateTime.UtcNow);
         Assert.False(await processor.ProcessNextAsync(CancellationToken));
         Assert.Single(storage.DeletedDirectories);
+        Assert.Single(storage.ClosedNamespaces);
     }
 
-    [Fact]
-    public async Task ProcessNextAsync_ShouldScheduleRetry_WhenStorageDeletionFails()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProcessNextAsync_ShouldScheduleRetry_WhenStorageCleanupFails(bool failClosure)
     {
         var job = new StorageCleanupJob(Guid.NewGuid());
         var storage = new TestFileStorage
         {
-            ThrowOnDelete = true
+            ThrowOnClose = failClosure,
+            ThrowOnDelete = !failClosure
         };
 
         await using var scope = _fixture.Services.CreateAsyncScope();
@@ -77,38 +85,71 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
         var processor = new StorageCleanupProcessor(
             context,
             storage,
+            storage,
             NullLogger<StorageCleanupProcessor>.Instance
         );
 
         var processed = await processor.ProcessNextAsync(CancellationToken);
 
         Assert.True(processed);
-        Assert.Equal(1, job.AttemptCount);
-        Assert.True(job.NextAttemptAtUtc > DateTime.UtcNow);
-
-        Assert.Equal(
-            $"datasets/{job.DatasetId:N}",
-            Assert.Single(storage.DeletedDirectories)
-        );
-
-        Assert.True(await context.StorageCleanupJobs
+        var saved = await context.StorageCleanupJobs
             .AsNoTracking()
-            .AnyAsync(
+            .SingleAsync(
                 item => item.Id == job.Id,
                 CancellationToken
-            ));
+            );
+        Assert.Equal(1, saved.AttemptCount);
+        Assert.True(saved.NextAttemptAtUtc > DateTime.UtcNow);
+        Assert.Equal(job.DatasetId, Assert.Single(storage.ClosedNamespaces));
+
+        if (failClosure)
+        {
+            Assert.Equal(new[] { "close" }, storage.Operations);
+            Assert.Empty(storage.DeletedDirectories);
+        }
+        else
+        {
+            Assert.Equal(new[] { "close", "delete" }, storage.Operations);
+            Assert.Equal(
+                $"datasets/{job.DatasetId:N}",
+                Assert.Single(storage.DeletedDirectories)
+            );
+        }
 
         var processedAgain = await processor.ProcessNextAsync(CancellationToken);
 
         Assert.False(processedAgain);
-        Assert.Single(storage.DeletedDirectories);
+        Assert.Single(storage.ClosedNamespaces);
     }
 
-    private sealed class TestFileStorage : IFileStorage
+    private sealed class TestFileStorage : IFileStorage, IStorageNamespaceCloser
     {
+        public List<string> Operations { get; } = [];
+
+        public List<Guid> ClosedNamespaces { get; } = [];
+
         public List<string> DeletedDirectories { get; } = [];
 
+        public bool ThrowOnClose { get; set; }
+
         public bool ThrowOnDelete { get; set; }
+
+        public Task CloseNamespaceAsync(
+            Guid datasetId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Operations.Add("close");
+            ClosedNamespaces.Add(datasetId);
+
+            if (ThrowOnClose)
+            {
+                throw new IOException("Simulated namespace closure failure.");
+            }
+
+            return Task.CompletedTask;
+        }
 
         public Task DeleteDirectoryAsync(
             string storageKey,
@@ -116,6 +157,7 @@ public sealed class StorageCleanupProcessorTests : IClassFixture<ApiFixture>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            Operations.Add("delete");
             DeletedDirectories.Add(storageKey);
 
             if (ThrowOnDelete)
