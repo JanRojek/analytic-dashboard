@@ -2,6 +2,7 @@
 using System.Security.Claims;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Projects;
+using AnalyticDashboard.Application.Common.Pagination;
 using AnalyticDashboard.Application.Projects.CreateProject;
 using AnalyticDashboard.Application.Projects.GetProjectById;
 using AnalyticDashboard.Application.Projects.GetProjects;
@@ -136,8 +137,8 @@ public static class ProjectEndpoints
             GetProjectsHandler handler,
             ClaimsPrincipal user,
             CancellationToken cancellationToken,
-            int page = GetProjectsQuery.DefaultPage,
-            int pageSize = GetProjectsQuery.DefaultPageSize) =>
+            int page = PaginationRequest.DefaultPage,
+            int pageSize = PaginationRequest.DefaultPageSize) =>
         {
             if (!user.TryGetUserId(out var ownerId))
             {
@@ -146,8 +147,7 @@ public static class ProjectEndpoints
 
             var query = new GetProjectsQuery(
                 ownerId,
-                page,
-                pageSize
+                new PaginationRequest(page, pageSize)
             );
 
             var result = await handler.HandleAsync(
@@ -155,35 +155,21 @@ public static class ProjectEndpoints
                 cancellationToken
             );
 
-            return result switch
-            {
-                GetProjectsResult.Success success =>
-                    Results.Ok(
-                        new GetProjectsResponse(
-                            success.Items
-                                .Select(item => new GetProjectsResponseItem(
-                                    item.Id,
-                                    item.Name,
-                                    item.CreatedAtUtc
-                                ))
-                                .ToList(),
-                            success.Page,
-                            success.PageSize,
-                            success.TotalCount,
-                            success.TotalPages
-                        )
-                    ),
-
-                GetProjectsResult.InvalidPageSize invalid =>
-                    Results.ValidationProblem(
-                        new Dictionary<string, string[]>
-                        {
-                            ["PageSize"] = [invalid.Message]
-                        }
-                    ),
-
-                _ => throw new UnreachableException()
-            };
+            return Results.Ok(
+                new GetProjectsResponse(
+                    result.Items
+                        .Select(item => new GetProjectsResponseItem(
+                            item.Id,
+                            item.Name,
+                            item.CreatedAtUtc
+                        ))
+                        .ToList(),
+                    result.Page,
+                    result.PageSize,
+                    result.TotalCount,
+                    result.TotalPages
+                )
+            );
         })
         .WithName("GetProjects")
         .Produces<GetProjectsResponse>()

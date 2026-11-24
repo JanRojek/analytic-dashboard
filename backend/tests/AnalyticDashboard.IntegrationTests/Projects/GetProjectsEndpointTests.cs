@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using AnalyticDashboard.Api.Contracts.Projects;
 using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -154,7 +153,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            25,
+            24,
             result.PageSize
         );
 
@@ -223,7 +222,7 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            25,
+            24,
             result.PageSize
         );
 
@@ -676,35 +675,17 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         );
     }
 
+
     [Fact]
-    public async Task GetProjects_ShouldReturnLastPage_WhenPageExceedsTotalPages()
+    public async Task GetProjects_ShouldReturnFirstPage_WhenPageExceedsTotalPages()
     {
         var userId = Guid.NewGuid();
 
-        var projectA = new Project(
-            userId,
-            "Last page A"
-        );
-
-        var projectB = new Project(
-            userId,
-            "Last page B"
-        );
-
-        var projectC = new Project(
-            userId,
-            "Last page C"
-        );
-
-        var projectD = new Project(
-            userId,
-            "Last page D"
-        );
-
-        var projectE = new Project(
-            userId,
-            "Last page E"
-        );
+        var projectA = new Project(userId, "Last page A");
+        var projectB = new Project(userId, "Last page B");
+        var projectC = new Project(userId, "Last page C");
+        var projectD = new Project(userId, "Last page D");
+        var projectE = new Project(userId, "Last page E");
 
         await AddProjectsAsync(
             projectA,
@@ -755,31 +736,14 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
 
         Assert.NotNull(result);
 
-        Assert.Equal(
-            3,
-            result.Page
-        );
+        Assert.Equal(1, result.Page);
+        Assert.Equal(2, result.PageSize);
+        Assert.Equal(5, result.TotalCount);
+        Assert.Equal(3, result.TotalPages);
 
         Assert.Equal(
-            2,
-            result.PageSize
-        );
-
-        Assert.Equal(
-            5,
-            result.TotalCount
-        );
-
-        Assert.Equal(
-            3,
-            result.TotalPages
-        );
-
-        var item = Assert.Single(result.Items);
-
-        Assert.Equal(
-            projectA.Id,
-            item.Id
+            new[] { projectE.Id, projectD.Id },
+            result.Items.Select(item => item.Id).ToArray()
         );
     }
 
@@ -868,12 +832,22 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-100)]
+    [InlineData(97)]
     [InlineData(101)]
-    public async Task GetProjects_ShouldReturnBadRequest_WhenPageSizeIsInvalid(
-        int pageSize)
+    [InlineData(200)]
+    public async Task GetProjects_ShouldNormalizePageSize_WhenPageSizeIsInvalid(int pageSize)
     {
+        var userId = Guid.NewGuid();
+
+        var project = new Project(
+            userId,
+            "Page size normalization"
+        );
+
+        await AddProjectsAsync(project);
+
         using var request = CreateGetRequest(
-            Guid.NewGuid(),
+            userId,
             pageSize: pageSize
         );
 
@@ -883,39 +857,67 @@ public sealed class GetProjectsEndpointTests : IClassFixture<ApiFixture>
         );
 
         Assert.Equal(
-            HttpStatusCode.BadRequest,
+            HttpStatusCode.OK,
             response.StatusCode
         );
 
-        Assert.Equal(
-            "application/problem+json",
-            response.Content.Headers.ContentType?.MediaType
-        );
-
-        var problem = await response.Content
-            .ReadFromJsonAsync<HttpValidationProblemDetails>(
+        var result = await response.Content
+            .ReadFromJsonAsync<GetProjectsResponse>(
                 CancellationToken
             );
 
-        Assert.NotNull(problem);
+        Assert.NotNull(result);
+
+        Assert.Equal(1, result.Page);
+        Assert.Equal(24, result.PageSize);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
+
+        var item = Assert.Single(result.Items);
+
+        Assert.Equal(project.Id, item.Id);
+    }
+
+    [Fact]
+    public async Task GetProjects_ShouldAcceptMaximumPageSize()
+    {
+        var userId = Guid.NewGuid();
+
+        var project = new Project(
+            userId,
+            "Maximum page size"
+        );
+
+        await AddProjectsAsync(project);
+
+        using var request = CreateGetRequest(
+            userId,
+            pageSize: 96
+        );
+
+        using var response = await _fixture.Client.SendAsync(
+            request,
+            CancellationToken
+        );
 
         Assert.Equal(
-            StatusCodes.Status400BadRequest,
-            problem.Status
+            HttpStatusCode.OK,
+            response.StatusCode
         );
 
-        Assert.True(
-            problem.Errors.TryGetValue(
-                "PageSize",
-                out var errors
-            )
-        );
+        var result = await response.Content
+            .ReadFromJsonAsync<GetProjectsResponse>(
+                CancellationToken
+            );
 
-        Assert.Single(errors);
+        Assert.NotNull(result);
 
-        Assert.Equal(
-            "Page size must be between 1 and 100.",
-            errors[0]
-        );
+        Assert.Equal(96, result.PageSize);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(1, result.TotalPages);
+
+        var item = Assert.Single(result.Items);
+
+        Assert.Equal(project.Id, item.Id);
     }
 }

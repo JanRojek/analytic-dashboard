@@ -1,3 +1,4 @@
+using AnalyticDashboard.Application.Common.Pagination;
 using AnalyticDashboard.Application.Datasets.Persistence;
 using AnalyticDashboard.Application.Projects.Persistence;
 using AnalyticDashboard.Domain.Entities;
@@ -35,12 +36,24 @@ public sealed class GetDatasetsHandler
             return new GetDatasetsResult.NotFound();
         }
 
-        var datasets =
-            await _datasetRepository.GetAllByProjectAndOwnerAsync(
-                query.ProjectId,
-                query.OwnerId,
-                cancellationToken
-            );
+        var totalCount = await _datasetRepository.CountByProjectAndOwnerAsync(
+            query.ProjectId,
+            query.OwnerId,
+            cancellationToken
+        );
+
+        var pagination = Pagination.Calculate(
+            query.Pagination,
+            totalCount
+        );
+
+        var datasets = await _datasetRepository.GetPageByProjectAndOwnerAsync(
+            query.ProjectId,
+            query.OwnerId,
+            pagination.Skip,
+            pagination.PageSize,
+            cancellationToken
+        );
 
         var currentVersionIds = datasets
             .Where(dataset => dataset.CurrentVersionId.HasValue)
@@ -59,7 +72,7 @@ public sealed class GetDatasetsHandler
         var items = datasets
             .Select(dataset =>
             {
-                GetDatasetsResult.CurrentVersion? currentVersion = null;
+                GetDatasetsItem.CurrentVersion? currentVersion = null;
 
                 if (dataset.CurrentVersionId is { } versionId
                     && versionsById.TryGetValue(
@@ -73,17 +86,16 @@ public sealed class GetDatasetsHandler
                         ColumnCount: { } columnCount
                     })
                 {
-                    currentVersion =
-                        new GetDatasetsResult.CurrentVersion(
-                            version.Id,
-                            version.VersionNumber,
-                            version.OriginalFileName,
-                            rowCount,
-                            columnCount
-                        );
+                    currentVersion = new GetDatasetsItem.CurrentVersion(
+                        version.Id,
+                        version.VersionNumber,
+                        version.OriginalFileName,
+                        rowCount,
+                        columnCount
+                    );
                 }
 
-                return new GetDatasetsResult.Item(
+                return new GetDatasetsItem(
                     dataset.Id,
                     dataset.Name,
                     dataset.CreatedAtUtc,
@@ -93,7 +105,13 @@ public sealed class GetDatasetsHandler
             .ToList();
 
         return new GetDatasetsResult.Success(
-            items
+            new PagedResult<GetDatasetsItem>(
+                items,
+                pagination.Page,
+                pagination.PageSize,
+                totalCount,
+                pagination.TotalPages
+            )
         );
     }
 }

@@ -4,9 +4,17 @@ namespace AnalyticDashboard.Application.Datasets.Persistence;
 
 public interface IDatasetRepository
 {
-    Task<IReadOnlyList<Dataset>> GetAllByProjectAndOwnerAsync(
+    Task<int> CountByProjectAndOwnerAsync(
         Guid projectId,
         Guid ownerId,
+        CancellationToken cancellationToken
+    );
+
+    Task<IReadOnlyList<Dataset>> GetPageByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        int skip,
+        int take,
         CancellationToken cancellationToken
     );
 

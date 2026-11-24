@@ -76,7 +76,6 @@ public sealed partial class LocalFileStorage
 
         if (guard is not null)
         {
-            // Unix creation and flock are separate; a closer may have written before the creator acquired its lock.
             if (guard.Created && guard.Stream.Length == 0)
             {
                 WriteState(guard.Stream, OpenState);
@@ -96,7 +95,6 @@ public sealed partial class LocalFileStorage
     {
         await using var guard = await AcquireNamespaceAsync(datasetId, create: true, cancellationToken);
         _logger.LogDebug("Local storage namespace {NamespaceId} closure lock acquired.", datasetId);
-        // Never restore Open after an uncertain write; an incomplete marker also blocks installation.
         WriteClosedState(guard!.Stream);
         _logger.LogDebug("Local storage namespace {NamespaceId} closure persisted.", datasetId);
     }
@@ -107,6 +105,103 @@ public sealed partial class LocalFileStorage
     {
         await using var guard = await AcquireNamespaceAsync(datasetId, create: false, cancellationToken);
         return guard is null ? LocalStorageNamespaceState.Uninitialized : ReadState(guard.Stream);
+    }
+
+    public async Task<TResult> ExecuteWithReadLeaseAsync<TResult>(
+        string storageKey,
+        Func<string, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var path = ResolvePath(storageKey);
+        var datasetId = GetDatasetNamespace(storageKey)
+            ?? throw new ArgumentException("A read lease requires a dataset storage key.", nameof(storageKey));
+        if (storageKey.Split('/').Length < 3)
+        {
+            throw new ArgumentException("A read lease requires a file key inside the dataset namespace.", nameof(storageKey));
+        }
+
+        var guard = await AcquireSharedNamespaceAsync(datasetId, cancellationToken);
+        if (guard is null)
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("The dataset artifact does not exist.", path);
+            }
+            await InitializeLegacyReadNamespaceAsync(datasetId, cancellationToken);
+            guard = await AcquireSharedNamespaceAsync(datasetId, cancellationToken)
+                ?? throw new IOException("Dataset namespace marker disappeared during read acquisition.");
+        }
+
+        await using (guard)
+        {
+            ThrowIfNotOpen(ReadState(guard.Stream));
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("The dataset artifact does not exist.", path);
+            }
+            return await operation(path, cancellationToken);
+        }
+    }
+
+    private async Task InitializeLegacyReadNamespaceAsync(Guid datasetId, CancellationToken cancellationToken)
+    {
+        await using var guard = await AcquireNamespaceAsync(datasetId, create: true, cancellationToken);
+        if (guard!.Created && guard.Stream.Length == 0)
+        {
+            WriteState(guard.Stream, OpenState);
+        }
+        ThrowIfNotOpen(ReadState(guard.Stream));
+    }
+
+    private async Task<NamespaceGuard?> AcquireSharedNamespaceAsync(
+        Guid datasetId,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(_rootPath, ProtocolDirectory, "namespaces", datasetId.ToString("N"));
+        var reportedBusy = false;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RejectReparsePoints(path);
+            try
+            {
+                return new NamespaceGuard(OpenSharedControl(path), created: false);
+            }
+            catch (FileNotFoundException)
+            {
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+            catch (IOException exception) when (IsSharingViolation(exception))
+            {
+                if (!reportedBusy)
+                {
+                    _logger.LogDebug("Local storage namespace {NamespaceId} shared lock is busy.", datasetId);
+                    reportedBusy = true;
+                }
+                await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken);
+            }
+        }
+    }
+
+    private static FileStream OpenSharedControl(string path)
+    {
+        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.None);
+        try
+        {
+            AtomicFileInstall.RequireSharedLock(stream);
+            return stream;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 
     private async Task<NamespaceGuard?> AcquireNamespaceAsync(
@@ -217,7 +312,6 @@ public sealed partial class LocalFileStorage
 
     private static void WriteClosedState(FileStream stream)
     {
-        // Appending makes every partial close marker different from a valid Open record.
         stream.Position = OpenState.Length;
         stream.Write(ClosedState);
         stream.SetLength(OpenState.Length + ClosedState.Length);

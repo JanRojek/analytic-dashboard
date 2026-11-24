@@ -75,6 +75,7 @@ public sealed class GetWidgetDataEndpointTests : IClassFixture<ApiFixture>
             $"/projects/{projectId}/datasets/import/csv",
             userId
         );
+        request.Headers.Add("X-Aperture-Request", "fetch");
 
         var multipart = new MultipartFormDataContent();
 

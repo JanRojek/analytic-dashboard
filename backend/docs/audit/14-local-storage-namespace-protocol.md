@@ -121,7 +121,7 @@ Dodano LocalStorageNamespaceTests — 26 przypadków:
 
 Istniejące trzy LocalFileStorageWriteTests nadal sprawdzają ochronę istniejącego pliku oraz cleanup własnego częściowego zapisu po błędzie/anulowaniu; nie dodano ich kopii.
 
-Mały konsolowy StorageTestHost znajduje się pod Support/StorageTestHost w projekcie IntegrationTests i służy do rzeczywistej synchronizacji między procesami. Nie ma własnych pakietów ani frameworka testowego. IntegrationTests wyklucza ten katalog z domyślnych elementów projektu, buduje host przez ProjectReference i kopiuje jego pliki uruchomieniowe do swojego outputu. Zachowanie osobnego punktu wejścia unika zastępowania Main generowanego przez xUnit v3.
+Mały konsolowy StorageTestHost znajduje się w tests/AnalyticDashboard.StorageTestHost, obok IntegrationTests i UnitTests, i służy do rzeczywistej synchronizacji między procesami. Nie ma własnych pakietów ani frameworka testowego. IntegrationTests buduje host przez ProjectReference i kopiuje jego pliki uruchomieniowe do swojego outputu. Zachowanie osobnego punktu wejścia unika zastępowania Main generowanego przez xUnit v3.
 
 Bramki wykorzystują standardowe logi Debug po uzyskaniu blokady oraz sygnał faktycznego sharing violation. Parent czeka na potwierdzone zablokowanie drugiego procesu przed zwolnieniem pierwszego. Sprawdzane są różne PID; nie używa się Task.WhenAll jako substytutu procesów ani opóźnień do ustalania zwycięzcy.
 
@@ -177,8 +177,8 @@ Nowe pliki kodu:
 - src/AnalyticDashboard.Infrastructure/Storage/StorageNamespaceClosedException.cs;
 - src/AnalyticDashboard.Infrastructure/Storage/AtomicFileInstall.cs;
 - tests/AnalyticDashboard.IntegrationTests/Storage/LocalStorageNamespaceTests.cs;
-- tests/AnalyticDashboard.IntegrationTests/Support/StorageTestHost/AnalyticDashboard.StorageTestHost.csproj;
-- tests/AnalyticDashboard.IntegrationTests/Support/StorageTestHost/Program.cs.
+- tests/AnalyticDashboard.StorageTestHost/AnalyticDashboard.StorageTestHost.csproj;
+- tests/AnalyticDashboard.StorageTestHost/Program.cs.
 
 Dokumentacja: ten raport, dwa pliki wyników i [pełny diff](aud006b1-namespace.diff).
 

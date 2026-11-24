@@ -1,4 +1,5 @@
-﻿using AnalyticDashboard.Application.Projects.Persistence;
+﻿using AnalyticDashboard.Application.Common.Pagination;
+using AnalyticDashboard.Application.Projects.Persistence;
 
 namespace AnalyticDashboard.Application.Projects.GetProjects;
 
@@ -11,44 +12,24 @@ public sealed class GetProjectsHandler
         _projectRepository = projectRepository;
     }
 
-    public async Task<GetProjectsResult> HandleAsync(
+    public async Task<PagedResult<GetProjectsItem>> HandleAsync(
         GetProjectsQuery query,
         CancellationToken cancellationToken)
     {
-        if (query.PageSize is < 1 or > GetProjectsQuery.MaxPageSize)
-        {
-            return new GetProjectsResult.InvalidPageSize(
-                $"Page size must be between 1 and {GetProjectsQuery.MaxPageSize}."
-            );
-        }
-
-        var normalizedPage = query.Page <= 0
-            ? GetProjectsQuery.DefaultPage
-            : query.Page;
-
         var totalCount = await _projectRepository.CountByOwnerAsync(
             query.OwnerId,
             cancellationToken
         );
 
-        var totalPages = Math.Max(
-            1,
-            (int)Math.Ceiling(
-                totalCount / (double)query.PageSize
-            )
+        var pagination = Pagination.Calculate(
+            query.Pagination,
+            totalCount
         );
-
-        var actualPage = Math.Min(
-            normalizedPage,
-            totalPages
-        );
-
-        var skip = (actualPage - 1) * query.PageSize;
 
         var projects = await _projectRepository.GetPageByOwnerAsync(
             query.OwnerId,
-            skip,
-            query.PageSize,
+            pagination.Skip,
+            pagination.PageSize,
             cancellationToken
         );
 
@@ -60,12 +41,12 @@ public sealed class GetProjectsHandler
             ))
             .ToList();
 
-        return new GetProjectsResult.Success(
+        return new PagedResult<GetProjectsItem>(
             items,
-            actualPage,
-            query.PageSize,
+            pagination.Page,
+            pagination.PageSize,
             totalCount,
-            totalPages
+            pagination.TotalPages
         );
     }
 }

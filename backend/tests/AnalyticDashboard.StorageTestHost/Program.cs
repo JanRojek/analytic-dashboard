@@ -57,6 +57,22 @@ try
         }));
         await storage.DeleteDirectoryAsync($"datasets/{datasetId:N}", deadline.Token);
     }
+    else if (operation == "read")
+    {
+        Console.WriteLine("prepared");
+        await ReadCommandAsync(deadline.Token);
+        await storage.ExecuteWithReadLeaseAsync(
+            key,
+            async (_, ct) =>
+            {
+                Console.WriteLine("reading");
+                await ReadCommandAsync(ct);
+                return true;
+            },
+            deadline.Token
+        );
+        Console.WriteLine("read-completed");
+    }
     else if (operation == "close")
     {
         Console.WriteLine("prepared");

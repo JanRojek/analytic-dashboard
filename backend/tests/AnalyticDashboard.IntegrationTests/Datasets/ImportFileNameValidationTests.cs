@@ -69,6 +69,7 @@ public sealed class ImportFileNameValidationTests : IClassFixture<ApiFixture>
         multipart.Add(file);
         request.Content = multipart;
         request.Headers.Add(TestAuthHandler.UserIdHeader, ownerId.ToString());
+        request.Headers.Add("X-Aperture-Request", "fetch");
 
         using var response = await client.SendAsync(request, CancellationToken);
 

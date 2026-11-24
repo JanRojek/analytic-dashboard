@@ -34,6 +34,8 @@ public sealed class ImportCsvDatasetEndpointTests : IClassFixture<ApiFixture>
             $"/projects/{projectId}/datasets/import/csv"
         );
 
+        request.Headers.Add("X-Aperture-Request", "fetch");
+
         if (userId.HasValue)
         {
             request.Headers.Add(

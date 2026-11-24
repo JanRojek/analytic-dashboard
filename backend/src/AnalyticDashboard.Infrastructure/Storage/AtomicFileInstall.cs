@@ -10,6 +10,7 @@ internal static class AtomicFileInstall
     private const uint RenameNoReplace = 1;
     private const int DirectoryOnly = 0x10000;
     private const int ExclusiveNonBlockingLock = 2 | 4;
+    private const int SharedNonBlockingLock = 1 | 4;
 
     internal static void RequireExclusiveLock(FileStream stream)
     {
@@ -22,7 +23,6 @@ internal static class AtomicFileInstall
             throw new PlatformNotSupportedException("Local storage namespace locking is supported on Windows and Linux.");
         }
 
-        // FileShare on Unix ignores some flock failures; namespace exclusion must fail closed instead.
         while (Lock(stream.SafeFileHandle.DangerousGetHandle().ToInt32(), ExclusiveNonBlockingLock) != 0)
         {
             var error = Marshal.GetLastPInvokeError();
@@ -34,11 +34,32 @@ internal static class AtomicFileInstall
         }
     }
 
+    internal static void RequireSharedLock(FileStream stream)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        if (!OperatingSystem.IsLinux())
+        {
+            throw new PlatformNotSupportedException("Local storage namespace locking is supported on Windows and Linux.");
+        }
+
+        while (Lock(stream.SafeFileHandle.DangerousGetHandle().ToInt32(), SharedNonBlockingLock) != 0)
+        {
+            var error = Marshal.GetLastPInvokeError();
+            if (error == 4)
+            {
+                continue;
+            }
+            throw new IOException("Shared storage namespace locking failed.", unchecked((int)0x80070000) | error);
+        }
+    }
+
     public static void Move(string source, string destination)
     {
         if (OperatingSystem.IsWindows())
         {
-            // No COPY_ALLOWED or REPLACE_EXISTING: cross-volume moves and collisions must fail.
             if (!MoveFileEx(ExtendedPath(source), ExtendedPath(destination), MoveWriteThrough))
             {
                 throw new IOException(

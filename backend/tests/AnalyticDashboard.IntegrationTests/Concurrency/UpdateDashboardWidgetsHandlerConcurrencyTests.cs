@@ -423,11 +423,41 @@ public sealed class UpdateDashboardWidgetsHandlerConcurrencyTests : IClassFixtur
             CancellationToken cancellationToken) =>
             _inner.AddAsync(dashboard, cancellationToken);
 
-        public Task<IReadOnlyList<Dashboard>> GetAllByProjectAndOwnerAsync(
+        public Task<int> CountByProjectAndOwnerAsync(
             Guid projectId,
             Guid ownerId,
             CancellationToken cancellationToken) =>
-            _inner.GetAllByProjectAndOwnerAsync(projectId, ownerId, cancellationToken);
+            _inner.CountByProjectAndOwnerAsync(
+                projectId,
+                ownerId,
+                cancellationToken
+            );
+
+        public Task<IReadOnlyList<Dashboard>> GetPageByProjectAndOwnerAsync(
+            Guid projectId,
+            Guid ownerId,
+            int skip,
+            int take,
+            CancellationToken cancellationToken) =>
+            _inner.GetPageByProjectAndOwnerAsync(
+                projectId,
+                ownerId,
+                skip,
+                take,
+                cancellationToken
+            );
+
+        public Task<DashboardEditorSnapshot?> GetEditorSnapshotAsync(
+            Guid dashboardId,
+            Guid projectId,
+            Guid ownerId,
+            CancellationToken cancellationToken) =>
+            _inner.GetEditorSnapshotAsync(
+                dashboardId,
+                projectId,
+                ownerId,
+                cancellationToken
+            );
 
         public async Task<Dashboard?> GetForUpdateByIdAndProjectOwnerAsync(
             Guid dashboardId,

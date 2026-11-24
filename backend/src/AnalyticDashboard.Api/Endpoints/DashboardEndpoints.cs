@@ -7,6 +7,8 @@ using AnalyticDashboard.Application.Dashboards.GetDashboardById;
 using AnalyticDashboard.Application.Dashboards.GetDashboards;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Dashboards;
+using AnalyticDashboard.Application.Common.Pagination;
+using AnalyticDashboard.Application.Dashboards.GetDashboardSnapshot;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
@@ -88,11 +90,14 @@ public static class DashboardEndpoints
             StatusCodes.Status404NotFound
         );
 
+
         dashboards.MapGet("", async (
             Guid projectId,
             GetDashboardsHandler handler,
             ClaimsPrincipal user,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int page = PaginationRequest.DefaultPage,
+            int pageSize = PaginationRequest.DefaultPageSize) =>
         {
             if (!user.TryGetUserId(out var ownerId))
             {
@@ -105,7 +110,8 @@ public static class DashboardEndpoints
 
             var query = new GetDashboardsQuery(
                 projectId,
-                ownerId
+                ownerId,
+                new PaginationRequest(page, pageSize)
             );
 
             var result = await handler.HandleAsync(
@@ -113,10 +119,39 @@ public static class DashboardEndpoints
                 cancellationToken
             );
 
-            return Results.Ok(result);
+            return result switch
+            {
+                GetDashboardsResult.Success success =>
+                    Results.Ok(
+                        new GetDashboardsResponse(
+                            success.Data.Items
+                                .Select(item => new GetDashboardsResponseItem(
+                                    item.Id,
+                                    item.ProjectId,
+                                    item.Name,
+                                    item.CreatedAtUtc
+                                ))
+                                .ToList(),
+                            success.Data.Page,
+                            success.Data.PageSize,
+                            success.Data.TotalCount,
+                            success.Data.TotalPages
+                        )
+                    ),
+
+                GetDashboardsResult.NotFound =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status404NotFound,
+                        title: "Project not found",
+                        detail: "The project does not exist or is not accessible by the current user."
+                    ),
+
+                _ => throw new UnreachableException()
+            };
         })
         .WithName("GetDashboards")
-        .Produces<IReadOnlyList<GetDashboardsResponse>>();
+        .Produces<GetDashboardsResponse>()
+        .ProducesProblem(StatusCodes.Status404NotFound);
 
         dashboards.MapGet("/{dashboardId:guid}", async (
             Guid projectId,
@@ -158,9 +193,75 @@ public static class DashboardEndpoints
         })
         .WithName("GetDashboardById")
         .Produces<GetDashboardByIdResponse>()
-        .ProducesProblem(
-            StatusCodes.Status404NotFound
-        );
+        .ProducesProblem(StatusCodes.Status404NotFound);
+
+        dashboards.MapGet("/{dashboardId:guid}/editor-state", async (
+            Guid projectId,
+            Guid dashboardId,
+            GetDashboardSnapshotHandler handler,
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken) =>
+        {
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    title: "Unauthorized",
+                    detail: "The authenticated user identifier is missing or invalid."
+                );
+            }
+
+            var query = new GetDashboardSnapshotQuery(
+                dashboardId,
+                projectId,
+                ownerId
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
+            return result switch
+            {
+                GetDashboardSnapshotResult.Success success =>
+                    Results.Ok(new GetDashboardSnapshotResponse(
+                        success.DashboardId,
+                        success.Name,
+                        success.Revision,
+                        success.Widgets
+                            .Select(widget => new WidgetSnapshotResponse(
+                                widget.Id,
+                                widget.DatasetId,
+                                widget.Type,
+                                widget.Title,
+                                widget.GroupByColumn,
+                                widget.MeasureColumn,
+                                widget.Aggregation,
+                                new WidgetSnapshotLayoutResponse(
+                                    widget.Layout.X,
+                                    widget.Layout.Y,
+                                    widget.Layout.Width,
+                                    widget.Layout.Height
+                                ),
+                                widget.CreatedAtUtc
+                            ))
+                            .ToArray()
+                    )),
+
+                GetDashboardSnapshotResult.NotFound =>
+                    Results.Problem(
+                        statusCode: StatusCodes.Status404NotFound,
+                        title: "Dashboard not found",
+                        detail: "The dashboard does not exist or is not accessible by the current user."
+                    ),
+
+                _ => throw new UnreachableException()
+            };
+        })
+        .WithName("GetDashboardSnapshot")
+        .Produces<GetDashboardSnapshotResponse>()
+        .ProducesProblem(StatusCodes.Status404NotFound);
 
         dashboards.MapDelete("/{dashboardId:guid}", async (
             Guid projectId,

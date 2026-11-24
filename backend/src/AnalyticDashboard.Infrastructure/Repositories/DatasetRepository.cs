@@ -14,14 +14,30 @@ public sealed class DatasetRepository : IDatasetRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<Dataset>> GetAllByProjectAndOwnerAsync(
+    public async Task<int> CountByProjectAndOwnerAsync(
         Guid projectId,
         Guid ownerId,
         CancellationToken cancellationToken)
     {
         return await _dbContext.Datasets
-            .Where(dataset =>
-                dataset.ProjectId == projectId
+            .Where(dataset => dataset.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dataset.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Dataset>> GetPageByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Datasets
+            .Where(dataset => dataset.ProjectId == projectId
                 && _dbContext.Projects.Any(project =>
                     project.Id == dataset.ProjectId
                     && project.OwnerId == ownerId
@@ -30,6 +46,8 @@ public sealed class DatasetRepository : IDatasetRepository
             .AsNoTracking()
             .OrderByDescending(dataset => dataset.CreatedAtUtc)
             .ThenBy(dataset => dataset.Id)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync(cancellationToken);
     }
 

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using AnalyticDashboard.Api.Auth;
 using AnalyticDashboard.Api.Contracts.Datasets;
 using AnalyticDashboard.Application.Analytics.QueryDataset;
+using AnalyticDashboard.Application.Common.Pagination;
 using AnalyticDashboard.Application.Datasets.DeleteDataset;
 using AnalyticDashboard.Application.Datasets.GetDatasetById;
 using AnalyticDashboard.Application.Datasets.GetDatasetProfile;
@@ -12,11 +13,16 @@ using AnalyticDashboard.Domain.Analytics;
 using AnalyticDashboard.Application.Datasets.GetDatasetRows;
 using AnalyticDashboard.Application.Datasets.GetImportStatus;
 using AnalyticDashboard.Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AnalyticDashboard.Api.Endpoints;
 
 public static class DatasetEndpoints
 {
+    private const long MaxCsvFileBytes = 256L * 1024 * 1024;
+
+    private const long MaxCsvRequestBytes = MaxCsvFileBytes + 1024 * 1024;
+
     public static IEndpointRouteBuilder MapDatasetEndpoints(
         this IEndpointRouteBuilder app)
     {
@@ -31,10 +37,21 @@ public static class DatasetEndpoints
         datasets.MapPost("/import/csv", async (
             Guid projectId,
             IFormFile file,
+            HttpRequest request,
             ImportCsvDatasetHandler handler,
             ClaimsPrincipal user,
             CancellationToken cancellationToken) =>
         {
+            if (!string.Equals(
+                request.Headers["X-Aperture-Request"].ToString(),
+                "fetch",
+                StringComparison.Ordinal))
+            {
+                return Results.StatusCode(
+                    StatusCodes.Status403Forbidden
+                );
+            }
+
             if (!user.TryGetUserId(out var ownerId))
             {
                 return Results.Unauthorized();
@@ -47,6 +64,15 @@ public static class DatasetEndpoints
                     {
                         ["File"] = ["File cannot be empty."]
                     }
+                );
+            }
+
+            if (file.Length > MaxCsvFileBytes)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status413PayloadTooLarge,
+                    title: "CSV file too large",
+                    detail: "The CSV file cannot exceed 256 MiB."
                 );
             }
 
@@ -91,22 +117,24 @@ public static class DatasetEndpoints
         })
         .WithName("ImportCsvDataset")
         .DisableAntiforgery()
-        .Produces<ImportCsvDatasetResponse>(
-            StatusCodes.Status202Accepted
+        .WithMetadata(
+            new RequestSizeLimitAttribute(MaxCsvRequestBytes),
+            new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaxCsvFileBytes }
         )
+        .Produces<ImportCsvDatasetResponse>(StatusCodes.Status202Accepted)
         .ProducesValidationProblem()
-        .Produces(
-            StatusCodes.Status401Unauthorized
-        )
-        .Produces(
-            StatusCodes.Status404NotFound
-        );
+        .Produces(StatusCodes.Status401Unauthorized)
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status413PayloadTooLarge);
 
         datasets.MapGet("", async (
             Guid projectId,
             GetDatasetsHandler handler,
             ClaimsPrincipal user,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int page = PaginationRequest.DefaultPage,
+            int pageSize = PaginationRequest.DefaultPageSize) =>
         {
             if (!user.TryGetUserId(out var ownerId))
             {
@@ -115,7 +143,8 @@ public static class DatasetEndpoints
 
             var query = new GetDatasetsQuery(
                 projectId,
-                ownerId
+                ownerId,
+                new PaginationRequest(page, pageSize)
             );
 
             var result = await handler.HandleAsync(
@@ -127,24 +156,30 @@ public static class DatasetEndpoints
             {
                 GetDatasetsResult.Success success =>
                     Results.Ok(
-                        success.Items
-                            .Select(item =>
-                                new DatasetResponse(
-                                    item.Id,
-                                    item.Name,
-                                    item.CreatedAtUtc,
-                                    item.Version is null
-                                        ? null
-                                        : new DatasetCurrentVersionResponse(
-                                            item.Version.Id,
-                                            item.Version.VersionNumber,
-                                            item.Version.OriginalFileName,
-                                            item.Version.RowCount,
-                                            item.Version.ColumnCount
-                                        )
+                        new GetDatasetsResponse(
+                            success.Data.Items
+                                .Select(item =>
+                                    new DatasetResponse(
+                                        item.Id,
+                                        item.Name,
+                                        item.CreatedAtUtc,
+                                        item.Version is null
+                                            ? null
+                                            : new DatasetCurrentVersionResponse(
+                                                item.Version.Id,
+                                                item.Version.VersionNumber,
+                                                item.Version.OriginalFileName,
+                                                item.Version.RowCount,
+                                                item.Version.ColumnCount
+                                            )
+                                    )
                                 )
-                            )
-                            .ToList()
+                                .ToList(),
+                            success.Data.Page,
+                            success.Data.PageSize,
+                            success.Data.TotalCount,
+                            success.Data.TotalPages
+                        )
                     ),
 
                 GetDatasetsResult.NotFound =>
@@ -154,13 +189,9 @@ public static class DatasetEndpoints
             };
         })
         .WithName("GetDatasets")
-        .Produces<IReadOnlyList<DatasetResponse>>()
-        .Produces(
-            StatusCodes.Status401Unauthorized
-        )
-        .Produces(
-            StatusCodes.Status404NotFound
-        );
+        .Produces<GetDatasetsResponse>()
+        .Produces(StatusCodes.Status401Unauthorized)
+        .Produces(StatusCodes.Status404NotFound);
 
         datasets.MapGet("/{datasetId:guid}", async (
             Guid projectId,

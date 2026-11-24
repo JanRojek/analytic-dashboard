@@ -4,6 +4,7 @@ using AnalyticDashboard.Domain.Entities;
 using AnalyticDashboard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Data;
 
 namespace AnalyticDashboard.Infrastructure.Repositories;
 
@@ -40,21 +41,39 @@ public sealed class DashboardRepository : IDashboardRepository
         }
     }
 
-    public async Task<IReadOnlyList<Dashboard>> GetAllByProjectAndOwnerAsync(
+    public async Task<DashboardEditorSnapshot?> GetEditorSnapshotAsync(
+        Guid dashboardId,
         Guid projectId,
         Guid ownerId,
         CancellationToken cancellationToken)
     {
-        return await _dbContext.Dashboards
-            .Where(dashboard =>
-                dashboard.ProjectId == projectId
-                && _dbContext.Projects.Any(project =>
-                    project.Id == dashboard.ProjectId
-                    && project.OwnerId == ownerId))
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken
+        );
+
+        var dashboard = await GetByIdAndProjectOwnerAsync(
+            dashboardId,
+            projectId,
+            ownerId,
+            cancellationToken
+        );
+
+        if (dashboard == null)
+        {
+            return null;
+        }
+
+        var widgets = await _dbContext.Widgets
+            .Where(widget => widget.DashboardId == dashboard.Id)
             .AsNoTracking()
-            .OrderByDescending(dashboard => dashboard.CreatedAtUtc)
-            .ThenBy(dashboard => dashboard.Id)
+            .OrderBy(widget => widget.CreatedAtUtc)
+            .ThenBy(widget => widget.Id)
             .ToListAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return new DashboardEditorSnapshot(dashboard, widgets);
     }
 
     public async Task<Dashboard?> GetForUpdateByIdAndProjectOwnerAsync(
@@ -124,5 +143,42 @@ public sealed class DashboardRepository : IDashboardRepository
                     && project.OwnerId == ownerId))
             .Select(dashboard => (long?)dashboard.Revision)
             .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<int> CountByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Dashboards
+            .Where(dashboard => dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Dashboard>> GetPageByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.Dashboards
+            .Where(dashboard => dashboard.ProjectId == projectId
+                && _dbContext.Projects.Any(project =>
+                    project.Id == dashboard.ProjectId
+                    && project.OwnerId == ownerId
+                )
+            )
+            .AsNoTracking()
+            .OrderByDescending(dashboard => dashboard.CreatedAtUtc)
+            .ThenBy(dashboard => dashboard.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
     }
 }

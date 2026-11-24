@@ -8,6 +8,7 @@
 
   <Folder Name="/tests/">
     <Project Path="tests/AnalyticDashboard.IntegrationTests/AnalyticDashboard.IntegrationTests.csproj" />
+    <Project Path="tests/AnalyticDashboard.StorageTestHost/AnalyticDashboard.StorageTestHost.csproj" />
     <Project Path="tests/AnalyticDashboard.UnitTests/AnalyticDashboard.UnitTests.csproj" />
   </Folder>
 </Solution>

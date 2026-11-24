@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../../src/AnalyticDashboard.Infrastructure/AnalyticDashboard.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/AnalyticDashboard.Infrastructure/AnalyticDashboard.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -9,7 +9,8 @@ public interface IDashboardRepository
         CancellationToken cancellationToken
     );
 
-    Task<IReadOnlyList<Dashboard>> GetAllByProjectAndOwnerAsync(
+    Task<DashboardEditorSnapshot?> GetEditorSnapshotAsync(
+        Guid dashboardId,
         Guid projectId,
         Guid ownerId,
         CancellationToken cancellationToken
@@ -40,6 +41,20 @@ public interface IDashboardRepository
         Guid dashboardId,
         Guid projectId,
         Guid ownerId,
+        CancellationToken cancellationToken
+    );
+
+    Task<int> CountByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        CancellationToken cancellationToken
+    );
+
+    Task<IReadOnlyList<Dashboard>> GetPageByProjectAndOwnerAsync(
+        Guid projectId,
+        Guid ownerId,
+        int skip,
+        int take,
         CancellationToken cancellationToken
     );
 }

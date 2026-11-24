@@ -292,6 +292,176 @@ public sealed class LocalStorageNamespaceTests
         }
     }
 
+    [Fact]
+    public async Task SharedReaders_ShouldRunConcurrently_AndDelayNamespaceClosureAcrossProcesses()
+    {
+        using var deadline = CreateDeadline();
+        var token = deadline.Token;
+        var directory = Directory.CreateTempSubdirectory("aperture-shared-read-");
+        var datasetId = Guid.NewGuid();
+        var key = $"datasets/{datasetId:N}/result.parquet";
+        var storage = new LocalFileStorage(directory.FullName);
+
+        try
+        {
+            await using (var input = new MemoryStream("published"u8.ToArray()))
+            {
+                await storage.SaveAsync(key, input, token);
+            }
+
+            await using var first = Child.Start(directory.FullName, datasetId, "read");
+            await using var second = Child.Start(directory.FullName, datasetId, "read");
+            await using var closer = Child.Start(directory.FullName, datasetId, "close");
+            await first.ExpectAsync("prepared", token);
+            await second.ExpectAsync("prepared", token);
+            await closer.ExpectAsync("prepared", token);
+
+            await first.ContinueAsync(token);
+            await first.ExpectAsync("reading", token);
+            await second.ContinueAsync(token);
+            await second.ExpectAsync("reading", token);
+            await closer.ContinueAsync(token);
+            await closer.ExpectAsync("blocked", token);
+
+            await first.ContinueAsync(token);
+            await first.ExpectAsync("read-completed", token);
+            await first.ExpectSuccessAsync(token);
+            await second.ContinueAsync(token);
+            await second.ExpectAsync("read-completed", token);
+            await second.ExpectSuccessAsync(token);
+            await closer.ExpectAsync("closed", token);
+            await closer.ExpectSuccessAsync(token);
+
+            Assert.Equal(LocalStorageNamespaceState.Closed, await storage.GetNamespaceStateAsync(datasetId, token));
+            await Assert.ThrowsAsync<StorageNamespaceClosedException>(() =>
+                storage.ExecuteWithReadLeaseAsync(key, (_, _) => Task.FromResult(true), token));
+            await storage.DeleteDirectoryAsync($"datasets/{datasetId:N}", token);
+            Assert.False(await storage.ExistsAsync(key, token));
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ReaderProcessDeath_ShouldReleaseNamespaceAndAllowClosure()
+    {
+        using var deadline = CreateDeadline();
+        var token = deadline.Token;
+        var directory = Directory.CreateTempSubdirectory("aperture-read-death-");
+        var datasetId = Guid.NewGuid();
+        var key = $"datasets/{datasetId:N}/result.parquet";
+        var storage = new LocalFileStorage(directory.FullName);
+
+        try
+        {
+            await using (var input = new MemoryStream("published"u8.ToArray()))
+            {
+                await storage.SaveAsync(key, input, token);
+            }
+            await using var reader = Child.Start(directory.FullName, datasetId, "read");
+            await using var closer = Child.Start(directory.FullName, datasetId, "close");
+            await reader.ExpectAsync("prepared", token);
+            await closer.ExpectAsync("prepared", token);
+            await reader.ContinueAsync(token);
+            await reader.ExpectAsync("reading", token);
+            await closer.ContinueAsync(token);
+            await closer.ExpectAsync("blocked", token);
+
+            reader.Kill();
+            await reader.WaitForExitAsync(token);
+            await closer.ExpectAsync("closed", token);
+            await closer.ExpectSuccessAsync(token);
+            await storage.DeleteDirectoryAsync($"datasets/{datasetId:N}", token);
+            Assert.False(await storage.ExistsAsync(key, token));
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CancelledRead_ShouldReleaseNamespaceLease()
+    {
+        using var deadline = CreateDeadline();
+        var token = deadline.Token;
+        var directory = Directory.CreateTempSubdirectory("aperture-read-cancellation-");
+        var datasetId = Guid.NewGuid();
+        var key = $"datasets/{datasetId:N}/result.parquet";
+        var storage = new LocalFileStorage(directory.FullName);
+
+        try
+        {
+            await using (var input = new MemoryStream("published"u8.ToArray()))
+            {
+                await storage.SaveAsync(key, input, token);
+            }
+            using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(token);
+            var leaseHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var read = storage.ExecuteWithReadLeaseAsync(
+                key,
+                async (_, ct) =>
+                {
+                    leaseHeld.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                    return true;
+                },
+                cancelled.Token
+            );
+
+            await leaseHeld.Task.WaitAsync(token);
+            await cancelled.CancelAsync();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read);
+            await storage.CloseNamespaceAsync(datasetId, token);
+            Assert.Equal(LocalStorageNamespaceState.Closed, await storage.GetNamespaceStateAsync(datasetId, token));
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task LegacyRead_ShouldInitializeMissingMarker_ButNeverReopenClosedOrUnknownNamespace()
+    {
+        using var deadline = CreateDeadline();
+        var token = deadline.Token;
+        var directory = Directory.CreateTempSubdirectory("aperture-read-legacy-");
+        var datasetId = Guid.NewGuid();
+        var key = $"datasets/{datasetId:N}/result.parquet";
+        var storage = new LocalFileStorage(directory.FullName);
+        var path = Path.Combine(directory.FullName, "datasets", datasetId.ToString("N"), "result.parquet");
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, "legacy payload", token);
+            var actual = await storage.ExecuteWithReadLeaseAsync(
+                key,
+                (file, _) => Task.FromResult(File.ReadAllText(file)),
+                token
+            );
+            Assert.Equal("legacy payload", actual);
+            Assert.Equal(LocalStorageNamespaceState.Open, await storage.GetNamespaceStateAsync(datasetId, token));
+
+            await storage.CloseNamespaceAsync(datasetId, token);
+            await Assert.ThrowsAsync<StorageNamespaceClosedException>(() =>
+                storage.ExecuteWithReadLeaseAsync(key, (_, _) => Task.FromResult(true), token));
+
+            var marker = Path.Combine(directory.FullName, ".aperture-storage", "namespaces", datasetId.ToString("N"));
+            await File.WriteAllTextAsync(marker, "invalid!", token);
+            await Assert.ThrowsAsync<IOException>(() =>
+                storage.ExecuteWithReadLeaseAsync(key, (_, _) => Task.FromResult(true), token));
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
     private sealed class InstallationAcknowledgementFault : ILogger<LocalFileStorage>
     {
         public IOException Failure { get; } = new("Lost acknowledgement after the actual installation.");

@@ -1,6 +1,6 @@
 namespace AnalyticDashboard.Application.Dashboards.GetDashboards;
 
-public sealed record GetDashboardsResponse(
+public sealed record GetDashboardsItem(
     Guid Id,
     Guid ProjectId,
     string Name,

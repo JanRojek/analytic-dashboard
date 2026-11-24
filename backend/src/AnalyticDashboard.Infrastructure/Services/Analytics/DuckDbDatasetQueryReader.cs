@@ -9,6 +9,8 @@ public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
 {
     private readonly DuckDbParquetExecutor _executor;
 
+    private const int TopGroupLimit = 20;
+
     public DuckDbDatasetQueryReader(
         DuckDbParquetExecutor executor)
     {
@@ -90,7 +92,7 @@ public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
             DESCRIBE
             SELECT *
             FROM read_parquet($parquetPath);
-            """;
+        """;
 
         command.Parameters.Add(
             new DuckDBParameter(
@@ -147,6 +149,23 @@ public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
             )
         };
 
+        var otherAggregationExpression = aggregation switch
+        {
+            AggregationType.Sum => "SUM(value)",
+
+            AggregationType.Count => "SUM(value)",
+
+            AggregationType.Average => "SUM(value * measure_count) / NULLIF(SUM(measure_count), 0)",
+
+            AggregationType.Min => "MIN(value)",
+
+            AggregationType.Max => "MAX(value)",
+
+            _ => throw new InvalidOperationException(
+                "Unsupported aggregation type."
+            )
+        };
+
         var havingClause = aggregation == AggregationType.Count
             ? string.Empty
             : $"HAVING {aggregationExpression} IS NOT NULL";
@@ -154,14 +173,57 @@ public sealed class DuckDbDatasetQueryReader : IDatasetQueryReader
         await using var command = connection.CreateCommand();
 
         command.CommandText = $"""
+            WITH grouped AS (
+                SELECT
+                    CAST({quotedGroupBy} AS VARCHAR) AS label,
+                    CAST({aggregationExpression} AS DOUBLE) AS value,
+                    COUNT({quotedMeasure}) AS measure_count
+                FROM read_parquet($parquetPath)
+                GROUP BY {quotedGroupBy}
+                {havingClause}
+            ),
+            ranked AS (
+                SELECT
+                    label,
+                    value,
+                    measure_count,
+                    ROW_NUMBER() OVER (
+                        ORDER BY value DESC NULLS LAST, label ASC NULLS LAST
+                    ) AS position
+                FROM grouped
+            ),
+            other_aggregate AS (
+                SELECT
+                    COUNT(*) AS omitted_count,
+                    {otherAggregationExpression} AS other_value
+                FROM ranked
+                WHERE position > {TopGroupLimit}
+            ),
+            combined AS (
+                SELECT
+                    label,
+                    value,
+                    0 AS is_other,
+                    position
+                FROM ranked
+                WHERE position <= {TopGroupLimit}
+
+                UNION ALL
+
+                SELECT
+                    'Other (' || CAST(omitted_count AS VARCHAR) || ')' AS label,
+                    other_value AS value,
+                    1 AS is_other,
+                    CAST(NULL AS BIGINT) AS position
+                FROM other_aggregate
+                WHERE omitted_count > 0
+            )
             SELECT
-                CAST({quotedGroupBy} AS VARCHAR) AS label,
-                CAST({aggregationExpression} AS DOUBLE) AS value
-            FROM read_parquet($parquetPath)
-            GROUP BY {quotedGroupBy}
-            {havingClause}
-            ORDER BY label NULLS LAST;
-            """;
+                label,
+                value
+            FROM combined
+            ORDER BY is_other ASC, position ASC NULLS LAST;
+       """;
 
         command.Parameters.Add(
             new DuckDBParameter(

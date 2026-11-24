@@ -12,16 +12,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AnalyticDashboard.IntegrationTests.Analytics;
 
-public sealed class QueryDatasetEndpointTests
-    : IClassFixture<ApiFixture>
+public sealed class QueryDatasetEndpointTests : IClassFixture<ApiFixture>
 {
     private readonly ApiFixture _fixture;
 
     private static CancellationToken CancellationToken =>
         TestContext.Current.CancellationToken;
 
-    public QueryDatasetEndpointTests(
-        ApiFixture fixture)
+    public QueryDatasetEndpointTests(ApiFixture fixture)
     {
         _fixture = fixture;
     }
@@ -241,6 +239,7 @@ public sealed class QueryDatasetEndpointTests
             TestAuthHandler.UserIdHeader,
             userId.ToString()
         );
+        request.Headers.Add("X-Aperture-Request", "fetch");
 
         var multipart =
             new MultipartFormDataContent();
