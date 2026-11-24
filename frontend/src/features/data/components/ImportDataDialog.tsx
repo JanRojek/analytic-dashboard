@@ -7,6 +7,9 @@ import { useSession } from "../../../session/SessionContext";
 import { createSampleFile, parseCsv } from "../../../mocks/csv";
 import { Icon } from "../../../components/Icon";
 
+const DEMO_CSV_MAX_SIZE = 10 * 1024 * 1024;
+const API_CSV_MAX_SIZE = 256 * 1024 * 1024;
+
 export function ImportDataDialog({
   projectId,
   opened,
@@ -66,34 +69,45 @@ export function ImportDataDialog({
         throw new Error(
           "This file is empty. Choose a file with a header and at least one data row.",
         );
-      if (candidate.size > 10 * 1024 * 1024)
-        throw new Error(
-          "For this preview, choose a CSV file smaller than 10 MB.",
-        );
-      let parsed;
-      try {
-        parsed = parseCsv(await candidate.text());
-      } catch (parseError) {
-        if (
-          parseError instanceof Error &&
-          parseError.message.includes("20,000 rows")
-        )
+      if (mode === "demo") {
+        if (candidate.size > DEMO_CSV_MAX_SIZE)
           throw new Error(
-            "This import preview supports up to 20,000 rows. Choose a smaller CSV for this prototype.",
-            { cause: parseError },
+            "For this preview, choose a CSV file smaller than 10 MB.",
           );
-        throw parseError;
+
+        let parsed;
+        try {
+          parsed = parseCsv(await candidate.text());
+        } catch (parseError) {
+          if (
+            parseError instanceof Error &&
+            parseError.message.includes("20,000 rows")
+          )
+            throw new Error(
+              "This import preview supports up to 20,000 rows. Choose a smaller CSV for this prototype.",
+              { cause: parseError },
+            );
+          throw parseError;
+        }
+
+        if (currentSelection !== selection.current) return;
+        setPreview({
+          headers: parsed.columns,
+          rows: parsed.rows
+            .slice(0, 4)
+            .map((row) => parsed.columns.map((column) => row[column] ?? "")),
+          rowCount: parsed.rows.length,
+        });
+      } else {
+        if (candidate.size > API_CSV_MAX_SIZE)
+          throw new Error("Choose a CSV file smaller than 256 MiB.");
+
+        setPreview(null);
       }
+
       if (currentSelection !== selection.current) return;
       setFile(candidate);
       setName(candidate.name.replace(/\.csv$/i, "").slice(0, 180));
-      setPreview({
-        headers: parsed.columns,
-        rows: parsed.rows
-          .slice(0, 4)
-          .map((row) => parsed.columns.map((column) => row[column] ?? "")),
-        rowCount: parsed.rows.length,
-      });
     } catch (caught) {
       if (currentSelection !== selection.current) return;
       setFile(null);
@@ -142,7 +156,9 @@ export function ImportDataDialog({
         </div>
         <p className="data-muted">
           {file
-            ? "A quick look before your data becomes part of the project."
+            ? mode === "demo"
+              ? "A quick look before your data becomes part of the project."
+              : "Your data preview and profile will be ready after the server processes the file."
             : "Start with a CSV. We’ll identify your columns and prepare a profile automatically."}
         </p>
         <input
@@ -184,7 +200,11 @@ export function ImportDataDialog({
               <span>
                 or <u>browse files</u>
               </span>
-              <small>CSV with a header row · up to 10 MB / 20,000 rows</small>
+              <small>
+                {mode === "demo"
+                  ? "CSV with a header row · up to 10 MB / 20,000 rows"
+                  : "CSV with a header row · up to 256 MiB"}
+              </small>
             </button>
             <button
               type="button"
@@ -211,9 +231,11 @@ export function ImportDataDialog({
               <div>
                 <strong>{file.name}</strong>
                 <small>
-                  {(file.size / 1024).toFixed(1)} KB ·{" "}
-                  {preview?.rowCount.toLocaleString()} rows ·{" "}
-                  {preview?.headers.length} columns
+                  {file.size >= 1024 * 1024
+                    ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                    : `${(file.size / 1024).toFixed(1)} KB`}
+                  {preview &&
+                    ` · ${preview.rowCount.toLocaleString()} rows · ${preview.headers.length} columns`}
                 </small>
               </div>
               <Button

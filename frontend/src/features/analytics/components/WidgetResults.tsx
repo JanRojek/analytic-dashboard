@@ -18,7 +18,20 @@ export function WidgetResults({
     aggregation: widget.aggregation,
   };
 
-  const results = useChartData(projectId, widget.datasetId, config);
+  const results = useChartData(
+    projectId,
+    widget.datasetId ?? "",
+    config,
+    widget.datasetId !== null,
+  );
+
+  if (widget.datasetId === null) {
+    return (
+      <p className="analytics-note">
+        This chart's source dataset was removed. Its configuration is preserved.
+      </p>
+    );
+  }
 
   return results.isPending ? (
     <LoadingState />

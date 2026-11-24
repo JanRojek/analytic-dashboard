@@ -75,6 +75,18 @@ export interface Dashboard {
   revision: number;
   createdAtUtc: string;
 }
+// GET /editor-state omits Dashboard.createdAtUtc and each Widget.dashboardId.
+// The API adapter normalizes the wire contract into these editor-facing models.
+export type EditorDashboard = Pick<
+  Dashboard,
+  "id" | "projectId" | "name" | "revision"
+>;
+
+export interface DashboardEditorState {
+  dashboard: EditorDashboard;
+  widgets: Widget[];
+}
+
 export interface UpdateDashboardWidgetsResponse {
   revision: number;
 }
@@ -93,9 +105,10 @@ export interface WidgetInput extends QueryConfig {
   title: string;
 }
 
-export interface Widget extends WidgetInput {
+export interface Widget extends Omit<WidgetInput, "datasetId"> {
   id: string;
   dashboardId: string;
+  datasetId: string | null;
   createdAtUtc: string;
   layout: WidgetLayout;
 }
@@ -111,8 +124,9 @@ export interface CreateWidgetInput extends WidgetInput {
   layout: WidgetLayout;
 }
 
-export interface DashboardWidgetUpdate extends WidgetInput {
+export interface DashboardWidgetUpdate extends Omit<WidgetInput, "datasetId"> {
   widgetId: string;
+  datasetId: string | null;
   layout: WidgetLayout;
 }
 
@@ -151,6 +165,10 @@ export interface DataAdapter {
   ): Promise<QueryItem[]>;
   listDashboards(projectId: string): Promise<Dashboard[]>;
   getDashboard(projectId: string, dashboardId: string): Promise<Dashboard>;
+  getDashboardEditorState(
+    projectId: string,
+    dashboardId: string,
+  ): Promise<DashboardEditorState>;
   createDashboard(projectId: string, name: string): Promise<Dashboard>;
   deleteDashboard(projectId: string, dashboardId: string): Promise<void>;
   listWidgets(projectId: string, dashboardId: string): Promise<Widget[]>;

@@ -21,7 +21,20 @@ export function WidgetChart({
     aggregation: widget.aggregation,
   };
 
-  const data = useChartData(projectId, widget.datasetId, config);
+  const data = useChartData(
+    projectId,
+    widget.datasetId ?? "",
+    config,
+    widget.datasetId !== null,
+  );
+
+  if (widget.datasetId === null) {
+    return (
+      <div className="widget-loading" role="status">
+        Source dataset removed
+      </div>
+    );
+  }
 
   if (data.isPending)
     return (

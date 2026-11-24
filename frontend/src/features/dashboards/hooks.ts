@@ -1,9 +1,8 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
 import type {
   CreateWidgetInput,
-  Dashboard,
   DashboardWidgetUpdate,
 } from "../../data/types";
 
@@ -23,6 +22,24 @@ export function useDashboard(projectId: string, dashboardId: string) {
   return useQuery({
     queryKey: queryKeys.dashboards.detail(projectId, dashboardId),
     queryFn: () => adapter.getDashboard(projectId, dashboardId),
+  });
+}
+
+export function useDashboardEditorState(
+  projectId: string,
+  dashboardId: string,
+) {
+  const { adapter } = useSession();
+
+  return useQuery({
+    queryKey: queryKeys.dashboards.editorState(projectId, dashboardId),
+    queryFn: () => adapter.getDashboardEditorState(projectId, dashboardId),
+    enabled: Boolean(projectId && dashboardId),
+    // Every navigation to Edit/Preview must start from a fresh server snapshot.
+    // Do not refetch unexpectedly while the user is editing a local document.
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -133,12 +150,13 @@ export function useUpdateDashboardWidgets(projectId: string) {
         expectedRevision,
       ),
 
-    onSuccess: (result, { dashboardId }) => {
-      queryClient.setQueryData<Dashboard>(
-        queryKeys.dashboards.detail(projectId, dashboardId),
-        (dashboard) =>
-          dashboard ? { ...dashboard, revision: result.revision } : dashboard,
-      );
+    onSuccess: (_, { dashboardId }) => {
+      // Editor state is updated atomically by useDashboardAutosave, which knows
+      // the exact submitted widgets and the acknowledged revision.
+      // Legacy independent read consumers may still refresh separately.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboards.detail(projectId, dashboardId),
+      });
 
       void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),

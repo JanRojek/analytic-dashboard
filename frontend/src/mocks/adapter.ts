@@ -164,6 +164,25 @@ export const demoAdapter: DataAdapter = {
   async getDashboard(p, d) {
     return requireDashboard(readDemoState(), p, d);
   },
+  async getDashboardEditorState(p, d) {
+    const state = readDemoState();
+    const dashboard = requireDashboard(state, p, d);
+
+    return {
+      dashboard: {
+        id: dashboard.id,
+        projectId: dashboard.projectId,
+        name: dashboard.name,
+        revision: dashboard.revision,
+      },
+      widgets: state.widgets
+        .filter((widget) => widget.dashboardId === d)
+        .map((widget) => ({
+          ...widget,
+          layout: { ...widget.layout },
+        })),
+    };
+  },
   async createDashboard(p, name) {
     return mutateDemoState((state) => {
       requireProject(state, p);
@@ -227,6 +246,9 @@ export const demoAdapter: DataAdapter = {
       (item) => item.dashboardId === d && item.id === w,
     );
     if (!widget) throw new Error("This chart was not found.");
+    if (widget.datasetId === null) {
+      throw new Error("The chart source dataset is unavailable.");
+    }
     const data = requireDataset(state, p, widget.datasetId);
     return queryRows(data.columns, data.rows, widget);
   },
@@ -293,6 +315,9 @@ export const demoAdapter: DataAdapter = {
           throw new Error("Invalid widget layout.");
         }
 
+        if (update.datasetId === null) {
+          throw new Error("Demo mode cannot save detached charts.");
+        }
         const dataset = requireDataset(state, p, update.datasetId);
 
         queryRows(dataset.columns, dataset.rows, {

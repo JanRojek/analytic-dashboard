@@ -1,4 +1,4 @@
-﻿type Id = string | number | undefined;
+type Id = string | number | undefined;
 
 export const queryKeys = {
   projects: {
@@ -36,6 +36,9 @@ export const queryKeys = {
 
     widgets: (projectId: Id, dashboardId: Id) =>
       ["widgets", projectId, dashboardId] as const,
+
+    editorState: (projectId: Id, dashboardId: Id) =>
+      ["dashboard-editor-state", projectId, dashboardId] as const,
 
     widgetData: (projectId: Id, dashboardId: Id, widgetId: Id) =>
       ["widget-data", projectId, dashboardId, widgetId] as const,

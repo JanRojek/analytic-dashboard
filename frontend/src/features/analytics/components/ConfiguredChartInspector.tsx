@@ -58,20 +58,21 @@ export function ConfiguredChartInspector({
   }
 
   return (
-      <>
-        <div className="inspector-section">
-          <TextInput
-              label="Title"
-              value={title}
-              maxLength={200}
-              onFocus={() => {
-                titleFocused.current = true;
-                titleGroup.current = crypto.randomUUID();
-              }}
-              onBlur={finishTitleEditing}
-              onChange={(event) => changeTitle(event.currentTarget.value)}
-          />
+    <>
+      <div className="inspector-section">
+        <TextInput
+          label="Title"
+          value={title}
+          maxLength={200}
+          onFocus={() => {
+            titleFocused.current = true;
+            titleGroup.current = crypto.randomUUID();
+          }}
+          onBlur={finishTitleEditing}
+          onChange={(event) => changeTitle(event.currentTarget.value)}
+        />
 
+        {widget.datasetId !== null && (
           <details className="inspector-visualization-details">
             <summary>
               Change visualization
@@ -80,44 +81,45 @@ export function ConfiguredChartInspector({
 
             <div className="inspector-visualization-picker">
               <ChartTypePicker
-                  value={widget.type}
-                  onChange={(type) => onChange({ type })}
+                value={widget.type}
+                onChange={(type) => onChange({ type })}
               />
             </div>
           </details>
-        </div>
+        )}
+      </div>
 
-        <InspectorQuery
-            key={widget.id}
-            widget={widget}
-            projectId={projectId}
-            onChange={onChange}
-            onOpenDataset={onOpenDataset}
-        />
+      <InspectorQuery
+        key={widget.id}
+        widget={widget}
+        projectId={projectId}
+        onChange={onChange}
+        onOpenDataset={onOpenDataset}
+      />
 
-        <div className="inspector-section">
-          <Button
-              fullWidth
-              variant="default"
-              size="xs"
-              leftSection={<Icon name="data" size={15} />}
-              onClick={onInspectResults}
-          >
-            Inspect results
-          </Button>
+      <div className="inspector-section">
+        <Button
+          fullWidth
+          variant="default"
+          size="xs"
+          leftSection={<Icon name="data" size={15} />}
+          onClick={onInspectResults}
+        >
+          Inspect results
+        </Button>
 
-          <Button
-              fullWidth
-              variant="subtle"
-              color="red"
-              size="xs"
-              mt={8}
-              leftSection={<Icon name="trash" size={15} />}
-              onClick={onRemove}
-          >
-            Remove chart
-          </Button>
-        </div>
-      </>
+        <Button
+          fullWidth
+          variant="subtle"
+          color="red"
+          size="xs"
+          mt={8}
+          leftSection={<Icon name="trash" size={15} />}
+          onClick={onRemove}
+        >
+          Remove chart
+        </Button>
+      </div>
+    </>
   );
 }

@@ -16,7 +16,23 @@ export function InspectorQuery({
   onChange: (value: Partial<WidgetInput>) => void;
   onOpenDataset: () => void;
 }) {
-  const profile = useDatasetProfile(projectId, widget.datasetId);
+  const profile = useDatasetProfile(
+    projectId,
+    widget.datasetId ?? "",
+    Boolean(widget.datasetId),
+  );
+
+  if (widget.datasetId === null) {
+    return (
+      <div className="inspector-section">
+        <span className="inspector-label">Data &amp; question</span>
+        <p className="analytics-note">
+          The source dataset was removed. The chart configuration is preserved,
+          but its data settings cannot be changed.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="inspector-section">

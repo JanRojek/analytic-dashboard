@@ -17,7 +17,7 @@ import type { DraftWidget } from "../draftWidgets";
 import { QueryFields } from "./QueryFields";
 
 type DraftChartInspectorProps = {
-  dashboard: Dashboard;
+  dashboard: Pick<Dashboard, "id" | "projectId">;
   draft: DraftWidget;
   layout: WidgetLayout;
   onChange: (patch: Partial<DraftWidget>) => void;

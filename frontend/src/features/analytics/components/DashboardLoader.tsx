@@ -2,22 +2,46 @@
 
 import { Brand } from "../../../components/Brand";
 import { ErrorState, LoadingState } from "../../../components/Feedback";
+import { useDashboardEditorState } from "../../dashboards/hooks";
 
-import { useDashboard, useDashboardWidgets } from "../../dashboards/hooks";
 import { DashboardWorkspace } from "./DashboardWorkspace";
 
 export function DashboardLoader({ editing }: { editing: boolean }) {
   const { projectId = "", dashboardId = "" } = useParams();
-  const dashboard = useDashboard(projectId, dashboardId);
-  const widgets = useDashboardWidgets(projectId, dashboardId);
-  if (dashboard.isPending || widgets.isPending)
+
+  return (
+    <DashboardLoaderContent
+      key={`${projectId}:${dashboardId}:${editing}`}
+      projectId={projectId}
+      dashboardId={dashboardId}
+      editing={editing}
+    />
+  );
+}
+
+function DashboardLoaderContent({
+  projectId,
+  dashboardId,
+  editing,
+}: {
+  projectId: string;
+  dashboardId: string;
+  editing: boolean;
+}) {
+  const editorState = useDashboardEditorState(projectId, dashboardId);
+
+  // Cached data may be stale. On each Edit/Preview mount wait until a new
+  // snapshot has been fetched before constructing an editor history.
+  if (!editorState.isFetchedAfterMount && !editorState.isError) {
     return (
       <main className="canvas-loading">
         <Brand />
         <LoadingState label="Opening your dashboard…" />
       </main>
     );
-  if (dashboard.isError || widgets.isError)
+  }
+
+  if (editorState.isError) {
     return (
       <main className="canvas-loading">
         <Brand />
@@ -25,19 +49,26 @@ export function DashboardLoader({ editing }: { editing: boolean }) {
           Back to dashboards
         </Link>
         <ErrorState
-          error={dashboard.error || widgets.error}
-          retry={() => {
-            void dashboard.refetch();
-            void widgets.refetch();
-          }}
+          error={editorState.error}
+          retry={() => void editorState.refetch()}
         />
       </main>
     );
+  }
+
+  if (!editorState.data) {
+    return (
+      <main className="canvas-loading">
+        <Brand />
+        <LoadingState label="Opening your dashboard…" />
+      </main>
+    );
+  }
+
   return (
     <DashboardWorkspace
-      key={`${dashboardId}:${editing}`}
-      dashboard={dashboard.data}
-      sourceWidgets={widgets.data}
+      dashboard={editorState.data.dashboard}
+      sourceWidgets={editorState.data.widgets}
       editing={editing}
     />
   );

@@ -1,4 +1,4 @@
-﻿import type { EditorSnapshot } from "./editorState";
+import type { EditorSnapshot } from "./editorState";
 
 interface StoredSnapshotDraft {
   version: 1;
@@ -18,7 +18,6 @@ function isWidget(value: unknown): boolean {
     [
       value.id,
       value.dashboardId,
-      value.datasetId,
       value.type,
       value.title,
       value.groupByColumn,
@@ -26,6 +25,7 @@ function isWidget(value: unknown): boolean {
       value.aggregation,
       value.createdAtUtc,
     ].every((item) => typeof item === "string") &&
+    (value.datasetId === null || typeof value.datasetId === "string") &&
     [layout.x, layout.y, layout.width, layout.height].every((item) =>
       Number.isSafeInteger(item),
     ) &&

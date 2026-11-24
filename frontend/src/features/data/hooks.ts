@@ -49,7 +49,7 @@ export function useDatasetUsage(
   });
 }
 
-const IMPORT_STATUS_POLL_INTERVAL_MS = 3000;
+const IMPORT_STATUS_POLL_INTERVAL_MS = 750;
 
 export function useImportStatus(
   projectId: string,

@@ -1,5 +1,6 @@
 import type {
   Dashboard,
+  DashboardEditorState,
   DataAdapter,
   Dataset,
   DatasetProfile,
@@ -39,10 +40,25 @@ function reportSessionExpiry(path: string): void {
 
 export class ApiError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  readonly code?: string;
+  readonly expectedRevision?: number;
+  readonly currentRevision?: number;
+
+  constructor(
+    message: string,
+    status: number,
+    details: {
+      code?: string;
+      expectedRevision?: number;
+      currentRevision?: number;
+    } = {},
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = details.code;
+    this.expectedRevision = details.expectedRevision;
+    this.currentRevision = details.currentRevision;
   }
 }
 
@@ -52,7 +68,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     response = await fetch(`/api${path}`, {
       ...options,
       credentials: "include",
-      signal: AbortSignal.timeout(30_000),
+      signal: options.signal ?? AbortSignal.timeout(30_000),
       headers: {
         ...(options.body instanceof FormData
           ? {}
@@ -77,6 +93,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       detail?: string;
       title?: string;
       errors?: Record<string, string[]>;
+      code?: unknown;
+      expectedRevision?: unknown;
+      currentRevision?: unknown;
     } | null;
     const validation = problem?.errors
       ? Object.values(problem.errors).flat().join(" ")
@@ -92,6 +111,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(
       validation || problem?.detail || problem?.title || fallback,
       response.status,
+      {
+        code: typeof problem?.code === "string" ? problem.code : undefined,
+        expectedRevision:
+          typeof problem?.expectedRevision === "number"
+            ? problem.expectedRevision
+            : undefined,
+        currentRevision:
+          typeof problem?.currentRevision === "number"
+            ? problem.currentRevision
+            : undefined,
+      },
     );
   }
   if (response.status === 204) return undefined as T;
@@ -132,6 +162,14 @@ export const authApi = {
     request<void>("/auth/reset-password", json({ userId, token, newPassword })),
 };
 
+// Flat HTTP response: projectId and widget.dashboardId are implied by the route.
+type GetDashboardEditorStateResponse = {
+  dashboardId: string;
+  name: string;
+  revision: number;
+  widgets: Omit<DashboardEditorState["widgets"][number], "dashboardId">[];
+};
+
 export const apiAdapter: DataAdapter = {
   async listProjects() {
     type Page = { items: Project[]; totalPages: number };
@@ -165,7 +203,14 @@ export const apiAdapter: DataAdapter = {
       datasetId: string;
       datasetVersionId: string;
       importJobId: string;
-    }>(`${datasetPath(p)}/import/csv`, { method: "POST", body });
+    }>(`${datasetPath(p)}/import/csv`, {
+      method: "POST",
+      body,
+      signal: AbortSignal.timeout(5 * 60_000),
+      headers: {
+        "X-Aperture-Request": "fetch",
+      },
+    });
   },
   deleteDataset: (p, d) =>
     request<void>(datasetPath(p, d), { method: "DELETE" }),
@@ -179,6 +224,24 @@ export const apiAdapter: DataAdapter = {
   },
   listDashboards: (p) => request<Dashboard[]>(dashboardPath(p)),
   getDashboard: (p, d) => request<Dashboard>(dashboardPath(p, d)),
+  async getDashboardEditorState(p, d) {
+    const response = await request<GetDashboardEditorStateResponse>(
+      `${dashboardPath(p, d)}/editor-state`,
+    );
+
+    return {
+      dashboard: {
+        id: response.dashboardId,
+        projectId: p,
+        name: response.name,
+        revision: response.revision,
+      },
+      widgets: response.widgets.map((widget) => ({
+        ...widget,
+        dashboardId: response.dashboardId,
+      })),
+    };
+  },
   async createDashboard(p, name) {
     const result = await request<{ id: string }>(
       dashboardPath(p),
