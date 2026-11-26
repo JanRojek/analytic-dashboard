@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 
-import { useDatasets, useDatasetUsage, useDeleteDataset } from "../hooks";
+import {
+  useDatasets,
+  useDatasetsSummary,
+  useDatasetUsage,
+  useDeleteDataset,
+} from "../hooks";
+import { useDebouncedValue } from "@mantine/hooks";
 
 import {
   ActionIcon,
   Alert,
   Button,
+  Checkbox,
   Menu,
   Modal,
   Pagination,
@@ -35,7 +42,6 @@ export function DataPage() {
   const { projectId = "" } = useParams();
 
   const [importOpen, setImportOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<Dataset | null>(null);
 
   const [params, setParams] = useSearchParams();
@@ -43,11 +49,20 @@ export function DataPage() {
     page: Number(params.get("page") ?? 1),
     pageSize: Number(params.get("pageSize") ?? 24),
   });
-  const datasets = useDatasets(projectId, pagination);
+  const search = params.get("search") ?? "";
+  const readyOnly = params.get("readyOnly") === "true";
+  const [debouncedSearch] = useDebouncedValue(search, 300);
+  const searching = search !== debouncedSearch;
+  const datasets = useDatasets(
+    projectId,
+    { ...pagination, search: debouncedSearch, readyOnly },
+    !searching,
+  );
+  const summary = useDatasetsSummary(projectId);
   const result = datasets.data;
 
   useEffect(() => {
-    if (!result) return;
+    if (!result || searching || datasets.isFetching) return;
     if (
       params.get("page") === String(result.page) &&
       params.get("pageSize") === String(result.pageSize)
@@ -63,13 +78,12 @@ export function DataPage() {
       },
       { replace: true },
     );
-  }, [result, params, setParams]);
+  }, [result, params, setParams, searching, datasets.isFetching]);
 
   function changePage(
     page: number,
     pageSize = result?.pageSize ?? pagination.pageSize,
   ) {
-    setSearch("");
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set("page", String(page));
@@ -80,13 +94,31 @@ export function DataPage() {
   const usage = useDatasetUsage(projectId, deleting?.id);
   const remove = useDeleteDataset(projectId);
 
-  const visible =
-    datasets.data?.items.filter((item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
+  function changeFilter(name: "search" | "readyOnly", value: string) {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        next.set("page", "1");
+        return next;
+      },
+      { replace: true },
+    );
+  }
 
-  const ready =
-    datasets.data?.items.filter((item) => item.currentVersion) ?? [];
+  function clearFilters() {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("search");
+      next.delete("readyOnly");
+      next.set("page", "1");
+      return next;
+    });
+  }
+
+  const filtered = Boolean(search.trim() || readyOnly);
+  const visible = datasets.data?.items ?? [];
 
   return (
     <div className="page-content data-page">
@@ -128,12 +160,62 @@ export function DataPage() {
           </div>
         </div>
       </div>
-      {datasets.isPending ? (
+      <div className="data-list-heading">
+        <div>
+          <h2>
+            {filtered ? "Matching datasets" : "All datasets"}{" "}
+            <span>{searching ? "…" : (datasets.data?.totalCount ?? "—")}</span>
+          </h2>
+          <p>
+            {summary.data ? number.format(summary.data.totalRows) : "—"} rows
+            across your project
+          </p>
+        </div>
+        <div className="data-preview-controls">
+          <TextInput
+            placeholder="Search datasets…"
+            aria-label="Search project datasets"
+            value={search}
+            onChange={(event) =>
+              changeFilter("search", event.currentTarget.value)
+            }
+            leftSection={<Icon name="search" size={16} />}
+          />
+          <Checkbox
+            label="Ready only"
+            checked={readyOnly}
+            onChange={(event) =>
+              changeFilter(
+                "readyOnly",
+                event.currentTarget.checked ? "true" : "",
+              )
+            }
+          />
+        </div>
+      </div>
+      {summary.isError && (
+        <ErrorState
+          error={summary.error}
+          retry={() => void summary.refetch()}
+        />
+      )}
+      {searching || datasets.isPending ? (
         <LoadingState label="Loading datasets…" />
       ) : datasets.isError ? (
         <ErrorState
           error={datasets.error}
           retry={() => void datasets.refetch()}
+        />
+      ) : !datasets.data.totalCount && filtered ? (
+        <EmptyState
+          icon="search"
+          title="No datasets found"
+          description="Try a different name or clear the filters."
+          action={
+            <Button variant="default" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          }
         />
       ) : !datasets.data.totalCount ? (
         <EmptyState
@@ -151,31 +233,6 @@ export function DataPage() {
         />
       ) : (
         <>
-          <div className="data-list-heading">
-            <div>
-              <h2>
-                All datasets <span>{datasets.data.totalCount}</span>
-              </h2>
-              <p>
-                {number.format(
-                  ready.reduce(
-                    (total, item) =>
-                      total + (item.currentVersion?.rowCount ?? 0),
-                    0,
-                  ),
-                )}{" "}
-                rows on this page
-              </p>
-            </div>
-            <TextInput
-              placeholder="Filter this page…"
-              description="Filters the current page. Browse other pages to find more datasets."
-              aria-label="Filter datasets on this page"
-              value={search}
-              onChange={(event) => setSearch(event.currentTarget.value)}
-              leftSection={<Icon name="search" size={16} />}
-            />
-          </div>
           <div className="data-table-card">
             <div
               className="data-table-scroll"
@@ -279,12 +336,6 @@ export function DataPage() {
                   ))}
                 </tbody>
               </table>
-              {!visible.length && (
-                <div className="data-no-results">
-                  No datasets on this page match “{search}”.{" "}
-                  <button onClick={() => setSearch("")}>Clear search</button>
-                </div>
-              )}
             </div>
           </div>
           <div className="data-preview-footer">

@@ -1,5 +1,5 @@
 ﻿import type { Project } from "../../../data/types.ts";
-import { useDatasets } from "../../data/hooks.ts";
+import { useDatasetsSummary } from "../../data/hooks.ts";
 import { useDashboards } from "../../dashboards/hooks.ts";
 import { Link } from "react-router-dom";
 import { Icon } from "../../../components/Icon.tsx";
@@ -24,7 +24,7 @@ export function ProjectTile({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const datasets = useDatasets(project.id, { pageSize: 1 });
+  const datasets = useDatasetsSummary(project.id);
   const dashboards = useDashboards(project.id);
   return (
     <article className={`project-card project-tone-${index % 3}`}>

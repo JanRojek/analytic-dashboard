@@ -9,8 +9,15 @@ export const queryKeys = {
   datasets: {
     list: (projectId: Id) => ["datasets", projectId] as const,
 
-    page: (projectId: Id, page: number, pageSize: number) =>
-      ["datasets", projectId, page, pageSize] as const,
+    page: (
+      projectId: Id,
+      page: number,
+      pageSize: number,
+      search = "",
+      readyOnly = false,
+    ) => ["datasets", projectId, page, pageSize, search, readyOnly] as const,
+
+    summary: (projectId: Id) => ["datasets", projectId, "summary"] as const,
 
     detail: (projectId: Id, datasetId: Id) =>
       ["dataset", projectId, datasetId] as const,

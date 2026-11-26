@@ -24,7 +24,7 @@ export function ExplorePage() {
   const scope = editorScope(mode, session?.user.id || "", projectId);
   const draft = readExploration(scope);
   const selected = params.get("dataset") || draft?.datasetId;
-  const datasets = useDatasets(projectId, {}, !selected);
+  const datasets = useDatasets(projectId, { readyOnly: true }, !selected);
   const datasetId =
     selected ||
     datasets.data?.items.find((item) => item.currentVersion)?.id ||

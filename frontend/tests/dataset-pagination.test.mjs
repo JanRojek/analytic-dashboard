@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { QueryClient } from "@tanstack/react-query";
 import { apiAdapter } from "../src/data/api.ts";
-import { normalizePagination } from "../src/data/pagination.ts";
+import {
+  normalizeDatasetListParams,
+  normalizePagination,
+} from "../src/data/pagination.ts";
 import { queryKeys } from "../src/data/queryKeys.ts";
 import { demoAdapter } from "../src/mocks/adapter.ts";
 import { createSeed } from "../src/mocks/seed.ts";
@@ -176,6 +179,10 @@ test("page cache entries remain distinct and list invalidation reaches every pag
       queryKeys.datasets.page("project", 1, 24),
       queryKeys.datasets.page("project", 2, 24),
       queryKeys.datasets.page("project", 1, 96),
+      queryKeys.datasets.page("project", 1, 24, "sales", false),
+      queryKeys.datasets.page("project", 1, 24, "sales", true),
+      queryKeys.datasets.page("project", 1, 24, "revenue", true),
+      queryKeys.datasets.summary("project"),
     ];
     for (const [index, key] of keys.entries())
       client.setQueryData(key, { index });
@@ -195,5 +202,198 @@ test("page cache entries remain distinct and list invalidation reaches every pag
     assert.equal(client.getQueryState(detailKey).isInvalidated, false);
   } finally {
     client.clear();
+  }
+});
+
+test("dataset filter normalization trims search and keeps the ready flag", () => {
+  assert.deepEqual(normalizeDatasetListParams(), {
+    page: 1,
+    pageSize: 24,
+    search: "",
+    readyOnly: false,
+  });
+  assert.deepEqual(
+    normalizeDatasetListParams({
+      page: 2,
+      pageSize: 48,
+      search: "  Łódź  ",
+      readyOnly: true,
+    }),
+    { page: 2, pageSize: 48, search: "Łódź", readyOnly: true },
+  );
+  assert.equal(normalizeDatasetListParams({ search: "   " }).search, "");
+});
+
+test("demo search finds an off-page dataset and empty results normalize to page one", async () => {
+  await withDatasets(60, async (projectId) => {
+    const first = await demoAdapter.listDatasets(projectId);
+    assert.ok(first.items.every((item) => item.id !== "dataset-049"));
+
+    const found = await demoAdapter.listDatasets(projectId, {
+      search: "  DATASET 49  ",
+    });
+    assert.deepEqual(
+      found.items.map((item) => item.id),
+      ["dataset-049"],
+    );
+    assert.equal(found.totalCount, 1);
+    assert.equal(found.totalPages, 1);
+
+    const empty = await demoAdapter.listDatasets(projectId, {
+      page: 3,
+      search: "absent",
+    });
+    assert.deepEqual(empty.items, []);
+    assert.equal(empty.totalCount, 0);
+    assert.equal(empty.totalPages, 1);
+    assert.equal(empty.page, 1);
+  });
+});
+
+test("demo applies combined Unicode search and readiness before counting and paging", async () => {
+  await withDatasets(60, async (projectId, state) => {
+    state.datasets.forEach((item, index) => {
+      if (index >= 10) item.dataset.name = `Raport ŁÓDŹ ${index} 100%_`;
+      if (index % 2 === 1) item.dataset.currentVersion = null;
+    });
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(state));
+
+    const filtered = await demoAdapter.listDatasets(projectId, {
+      search: "raport łódź",
+      readyOnly: true,
+    });
+    assert.equal(filtered.totalCount, 25);
+    assert.equal(filtered.totalPages, 2);
+    assert.equal(filtered.items.length, 24);
+    assert.ok(filtered.items.every((item) => item.currentVersion !== null));
+
+    const last = await demoAdapter.listDatasets(projectId, {
+      page: 2,
+      search: "raport łódź",
+      readyOnly: true,
+    });
+    assert.deepEqual(
+      last.items.map((item) => item.id),
+      ["dataset-058"],
+    );
+    const reset = await demoAdapter.listDatasets(projectId, {
+      page: 3,
+      search: "raport łódź",
+      readyOnly: true,
+    });
+    assert.equal(reset.page, 1);
+    assert.deepEqual(reset.items, filtered.items);
+
+    const includingPending = await demoAdapter.listDatasets(projectId, {
+      search: "100%_",
+    });
+    assert.equal(includingPending.totalCount, 50);
+    assert.equal(includingPending.totalPages, 3);
+    assert.equal(
+      (await demoAdapter.listDatasets(projectId, { search: "missing%_" }))
+        .totalCount,
+      0,
+    );
+  });
+});
+
+test("project summary includes off-page ready rows and ignores list filters", async () => {
+  await withDatasets(25, async (projectId, state) => {
+    state.datasets.forEach((item, index) => {
+      item.dataset.currentVersion =
+        index === 0 || index === 24
+          ? {
+              ...item.dataset.currentVersion,
+              rowCount: index === 0 ? 0 : 850000,
+            }
+          : null;
+    });
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(state));
+    const expected = { totalCount: 25, readyCount: 2, totalRows: 850000 };
+    assert.deepEqual(await demoAdapter.getDatasetsSummary(projectId), expected);
+
+    await demoAdapter.listDatasets(projectId, { page: 2 });
+    await demoAdapter.listDatasets(projectId, {
+      search: "absent",
+      readyOnly: true,
+    });
+    assert.deepEqual(await demoAdapter.getDatasetsSummary(projectId), expected);
+    const otherProject = state.projects.find((item) => item.id !== projectId);
+    assert.deepEqual(await demoAdapter.getDatasetsSummary(otherProject.id), {
+      totalCount: 0,
+      readyCount: 0,
+      totalRows: 0,
+    });
+    await assert.rejects(
+      demoAdapter.getDatasetsSummary("missing-project"),
+      /not found/,
+    );
+  });
+});
+
+test("demo summary reflects import and deletion without loading every page", async () => {
+  await withDatasets(0, async (projectId) => {
+    const empty = { totalCount: 0, readyCount: 0, totalRows: 0 };
+    assert.deepEqual(await demoAdapter.getDatasetsSummary(projectId), empty);
+    const file = new File(["region,amount\nEurope,12\nAsia,15"], "sales.csv", {
+      type: "text/csv",
+    });
+
+    const imported = await demoAdapter.importCsv(projectId, file);
+    assert.deepEqual(await demoAdapter.getDatasetsSummary(projectId), {
+      totalCount: 1,
+      readyCount: 1,
+      totalRows: 2,
+    });
+    await demoAdapter.deleteDataset(projectId, imported.datasetId);
+    assert.deepEqual(await demoAdapter.getDatasetsSummary(projectId), empty);
+  });
+});
+
+test("API sends combined encoded filters and requests the global summary directly", async () => {
+  const previous = globalThis.fetch;
+  const calls = [];
+  const summary = { totalCount: 125, readyCount: 110, totalRows: 850000 };
+  const page = {
+    items: [],
+    page: 2,
+    pageSize: 48,
+    totalCount: 55,
+    totalPages: 2,
+  };
+  globalThis.fetch = async (url, options) => {
+    calls.push(url);
+    assert.equal(options.credentials, "include");
+    return new Response(
+      JSON.stringify(url.endsWith("/summary") ? summary : page),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  };
+  try {
+    assert.deepEqual(
+      await apiAdapter.listDatasets("project", {
+        page: 2,
+        pageSize: 48,
+        search: "  Łódź & 100%_  ",
+        readyOnly: true,
+      }),
+      page,
+    );
+    const requested = new URL(calls[0], "https://aperture.test");
+    assert.equal(requested.pathname, "/api/projects/project/datasets");
+    assert.deepEqual(Object.fromEntries(requested.searchParams), {
+      page: "2",
+      pageSize: "48",
+      search: "Łódź & 100%_",
+      readyOnly: "true",
+    });
+    assert.deepEqual(await apiAdapter.getDatasetsSummary("project"), summary);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1], "/api/projects/project/datasets/summary");
+  } finally {
+    globalThis.fetch = previous;
   }
 });

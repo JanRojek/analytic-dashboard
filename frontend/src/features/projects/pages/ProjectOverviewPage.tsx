@@ -2,6 +2,7 @@
 import {
   useDatasetProfile,
   useDatasets,
+  useDatasetsSummary,
   useDatasetUsage,
   useDeleteDataset,
 } from "../../data/hooks.ts";
@@ -140,18 +141,11 @@ export default function ProjectOverviewPage() {
   );
 
   const datasets = useDatasets(projectId);
+  const summary = useDatasetsSummary(projectId);
   const dashboards = useDashboards(projectId);
   const datasetUsage = useDatasetUsage(projectId, deletingDataset?.id);
   const removeDataset = useDeleteDataset(projectId);
   const removeDashboard = useDeleteDashboard(projectId);
-
-  const ready =
-    datasets.data?.items.filter((dataset) => dataset.currentVersion) ?? [];
-
-  const rowCount = ready.reduce(
-    (total, dataset) => total + (dataset.currentVersion?.rowCount ?? 0),
-    0,
-  );
 
   const dataPath = `/projects/${projectId}/data`;
 
@@ -181,19 +175,16 @@ export default function ProjectOverviewPage() {
           <span>
             <Icon name="data" size={17} /> Datasets
           </span>
-          <strong>{datasets.data?.totalCount ?? "—"}</strong>
-          <small>
-            {ready.length} ready in the {datasets.data?.items.length ?? 0} most
-            recent datasets
-          </small>
+          <strong>{summary.data?.totalCount ?? "—"}</strong>
+          <small>{summary.data?.readyCount ?? "—"} ready to work with</small>
         </div>
 
         <div>
           <span>
             <Icon name="list" size={17} /> Rows
           </span>
-          <strong>{rowCount.toLocaleString()}</strong>
-          <small>Across the ready datasets shown here</small>
+          <strong>{summary.data?.totalRows.toLocaleString() ?? "—"}</strong>
+          <small>Across all ready datasets</small>
         </div>
 
         <div>
@@ -204,6 +195,13 @@ export default function ProjectOverviewPage() {
           <small>Created in this project</small>
         </div>
       </div>
+
+      {summary.isError && (
+        <ErrorState
+          error={summary.error}
+          retry={() => void summary.refetch()}
+        />
+      )}
 
       {isEmptyProject && (
         <>

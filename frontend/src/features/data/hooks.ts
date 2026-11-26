@@ -1,8 +1,8 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
-import type { DataAdapter, PaginationParams } from "../../data/types";
-import { normalizePagination } from "../../data/pagination";
+import type { DataAdapter, DatasetListParams } from "../../data/types";
+import { normalizeDatasetListParams } from "../../data/pagination";
 
 async function findDatasetUsage(
   adapter: DataAdapter,
@@ -28,16 +28,33 @@ async function findDatasetUsage(
 
 export function useDatasets(
   projectId: string,
-  pagination: PaginationParams = {},
+  params: DatasetListParams = {},
   enabled = true,
 ) {
   const { adapter } = useSession();
-  const { page, pageSize } = normalizePagination(pagination);
+  const filters = normalizeDatasetListParams(params);
+  const { page, pageSize, search, readyOnly } = filters;
 
   return useQuery({
-    queryKey: queryKeys.datasets.page(projectId, page, pageSize),
-    queryFn: () => adapter.listDatasets(projectId, { page, pageSize }),
+    queryKey: queryKeys.datasets.page(
+      projectId,
+      page,
+      pageSize,
+      search,
+      readyOnly,
+    ),
+    queryFn: () => adapter.listDatasets(projectId, filters),
     enabled: enabled && Boolean(projectId),
+  });
+}
+
+export function useDatasetsSummary(projectId: string) {
+  const { adapter } = useSession();
+
+  return useQuery({
+    queryKey: queryKeys.datasets.summary(projectId),
+    queryFn: () => adapter.getDatasetsSummary(projectId),
+    enabled: Boolean(projectId),
   });
 }
 

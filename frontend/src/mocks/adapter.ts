@@ -1,5 +1,5 @@
 import type { DataAdapter, Dataset, Project, Widget } from "../data/types.ts";
-import { normalizePagination } from "../data/pagination.ts";
+import { normalizeDatasetListParams } from "../data/pagination.ts";
 import { parseCsv } from "./csv.ts";
 import { profileRows, queryRows } from "./analytics.ts";
 import {
@@ -76,18 +76,24 @@ export const demoAdapter: DataAdapter = {
       for (const datasetId of datasetIds) delete state.recipes[datasetId];
     });
   },
-  async listDatasets(p, pagination) {
+  async listDatasets(p, params) {
     const state = readDemoState();
     requireProject(state, p);
+    const normalized = normalizeDatasetListParams(params);
+    const term = normalized.search.toLowerCase();
     const datasets = state.datasets
       .filter((item) => item.projectId === p)
       .map((item) => item.dataset)
+      .filter(
+        (dataset) =>
+          (!normalized.readyOnly || dataset.currentVersion !== null) &&
+          dataset.name.toLowerCase().includes(term),
+      )
       .sort(
         (a, b) =>
           b.createdAtUtc.localeCompare(a.createdAtUtc) ||
           a.id.localeCompare(b.id),
       );
-    const normalized = normalizePagination(pagination);
     const totalCount = datasets.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / normalized.pageSize));
     const page = normalized.page <= totalPages ? normalized.page : 1;
@@ -99,6 +105,22 @@ export const demoAdapter: DataAdapter = {
       pageSize: normalized.pageSize,
       totalCount,
       totalPages,
+    };
+  },
+  async getDatasetsSummary(p) {
+    const state = readDemoState();
+    requireProject(state, p);
+    const datasets = state.datasets.filter((item) => item.projectId === p);
+    const ready = datasets.filter(
+      (item) => item.dataset.currentVersion !== null,
+    );
+    return {
+      totalCount: datasets.length,
+      readyCount: ready.length,
+      totalRows: ready.reduce(
+        (sum, item) => sum + item.dataset.currentVersion!.rowCount,
+        0,
+      ),
     };
   },
   async getDataset(p, d) {

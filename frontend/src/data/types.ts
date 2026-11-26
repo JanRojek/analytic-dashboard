@@ -40,6 +40,17 @@ export interface PaginationParams {
   pageSize?: number;
 }
 
+export interface DatasetListParams extends PaginationParams {
+  search?: string;
+  readyOnly?: boolean;
+}
+
+export interface DatasetSummary {
+  totalCount: number;
+  readyCount: number;
+  totalRows: number;
+}
+
 export interface PagedResult<T> {
   items: T[];
   page: number;
@@ -158,8 +169,9 @@ export interface DataAdapter {
   deleteProject(projectId: string): Promise<void>;
   listDatasets(
     projectId: string,
-    pagination?: PaginationParams,
+    params?: DatasetListParams,
   ): Promise<PagedResult<Dataset>>;
+  getDatasetsSummary(projectId: string): Promise<DatasetSummary>;
   getDataset(projectId: string, datasetId: string): Promise<Dataset>;
   getImportStatus(
     projectId: string,

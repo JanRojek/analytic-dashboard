@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Group, Pagination, Select } from "@mantine/core";
+import { Button, Group, Pagination, Select } from "@mantine/core";
+import { useDebouncedValue } from "@mantine/hooks";
 
 import { ErrorState } from "../../../components/Feedback";
 import { useDataset, useDatasets } from "../hooks";
@@ -16,9 +17,16 @@ export function DatasetSelect({
   disabled?: boolean;
 }) {
   const [page, setPage] = useState(1);
-  const datasets = useDatasets(projectId, { page });
+  const [search, setSearch] = useState("");
+  const [debouncedSearch] = useDebouncedValue(search, 300);
+  const searching = search !== debouncedSearch;
+  const datasets = useDatasets(
+    projectId,
+    { page, search: debouncedSearch, readyOnly: true },
+    !searching,
+  );
   const selected = useDataset(projectId, value ?? "", Boolean(value));
-  const items = datasets.data?.items ?? [];
+  const items = searching ? [] : (datasets.data?.items ?? []);
   const options =
     selected.data && !items.some((item) => item.id === selected.data.id)
       ? [selected.data, ...items]
@@ -31,8 +39,19 @@ export function DatasetSelect({
         placeholder={
           datasets.isPending ? "Loading datasets…" : "Choose a dataset"
         }
-        description="Browse pages; the filter searches displayed options only. Only ready datasets can be selected."
+        description="Search all ready datasets in this project."
         searchable
+        filter={({ options }) => options}
+        nothingFoundMessage={
+          searching || datasets.isPending
+            ? "Searching…"
+            : "No matching ready datasets"
+        }
+        // Select also changes its search label on blur and selection; only typing filters the API.
+        onInput={(event) => {
+          setSearch(event.currentTarget.value);
+          setPage(1);
+        }}
         data={options.map((dataset) => ({
           value: dataset.id,
           label: dataset.currentVersion
@@ -41,9 +60,15 @@ export function DatasetSelect({
           disabled: !dataset.currentVersion,
         }))}
         value={value}
-        disabled={disabled || (datasets.isPending && !selected.data)}
+        disabled={disabled}
         allowDeselect={false}
-        onChange={(datasetId) => datasetId && onChange(datasetId)}
+        onChange={(datasetId) => {
+          if (datasetId) {
+            setSearch("");
+            setPage(1);
+            onChange(datasetId);
+          }
+        }}
       />
       {datasets.isError && (
         <ErrorState
@@ -57,12 +82,30 @@ export function DatasetSelect({
           retry={() => void selected.refetch()}
         />
       )}
-      {datasets.data?.totalCount === 0 && (
+      {!searching && datasets.data?.totalCount === 0 && (
         <p className="analytics-note">
-          Import a dataset into this project to choose a source.
+          {debouncedSearch.trim()
+            ? "No ready datasets match this search."
+            : "No ready datasets are available in this project yet."}
         </p>
       )}
-      {datasets.data && (
+      {search && (
+        <Group gap="xs" mt="xs">
+          <span className="analytics-note">Search: {search}</span>
+          <Button
+            variant="subtle"
+            size="compact-xs"
+            disabled={disabled}
+            onClick={() => {
+              setSearch("");
+              setPage(1);
+            }}
+          >
+            Clear search
+          </Button>
+        </Group>
+      )}
+      {!searching && datasets.data && (
         <Group gap="xs" mt="xs">
           <span className="analytics-note">
             Page {datasets.data.page} of {datasets.data.totalPages} ·{" "}

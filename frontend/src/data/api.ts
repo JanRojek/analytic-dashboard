@@ -5,6 +5,7 @@ import type {
   Dataset,
   DatasetProfile,
   DatasetRowsPage,
+  DatasetSummary,
   PagedResult,
   Project,
   QueryItem,
@@ -14,7 +15,7 @@ import type {
   UpdateDashboardWidgetsResponse,
 } from "./types";
 
-import { normalizePagination } from "./pagination.ts";
+import { normalizeDatasetListParams } from "./pagination.ts";
 
 const sessionExpiryListeners = new Set<() => void>();
 
@@ -190,12 +191,19 @@ export const apiAdapter: DataAdapter = {
   renameProject: (p, name) =>
     request<Project>(projectPath(p), json({ name }, "PATCH")),
   deleteProject: (p) => request<void>(projectPath(p), { method: "DELETE" }),
-  listDatasets(p, pagination) {
-    const { page, pageSize } = normalizePagination(pagination);
-    return request<PagedResult<Dataset>>(
-      `${datasetPath(p)}?page=${page}&pageSize=${pageSize}`,
-    );
+  listDatasets(p, params) {
+    const { page, pageSize, search, readyOnly } =
+      normalizeDatasetListParams(params);
+    const query = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (search) query.set("search", search);
+    if (readyOnly) query.set("readyOnly", "true");
+    return request<PagedResult<Dataset>>(`${datasetPath(p)}?${query}`);
   },
+  getDatasetsSummary: (p) =>
+    request<DatasetSummary>(`${datasetPath(p)}/summary`),
   getDataset: (p, d) => request<Dataset>(datasetPath(p, d)),
   getImportStatus: (p, d) =>
     request<ImportStatus>(`${datasetPath(p, d)}/import-status`),
