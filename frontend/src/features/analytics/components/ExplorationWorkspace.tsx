@@ -1,5 +1,5 @@
-﻿import { useState } from "react";
-import { Button, SegmentedControl, Select, TextInput } from "@mantine/core";
+﻿import { useState, type ReactNode } from "react";
+import { Button, SegmentedControl, TextInput } from "@mantine/core";
 
 import { Chart } from "../../../components/Charts";
 import {
@@ -30,16 +30,14 @@ export function ExplorationWorkspace({
   projectId,
   scope,
   dataset,
-  datasets,
+  datasetSelector,
   profile,
-  onDataset,
 }: {
   projectId: string;
   scope: string;
   dataset: Dataset;
-  datasets: Dataset[];
+  datasetSelector: ReactNode;
   profile: DatasetProfile;
-  onDataset: (id: string) => void;
 }) {
   const [config, setConfig] = useState<WidgetInput>(() => {
     const draft = readExploration(scope);
@@ -94,15 +92,7 @@ export function ExplorationWorkspace({
           <div className="analytics-section-label">
             <span className="step-number">1</span> Choose your data
           </div>
-          <Select
-            aria-label="Dataset"
-            data={datasets
-              .filter((item) => item.currentVersion)
-              .map((item) => ({ value: item.id, label: item.name }))}
-            value={dataset.id}
-            onChange={(value) => value && onDataset(value)}
-            allowDeselect={false}
-          />
+          {datasetSelector}
           <div className="dataset-source-note">
             <Icon name="data" size={14} />
             {profile.rowCount.toLocaleString()} rows · {profile.columnCount}{" "}

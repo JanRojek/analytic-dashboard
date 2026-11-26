@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Button, Select, TextInput } from "@mantine/core";
+import { Button, TextInput } from "@mantine/core";
 
 import { ErrorState } from "../../../components/Feedback";
 import type {
@@ -9,7 +9,8 @@ import type {
   WidgetLayout,
 } from "../../../data/types";
 import { useSession } from "../../../session/SessionContext";
-import { useDatasetProfile, useDatasets } from "../../data/hooks";
+import { useDataset, useDatasetProfile } from "../../data/hooks";
+import { DatasetSelect } from "../../data/components/DatasetSelect";
 import { useCreateWidget } from "../../dashboards/hooks";
 
 import { defaults, queryCaption } from "../chartConfig";
@@ -35,7 +36,11 @@ export function DraftChartInspector({
 }: DraftChartInspectorProps) {
   const { adapter, mode } = useSession();
   const createWidget = useCreateWidget(dashboard.projectId);
-  const datasets = useDatasets(dashboard.projectId);
+  const dataset = useDataset(
+    dashboard.projectId,
+    draft.datasetId ?? "",
+    Boolean(draft.datasetId),
+  );
   const profile = useDatasetProfile(
     dashboard.projectId,
     draft.datasetId ?? "",
@@ -51,12 +56,8 @@ export function DraftChartInspector({
       }
     : null;
 
-  const availableDatasets = (datasets.data ?? []).filter((dataset) =>
-    Boolean(dataset.currentVersion),
-  );
-  const datasetIsAvailable = availableDatasets.some(
-    (dataset) => dataset.id === draft.datasetId,
-  );
+  const datasetIsAvailable =
+    Boolean(dataset.data?.currentVersion) && !dataset.isError;
   const canApply = Boolean(
     datasetIsAvailable && query?.groupByColumn && query.measureColumn,
   );
@@ -118,62 +119,39 @@ export function DraftChartInspector({
 
       <span className="inspector-label">Data &amp; question</span>
 
-      {datasets.isPending ? (
-        <p className="muted">Loading project datasets…</p>
-      ) : datasets.isError ? (
-        <ErrorState error={datasets.error} retry={() => datasets.refetch()} />
-      ) : availableDatasets.length === 0 ? (
-        <p className="analytics-note">
-          Import a dataset into this project before configuring your chart.
-        </p>
-      ) : (
+      <DatasetSelect
+        projectId={dashboard.projectId}
+        value={draft.datasetId}
+        disabled={create.isPending}
+        onChange={(datasetId) => {
+          if (datasetId === draft.datasetId) return;
+          onChange({
+            datasetId,
+            groupByColumn: null,
+            measureColumn: null,
+            aggregation: null,
+          });
+        }}
+      />
+
+      {draft.datasetId && (
         <>
-          <Select
-            label="Source dataset"
-            placeholder="Choose a dataset"
-            searchable
-            data={availableDatasets.map((dataset) => ({
-              value: dataset.id,
-              label: dataset.name,
-            }))}
-            value={draft.datasetId}
-            disabled={create.isPending}
-            allowDeselect={false}
-            onChange={(datasetId) => {
-              if (!datasetId || datasetId === draft.datasetId) return;
-
-              onChange({
-                datasetId,
-                groupByColumn: null,
-                measureColumn: null,
-                aggregation: null,
-              });
-            }}
-          />
-
-          {draft.datasetId && (
+          {profile.isPending ? (
+            <p className="muted">Reading dataset columns…</p>
+          ) : profile.isError ? (
+            <ErrorState error={profile.error} retry={() => profile.refetch()} />
+          ) : profile.data && query ? (
             <>
-              {profile.isPending ? (
-                <p className="muted">Reading dataset columns…</p>
-              ) : profile.isError ? (
-                <ErrorState
-                  error={profile.error}
-                  retry={() => profile.refetch()}
-                />
-              ) : profile.data && query ? (
-                <>
-                  <QueryFields
-                    profile={profile.data}
-                    config={query}
-                    onChange={(updated) => onChange(updated)}
-                  />
-                  {canApply && (
-                    <p className="analytics-note">{queryCaption(query)}</p>
-                  )}
-                </>
-              ) : null}
+              <QueryFields
+                profile={profile.data}
+                config={query}
+                onChange={(updated) => onChange(updated)}
+              />
+              {canApply && (
+                <p className="analytics-note">{queryCaption(query)}</p>
+              )}
             </>
-          )}
+          ) : null}
         </>
       )}
 

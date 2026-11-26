@@ -1,4 +1,5 @@
 import type { DataAdapter, Dataset, Project, Widget } from "../data/types.ts";
+import { normalizePagination } from "../data/pagination.ts";
 import { parseCsv } from "./csv.ts";
 import { profileRows, queryRows } from "./analytics.ts";
 import {
@@ -75,12 +76,30 @@ export const demoAdapter: DataAdapter = {
       for (const datasetId of datasetIds) delete state.recipes[datasetId];
     });
   },
-  async listDatasets(p) {
+  async listDatasets(p, pagination) {
     const state = readDemoState();
     requireProject(state, p);
-    return state.datasets
+    const datasets = state.datasets
       .filter((item) => item.projectId === p)
-      .map((item) => item.dataset);
+      .map((item) => item.dataset)
+      .sort(
+        (a, b) =>
+          b.createdAtUtc.localeCompare(a.createdAtUtc) ||
+          a.id.localeCompare(b.id),
+      );
+    const normalized = normalizePagination(pagination);
+    const totalCount = datasets.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / normalized.pageSize));
+    const page = normalized.page <= totalPages ? normalized.page : 1;
+    const offset = (page - 1) * normalized.pageSize;
+
+    return {
+      items: datasets.slice(offset, offset + normalized.pageSize),
+      page,
+      pageSize: normalized.pageSize,
+      totalCount,
+      totalPages,
+    };
   },
   async getDataset(p, d) {
     return requireDataset(readDemoState(), p, d).dataset;

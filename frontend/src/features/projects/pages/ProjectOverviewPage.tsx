@@ -146,7 +146,7 @@ export default function ProjectOverviewPage() {
   const removeDashboard = useDeleteDashboard(projectId);
 
   const ready =
-    datasets.data?.filter((dataset) => dataset.currentVersion) ?? [];
+    datasets.data?.items.filter((dataset) => dataset.currentVersion) ?? [];
 
   const rowCount = ready.reduce(
     (total, dataset) => total + (dataset.currentVersion?.rowCount ?? 0),
@@ -158,7 +158,7 @@ export default function ProjectOverviewPage() {
   const isEmptyProject =
     !datasets.isPending &&
     !dashboards.isPending &&
-    (datasets.data?.length ?? 0) === 0 &&
+    (datasets.data?.totalCount ?? 0) === 0 &&
     (dashboards.data?.length ?? 0) === 0;
 
   return (
@@ -181,8 +181,11 @@ export default function ProjectOverviewPage() {
           <span>
             <Icon name="data" size={17} /> Datasets
           </span>
-          <strong>{datasets.data?.length ?? "—"}</strong>
-          <small>{ready.length} ready to work with</small>
+          <strong>{datasets.data?.totalCount ?? "—"}</strong>
+          <small>
+            {ready.length} ready in the {datasets.data?.items.length ?? 0} most
+            recent datasets
+          </small>
         </div>
 
         <div>
@@ -190,7 +193,7 @@ export default function ProjectOverviewPage() {
             <Icon name="list" size={17} /> Rows
           </span>
           <strong>{rowCount.toLocaleString()}</strong>
-          <small>Across ready datasets</small>
+          <small>Across the ready datasets shown here</small>
         </div>
 
         <div>
@@ -254,14 +257,14 @@ export default function ProjectOverviewPage() {
         </>
       )}
 
-      {!!datasets.data?.length && (
+      {!!datasets.data?.totalCount && (
         <section className="quality-panel">
           <div className="panel-heading quality-panel-heading">
             <div>
               <h2>Data quality</h2>
               <p>
-                Review detected issues dataset by dataset before you build on
-                top of them.
+                Review the {datasets.data?.items.length ?? 0} most recent
+                datasets. Open all data to browse the remaining datasets.
               </p>
             </div>
 
@@ -271,7 +274,7 @@ export default function ProjectOverviewPage() {
           </div>
 
           <div className="quality-dataset-list">
-            {datasets.data.map((dataset) => (
+            {datasets.data.items.map((dataset) => (
               <DatasetQualityItem
                 key={dataset.id}
                 projectId={projectId}
@@ -299,7 +302,7 @@ export default function ProjectOverviewPage() {
                 error={datasets.error}
                 retry={() => void datasets.refetch()}
               />
-            ) : !datasets.data?.length ? (
+            ) : !datasets.data?.totalCount ? (
               <EmptyState
                 icon="data"
                 title="No datasets yet"
@@ -311,7 +314,7 @@ export default function ProjectOverviewPage() {
                 }
               />
             ) : (
-              datasets.data.slice(0, 4).map((dataset) => (
+              datasets.data.items.slice(0, 4).map((dataset) => (
                 <div className="resource-row" key={dataset.id}>
                   <Link
                     to={`${dataPath}/${dataset.id}`}

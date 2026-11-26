@@ -263,7 +263,7 @@ test("a complete local journey persists imports, prepared datasets, dashboards a
     );
     await demoAdapter.deleteWidget(project.id, dashboard.id, widget.id);
     await demoAdapter.deleteDataset(project.id, prepared.id);
-    assert.equal((await demoAdapter.listDatasets(project.id)).length, 1);
+    assert.equal((await demoAdapter.listDatasets(project.id)).totalCount, 1);
     await demoAdapter.deleteProject(project.id);
     await assert.rejects(demoAdapter.getProject(project.id), /not found/);
   } finally {

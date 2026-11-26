@@ -8,9 +8,11 @@ import {
   PageHeading,
 } from "../../../components/Feedback";
 import { Icon } from "../../../components/Icon";
-import { useDatasets, useDatasetProfile } from "../../data/hooks";
+import { useDataset, useDatasets, useDatasetProfile } from "../../data/hooks";
 import { useSession } from "../../../session/SessionContext";
 import { editorScope, readExploration } from "../../../mocks/editor";
+
+import { DatasetSelect } from "../../data/components/DatasetSelect";
 
 import { ExplorationWorkspace } from "../components/ExplorationWorkspace";
 
@@ -21,17 +23,26 @@ export function ExplorePage() {
 
   const scope = editorScope(mode, session?.user.id || "", projectId);
   const draft = readExploration(scope);
-  const datasets = useDatasets(projectId);
-
   const selected = params.get("dataset") || draft?.datasetId;
-  const dataset =
-    datasets.data?.find((item) => item.id === selected) ||
-    datasets.data?.find((item) => item.currentVersion);
+  const datasets = useDatasets(projectId, {}, !selected);
+  const datasetId =
+    selected ||
+    datasets.data?.items.find((item) => item.currentVersion)?.id ||
+    "";
+  const detail = useDataset(projectId, datasetId, Boolean(datasetId));
+  const dataset = detail.data;
+  const datasetSelector = (
+    <DatasetSelect
+      projectId={projectId}
+      value={datasetId || null}
+      onChange={(id) => setParams({ dataset: id })}
+    />
+  );
 
   const profile = useDatasetProfile(
     projectId,
     dataset?.id ?? "",
-    Boolean(dataset),
+    Boolean(dataset?.currentVersion),
   );
 
   return (
@@ -42,21 +53,33 @@ export function ExplorePage() {
         description="Start with a comparison. Shape it into a chart. Give it a place on your dashboard."
       />
 
-      {datasets.isPending ? (
+      {(!selected && datasets.isPending) ||
+      (Boolean(datasetId) && detail.isPending) ? (
         <LoadingState />
-      ) : datasets.isError ? (
+      ) : detail.isError ? (
+        <>
+          {datasetSelector}
+          <ErrorState
+            error={detail.error}
+            retry={() => void detail.refetch()}
+          />
+        </>
+      ) : !selected && datasets.isError ? (
         <ErrorState error={datasets.error} retry={() => datasets.refetch()} />
-      ) : !dataset ? (
-        <EmptyState
-          icon="chart"
-          title="Every insight starts with data"
-          description="Add a dataset to your project, then explore its patterns here."
-          action={
-            <Button component={Link} to={`/projects/${projectId}/data`}>
-              Go to data <Icon name="arrow" />
-            </Button>
-          }
-        />
+      ) : !dataset?.currentVersion ? (
+        <>
+          {datasetSelector}
+          <EmptyState
+            icon="chart"
+            title="Choose a ready dataset"
+            description="Browse the dataset pages above, or import a new source. Datasets still being imported cannot be explored yet."
+            action={
+              <Button component={Link} to={`/projects/${projectId}/data`}>
+                Go to data <Icon name="arrow" />
+              </Button>
+            }
+          />
+        </>
       ) : profile.isPending ? (
         <LoadingState label="Reading the dataset columns…" />
       ) : profile.isError ? (
@@ -67,9 +90,8 @@ export function ExplorePage() {
           projectId={projectId}
           scope={scope}
           dataset={dataset}
-          datasets={datasets.data || []}
+          datasetSelector={datasetSelector}
           profile={profile.data}
-          onDataset={(id) => setParams({ dataset: id })}
         />
       )}
     </div>

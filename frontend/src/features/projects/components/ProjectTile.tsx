@@ -24,7 +24,7 @@ export function ProjectTile({
   onRename: () => void;
   onDelete: () => void;
 }) {
-  const datasets = useDatasets(project.id);
+  const datasets = useDatasets(project.id, { pageSize: 1 });
   const dashboards = useDashboards(project.id);
   return (
     <article className={`project-card project-tone-${index % 3}`}>
@@ -60,7 +60,7 @@ export function ProjectTile({
             </div>
           </div>
           <span className="project-preview-tag">
-            {datasets.data?.length ? "IN PROGRESS" : "GETTING STARTED"}
+            {datasets.data?.totalCount ? "IN PROGRESS" : "GETTING STARTED"}
           </span>
         </div>
         <div className="project-card-content">
@@ -72,8 +72,8 @@ export function ProjectTile({
           <div className="project-card-meta">
             <span>
               <Icon name="data" size={14} />
-              {datasets.data?.length ?? "—"}{" "}
-              {datasets.data?.length === 1 ? "dataset" : "datasets"}
+              {datasets.data?.totalCount ?? "—"}{" "}
+              {datasets.data?.totalCount === 1 ? "dataset" : "datasets"}
             </span>
             <span>
               <Icon name="dashboard" size={14} />

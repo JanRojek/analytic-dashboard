@@ -1,7 +1,8 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
-import type { DataAdapter } from "../../data/types";
+import type { DataAdapter, PaginationParams } from "../../data/types";
+import { normalizePagination } from "../../data/pagination";
 
 async function findDatasetUsage(
   adapter: DataAdapter,
@@ -25,13 +26,18 @@ async function findDatasetUsage(
   return usages.filter((usage) => usage.count > 0);
 }
 
-export function useDatasets(projectId: string, enabled = true) {
+export function useDatasets(
+  projectId: string,
+  pagination: PaginationParams = {},
+  enabled = true,
+) {
   const { adapter } = useSession();
+  const { page, pageSize } = normalizePagination(pagination);
 
   return useQuery({
-    queryKey: queryKeys.datasets.list(projectId),
-    queryFn: () => adapter.listDatasets(projectId),
-    enabled,
+    queryKey: queryKeys.datasets.page(projectId, page, pageSize),
+    queryFn: () => adapter.listDatasets(projectId, { page, pageSize }),
+    enabled: enabled && Boolean(projectId),
   });
 }
 
@@ -111,12 +117,17 @@ export function useDeleteDataset(projectId: string) {
   });
 }
 
-export function useDataset(projectId: string, datasetId: string) {
+export function useDataset(
+  projectId: string,
+  datasetId: string,
+  enabled = true,
+) {
   const { adapter } = useSession();
 
   return useQuery({
     queryKey: queryKeys.datasets.detail(projectId, datasetId),
     queryFn: () => adapter.getDataset(projectId, datasetId),
+    enabled: enabled && Boolean(projectId && datasetId),
   });
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useDatasets, useDatasetUsage, useDeleteDataset } from "../hooks";
 
@@ -8,10 +8,12 @@ import {
   Button,
   Menu,
   Modal,
+  Pagination,
+  Select,
   TextInput,
 } from "@mantine/core";
 
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Icon } from "../../../components/Icon";
 
@@ -24,6 +26,8 @@ import {
 
 import { ImportDataDialog } from "../components/ImportDataDialog";
 
+import { normalizePagination } from "../../../data/pagination";
+
 import type { Dataset } from "../../../data/types";
 import { number, date } from "../formatters";
 
@@ -34,16 +38,55 @@ export function DataPage() {
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<Dataset | null>(null);
 
-  const datasets = useDatasets(projectId);
+  const [params, setParams] = useSearchParams();
+  const pagination = normalizePagination({
+    page: Number(params.get("page") ?? 1),
+    pageSize: Number(params.get("pageSize") ?? 24),
+  });
+  const datasets = useDatasets(projectId, pagination);
+  const result = datasets.data;
+
+  useEffect(() => {
+    if (!result) return;
+    if (
+      params.get("page") === String(result.page) &&
+      params.get("pageSize") === String(result.pageSize)
+    )
+      return;
+
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("page", String(result.page));
+        next.set("pageSize", String(result.pageSize));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [result, params, setParams]);
+
+  function changePage(
+    page: number,
+    pageSize = result?.pageSize ?? pagination.pageSize,
+  ) {
+    setSearch("");
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("page", String(page));
+      next.set("pageSize", String(pageSize));
+      return next;
+    });
+  }
   const usage = useDatasetUsage(projectId, deleting?.id);
   const remove = useDeleteDataset(projectId);
 
   const visible =
-    datasets.data?.filter((item) =>
+    datasets.data?.items.filter((item) =>
       item.name.toLowerCase().includes(search.toLowerCase()),
     ) ?? [];
 
-  const ready = datasets.data?.filter((item) => item.currentVersion) ?? [];
+  const ready =
+    datasets.data?.items.filter((item) => item.currentVersion) ?? [];
 
   return (
     <div className="page-content data-page">
@@ -92,7 +135,7 @@ export function DataPage() {
           error={datasets.error}
           retry={() => void datasets.refetch()}
         />
-      ) : !datasets.data.length ? (
+      ) : !datasets.data.totalCount ? (
         <EmptyState
           icon="data"
           title="Good questions start with data."
@@ -111,7 +154,7 @@ export function DataPage() {
           <div className="data-list-heading">
             <div>
               <h2>
-                All datasets <span>{datasets.data.length}</span>
+                All datasets <span>{datasets.data.totalCount}</span>
               </h2>
               <p>
                 {number.format(
@@ -121,12 +164,13 @@ export function DataPage() {
                     0,
                   ),
                 )}{" "}
-                rows across your project
+                rows on this page
               </p>
             </div>
             <TextInput
-              placeholder="Find a dataset…"
-              aria-label="Find a dataset"
+              placeholder="Filter this page…"
+              description="Filters the current page. Browse other pages to find more datasets."
+              aria-label="Filter datasets on this page"
               value={search}
               onChange={(event) => setSearch(event.currentTarget.value)}
               leftSection={<Icon name="search" size={16} />}
@@ -237,10 +281,44 @@ export function DataPage() {
               </table>
               {!visible.length && (
                 <div className="data-no-results">
-                  No datasets match “{search}”.{" "}
+                  No datasets on this page match “{search}”.{" "}
                   <button onClick={() => setSearch("")}>Clear search</button>
                 </div>
               )}
+            </div>
+          </div>
+          <div className="data-preview-footer">
+            <span>
+              Showing {(datasets.data.page - 1) * datasets.data.pageSize + 1}–
+              {Math.min(
+                datasets.data.page * datasets.data.pageSize,
+                datasets.data.totalCount,
+              )}{" "}
+              of {datasets.data.totalCount} datasets
+            </span>
+            <div className="data-preview-controls">
+              {datasets.data.totalPages > 1 && (
+                <Pagination
+                  value={datasets.data.page}
+                  total={datasets.data.totalPages}
+                  onChange={(page) => changePage(page)}
+                  size="sm"
+                />
+              )}
+              <Select
+                aria-label="Datasets per page"
+                size="xs"
+                w={145}
+                value={String(datasets.data.pageSize)}
+                data={[...new Set([24, 48, 96, datasets.data.pageSize])]
+                  .sort((a, b) => a - b)
+                  .map((size) => ({
+                    value: String(size),
+                    label: `${size} per page`,
+                  }))}
+                allowDeselect={false}
+                onChange={(value) => value && changePage(1, Number(value))}
+              />
             </div>
           </div>
           <p className="data-footnote">

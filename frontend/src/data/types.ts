@@ -35,6 +35,19 @@ export interface ImportStatus {
   errorMessage: string | null;
 }
 
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface Dataset {
   id: string;
   name: string;
@@ -143,7 +156,10 @@ export interface DataAdapter {
   createProject(name: string, description?: string): Promise<Project>;
   renameProject(projectId: string, name: string): Promise<Project>;
   deleteProject(projectId: string): Promise<void>;
-  listDatasets(projectId: string): Promise<Dataset[]>;
+  listDatasets(
+    projectId: string,
+    pagination?: PaginationParams,
+  ): Promise<PagedResult<Dataset>>;
   getDataset(projectId: string, datasetId: string): Promise<Dataset>;
   getImportStatus(
     projectId: string,
