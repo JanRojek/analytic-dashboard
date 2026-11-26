@@ -39,6 +39,8 @@ public sealed class GetDatasetsHandler
         var totalCount = await _datasetRepository.CountByProjectAndOwnerAsync(
             query.ProjectId,
             query.OwnerId,
+            query.Search,
+            query.ReadyOnly,
             cancellationToken
         );
 
@@ -50,6 +52,8 @@ public sealed class GetDatasetsHandler
         var datasets = await _datasetRepository.GetPageByProjectAndOwnerAsync(
             query.ProjectId,
             query.OwnerId,
+            query.Search,
+            query.ReadyOnly,
             pagination.Skip,
             pagination.PageSize,
             cancellationToken

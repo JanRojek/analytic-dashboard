@@ -11,6 +11,7 @@ using AnalyticDashboard.Application.Datasets.GetDatasets;
 using AnalyticDashboard.Application.Datasets.ImportCsvDataset;
 using AnalyticDashboard.Domain.Analytics;
 using AnalyticDashboard.Application.Datasets.GetDatasetRows;
+using AnalyticDashboard.Application.Datasets.GetDatasetsSummary;
 using AnalyticDashboard.Application.Datasets.GetImportStatus;
 using AnalyticDashboard.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
@@ -134,7 +135,9 @@ public static class DatasetEndpoints
             ClaimsPrincipal user,
             CancellationToken cancellationToken,
             int page = PaginationRequest.DefaultPage,
-            int pageSize = PaginationRequest.DefaultPageSize) =>
+            int pageSize = PaginationRequest.DefaultPageSize,
+            string? search = null,
+            bool readyOnly = false) =>
         {
             if (!user.TryGetUserId(out var ownerId))
             {
@@ -144,7 +147,9 @@ public static class DatasetEndpoints
             var query = new GetDatasetsQuery(
                 projectId,
                 ownerId,
-                new PaginationRequest(page, pageSize)
+                new PaginationRequest(page, pageSize),
+                search,
+                readyOnly
             );
 
             var result = await handler.HandleAsync(
@@ -568,6 +573,47 @@ public static class DatasetEndpoints
         .Produces(
             StatusCodes.Status404NotFound
         );
+
+        datasets.MapGet("/summary", async (
+            Guid projectId,
+            GetDatasetsSummaryHandler handler,
+            ClaimsPrincipal user,
+            CancellationToken cancellationToken) =>
+        {
+            if (!user.TryGetUserId(out var ownerId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var query = new GetDatasetsSummaryQuery(
+                projectId,
+                ownerId
+            );
+
+            var result = await handler.HandleAsync(
+                query,
+                cancellationToken
+            );
+
+            return result switch
+            {
+                GetDatasetsSummaryResult.Success success =>
+                    Results.Ok(new GetDatasetsSummaryResponse(
+                        success.TotalCount,
+                        success.ReadyCount,
+                        success.TotalRows
+                    )),
+
+                GetDatasetsSummaryResult.NotFound =>
+                    Results.NotFound(),
+
+                _ => Results.Problem()
+            };
+        })
+        .WithName("GetDatasetsSummary")
+        .Produces<GetDatasetsSummaryResponse>()
+        .Produces(StatusCodes.Status401Unauthorized)
+        .Produces(StatusCodes.Status404NotFound);
 
         return app;
     }

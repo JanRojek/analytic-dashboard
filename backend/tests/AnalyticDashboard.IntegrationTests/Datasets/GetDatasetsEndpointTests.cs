@@ -24,7 +24,9 @@ public sealed class GetDatasetsEndpointTests : IClassFixture<ApiFixture>
         Guid projectId,
         Guid? userId = null,
         int? page = null,
-        int? pageSize = null)
+        int? pageSize = null,
+        string? search = null,
+        bool? readyOnly = null)
     {
         var queryParameters = new List<string>();
 
@@ -36,6 +38,16 @@ public sealed class GetDatasetsEndpointTests : IClassFixture<ApiFixture>
         if (pageSize.HasValue)
         {
             queryParameters.Add($"pageSize={pageSize.Value}");
+        }
+
+        if (search is not null)
+        {
+            queryParameters.Add($"search={Uri.EscapeDataString(search)}");
+        }
+
+        if (readyOnly.HasValue)
+        {
+            queryParameters.Add($"readyOnly={readyOnly.Value.ToString().ToLowerInvariant()}");
         }
 
         var url = $"/projects/{projectId}/datasets";
@@ -77,6 +89,36 @@ public sealed class GetDatasetsEndpointTests : IClassFixture<ApiFixture>
         dbContext.Datasets.AddRange(datasets);
 
         await dbContext.SaveChangesAsync(CancellationToken);
+    }
+
+    private async Task AddVersionsAndSetCurrentAsync(
+        IReadOnlyCollection<DatasetVersion> versions,
+        params (Dataset Dataset, DatasetVersion Version)[] currentVersions)
+    {
+        await using var scope = _fixture.Services.CreateAsyncScope();
+
+        var dbContext = scope.ServiceProvider
+            .GetRequiredService<AppDbContext>();
+
+        dbContext.DatasetVersions.AddRange(versions);
+        await dbContext.SaveChangesAsync(CancellationToken);
+
+        foreach (var (dataset, version) in currentVersions)
+        {
+            Assert.Equal(dataset.Id, version.DatasetId);
+
+            var updatedCount = await dbContext.Datasets
+                .Where(entity => entity.Id == dataset.Id)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        entity => entity.CurrentVersionId,
+                        version.Id
+                    ),
+                    CancellationToken
+                );
+
+            Assert.Equal(1, updatedCount);
+        }
     }
 
     private async Task<(Project Project, Dataset[] Datasets)> SeedDatasetsAsync(
@@ -128,13 +170,17 @@ public sealed class GetDatasetsEndpointTests : IClassFixture<ApiFixture>
         Guid projectId,
         Guid userId,
         int? page = null,
-        int? pageSize = null)
+        int? pageSize = null,
+        string? search = null,
+        bool? readyOnly = null)
     {
         using var request = CreateGetRequest(
             projectId,
             userId,
             page,
-            pageSize
+            pageSize,
+            search,
+            readyOnly
         );
 
         using var response = await _fixture.Client.SendAsync(
@@ -644,5 +690,219 @@ public sealed class GetDatasetsEndpointTests : IClassFixture<ApiFixture>
         var item = Assert.Single(result.Items);
 
         Assert.Equal(datasets[0].Id, item.Id);
+    }
+
+    [Fact]
+    public async Task GetDatasets_ShouldSearchNamesIgnoringCaseAndOuterWhitespace()
+    {
+        var userId = Guid.NewGuid();
+        var (project, datasets) = await SeedDatasetsAsync(
+            userId,
+            "Monthly Sales",
+            "SALES 2026",
+            "Inventory"
+        );
+
+        var result = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            search: "  sAlEs  "
+        );
+
+        Assert.Equal(1, result.Page);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
+        Assert.Equivalent(
+            expected: new[] { datasets[0].Id, datasets[1].Id },
+            actual: result.Items.Select(item => item.Id),
+            strict: true
+        );
+    }
+
+    [Fact]
+    public async Task GetDatasets_ShouldTreatPercentAndUnderscoreAsLiteralSearchCharacters()
+    {
+        var userId = Guid.NewGuid();
+        var (project, datasets) = await SeedDatasetsAsync(
+            userId,
+            "100% Growth",
+            "100X Growth",
+            "Region_One",
+            "RegionXOne"
+        );
+
+        var percentResult = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            search: "%"
+        );
+
+        var underscoreResult = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            search: "_"
+        );
+
+        Assert.Equal(1, percentResult.TotalCount);
+        Assert.Equal(datasets[0].Id, Assert.Single(percentResult.Items).Id);
+
+        Assert.Equal(1, underscoreResult.TotalCount);
+        Assert.Equal(datasets[2].Id, Assert.Single(underscoreResult.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetDatasets_ShouldReturnOnlyDatasetsWithReadyCurrentVersion_WhenReadyOnlyIsTrue()
+    {
+        var userId = Guid.NewGuid();
+        var (project, datasets) = await SeedDatasetsAsync(
+            userId,
+            "Ready dataset",
+            "Pending dataset",
+            "Failed dataset",
+            "No version",
+            "Historical ready version"
+        );
+
+        var ready = new DatasetVersion(datasets[0].Id, 1, "ready.csv");
+        ready.MarkReady("tests/ready.parquet", 120, 4);
+
+        var pending = new DatasetVersion(datasets[1].Id, 1, "pending.csv");
+
+        var failed = new DatasetVersion(datasets[2].Id, 1, "failed.csv");
+        failed.MarkFailed();
+
+        var olderReady = new DatasetVersion(datasets[4].Id, 1, "older.csv");
+        olderReady.MarkReady("tests/older.parquet", 75, 2);
+        var currentPending = new DatasetVersion(datasets[4].Id, 2, "current.csv");
+
+        await AddVersionsAndSetCurrentAsync(
+            [ready, pending, failed, olderReady, currentPending],
+            (datasets[0], ready),
+            (datasets[1], pending),
+            (datasets[2], failed),
+            (datasets[4], currentPending)
+        );
+
+        var result = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            readyOnly: true
+        );
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
+
+        var allDatasets = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            readyOnly: false
+        );
+        Assert.Equal(5, allDatasets.TotalCount);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(datasets[0].Id, item.Id);
+        Assert.NotNull(item.CurrentVersion);
+        Assert.Equal(ready.Id, item.CurrentVersion.Id);
+        Assert.Equal(120, item.CurrentVersion.RowCount);
+        Assert.Equal(4, item.CurrentVersion.ColumnCount);
+    }
+
+    [Fact]
+    public async Task GetDatasets_ShouldApplySearchAndReadyOnlyTogether()
+    {
+        var userId = Guid.NewGuid();
+        var (project, datasets) = await SeedDatasetsAsync(
+            userId,
+            "Sales Ready",
+            "Sales Pending",
+            "Inventory Ready"
+        );
+
+        var salesReady = new DatasetVersion(datasets[0].Id, 1, "sales.csv");
+        salesReady.MarkReady("tests/sales.parquet", 10, 2);
+        var salesPending = new DatasetVersion(datasets[1].Id, 1, "pending.csv");
+        var inventoryReady = new DatasetVersion(datasets[2].Id, 1, "inventory.csv");
+        inventoryReady.MarkReady("tests/inventory.parquet", 5, 3);
+
+        await AddVersionsAndSetCurrentAsync(
+            [salesReady, salesPending, inventoryReady],
+            (datasets[0], salesReady),
+            (datasets[1], salesPending),
+            (datasets[2], inventoryReady)
+        );
+
+        var result = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            search: "sales",
+            readyOnly: true
+        );
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
+        Assert.Equal(datasets[0].Id, Assert.Single(result.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetDatasets_ShouldFilterBeforePagination()
+    {
+        var userId = Guid.NewGuid();
+        var (project, datasets) = await SeedDatasetsAsync(
+            userId,
+            "Sales oldest",
+            "Costs middle",
+            "Sales middle",
+            "Costs newest",
+            "Sales newest"
+        );
+
+        var baseDate = new DateTime(
+            2026, 8, 24, 10, 0, 0, DateTimeKind.Utc
+        );
+
+        await SetCreatedAtUtcAsync(
+            (datasets[0], baseDate),
+            (datasets[1], baseDate.AddHours(1)),
+            (datasets[2], baseDate.AddHours(2)),
+            (datasets[3], baseDate.AddHours(3)),
+            (datasets[4], baseDate.AddHours(4))
+        );
+
+        var result = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            page: 2,
+            pageSize: 2,
+            search: "sales"
+        );
+
+        Assert.Equal(2, result.Page);
+        Assert.Equal(2, result.PageSize);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(2, result.TotalPages);
+        Assert.Equal(datasets[0].Id, Assert.Single(result.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetDatasets_ShouldReturnEmptyPage_WhenNoDatasetsMatchSearch()
+    {
+        var userId = Guid.NewGuid();
+        var (project, _) = await SeedDatasetsAsync(
+            userId,
+            "Sales",
+            "Inventory"
+        );
+
+        var result = await GetSuccessfulResponseAsync(
+            project.Id,
+            userId,
+            search: "missing"
+        );
+
+        Assert.Empty(result.Items);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(24, result.PageSize);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
     }
 }

@@ -38,6 +38,7 @@ using AnalyticDashboard.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using AnalyticDashboard.Api.Development;
 using AnalyticDashboard.Application.Dashboards.GetDashboardSnapshot;
+using AnalyticDashboard.Application.Datasets.GetDatasetsSummary;
 using AnalyticDashboard.Application.Widgets.UpdateDashboardWidgets;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -152,6 +153,7 @@ builder.Services.AddScoped<GetDatasetRowsHandler>();
 builder.Services.AddScoped<GetImportStatusHandler>();
 builder.Services.AddScoped<UpdateDashboardWidgetsHandler>();
 builder.Services.AddScoped<GetDashboardSnapshotHandler>();
+builder.Services.AddScoped<GetDatasetsSummaryHandler>();
 
 builder.Services.AddHttpContextAccessor();
 
