@@ -1,13 +1,16 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
+import { normalizePagination } from "../../data/pagination";
+import type { PaginationParams } from "../../data/types";
 
-export function useProjects() {
+export function useProjects(params: PaginationParams = {}) {
   const { adapter } = useSession();
+  const pagination = normalizePagination(params);
 
   return useQuery({
-    queryKey: queryKeys.projects.all,
-    queryFn: () => adapter.listProjects(),
+    queryKey: queryKeys.projects.page(pagination.page, pagination.pageSize),
+    queryFn: () => adapter.listProjects(pagination),
   });
 }
 
@@ -17,6 +20,7 @@ export function useProject(projectId: string) {
   return useQuery({
     queryKey: queryKeys.projects.detail(projectId),
     queryFn: () => adapter.getProject(projectId),
+    enabled: Boolean(projectId),
   });
 }
 

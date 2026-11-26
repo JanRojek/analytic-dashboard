@@ -231,19 +231,20 @@ export function DashboardWorkspace({
     return () => window.clearTimeout(timeout);
   }, [mode, editing, dirty, scope, dashboard.id, document]);
 
+  const { canUndo, canRedo, undo, redo } = editor;
   const runHistoryAction = useCallback(
     (action: "undo" | "redo") => {
       if (mode !== "api" || !editing) return;
 
       if (action === "undo") {
-        if (!editor.canUndo) return;
-        editor.undo();
+        if (!canUndo) return;
+        undo();
       } else {
-        if (!editor.canRedo) return;
-        editor.redo();
+        if (!canRedo) return;
+        redo();
       }
     },
-    [mode, editing, editor.canUndo, editor.canRedo, editor.undo, editor.redo],
+    [mode, editing, canUndo, canRedo, undo, redo],
   );
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import {
   DASHBOARD_GRID_LEGACY_COLUMNS,
   upgradeLegacyGridGeometry,
   type DashboardGridGeometry,
-} from "../data/dashboardGrid";
+} from "../data/dashboardGrid.ts";
 
 // The API can create widgets, but cannot update their configuration or layout yet.
 // These browser-only overrides are deliberately kept out of the API adapter.

@@ -1,6 +1,21 @@
-﻿import { useState } from "react";
-import { ActionIcon, Button, Menu, Modal, TextInput } from "@mantine/core";
-import { Link, useNavigate, useParams } from "react-router-dom";
+﻿import { useEffect, useState } from "react";
+import { normalizePagination } from "../../../data/pagination";
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Menu,
+  Modal,
+  Pagination,
+  Select,
+  TextInput,
+} from "@mantine/core";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 
 import {
   EmptyState,
@@ -9,7 +24,7 @@ import {
   PageHeading,
 } from "../../../components/Feedback";
 import { Icon } from "../../../components/Icon";
-import type { Dashboard } from "../../../data/types";
+import type { DashboardListItem } from "../../../data/types";
 import { editorScope, removeEditor } from "../../../mocks/editor";
 import { useSession } from "../../../session/SessionContext";
 
@@ -28,12 +43,49 @@ export function DashboardsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
-  const [deleting, setDeleting] = useState<Dashboard | null>(null);
-  const dashboards = useDashboards(projectId);
+  const [deleting, setDeleting] = useState<DashboardListItem | null>(null);
+  const [params, setParams] = useSearchParams();
+  const pagination = normalizePagination({
+    page: Number(params.get("page") ?? 1),
+    pageSize: Number(params.get("pageSize") ?? 24),
+  });
+  const dashboards = useDashboards(projectId, pagination);
+  const result = dashboards.data;
+
+  useEffect(() => {
+    if (!result || dashboards.isFetching) return;
+    if (
+      params.get("page") === String(result.page) &&
+      params.get("pageSize") === String(result.pageSize)
+    )
+      return;
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("page", String(result.page));
+        next.set("pageSize", String(result.pageSize));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [result, dashboards.isFetching, params, setParams]);
+
+  function changePage(
+    page: number,
+    pageSize = result?.pageSize ?? pagination.pageSize,
+  ) {
+    setSearch("");
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("page", String(page));
+      next.set("pageSize", String(pageSize));
+      return next;
+    });
+  }
   const create = useCreateDashboard(projectId);
   const remove = useDeleteDashboard(projectId);
   const filtered =
-    dashboards.data?.filter((item) =>
+    dashboards.data?.items.filter((item) =>
       item.name.toLowerCase().includes(search.toLowerCase()),
     ) || [];
   return (
@@ -57,11 +109,12 @@ export function DashboardsPage() {
       />
       <div className="dashboard-list-toolbar">
         <strong>
-          All dashboards <span>{dashboards.data?.length || 0}</span>
+          All dashboards <span>{dashboards.data?.totalCount ?? "—"}</span>
         </strong>
         <TextInput
-          aria-label="Search dashboards"
-          placeholder="Find a dashboard…"
+          aria-label="Filter dashboards on this page"
+          placeholder="Filter this page…"
+          description="Filters dashboards on the current page only."
           leftSection={<Icon name="search" size={16} />}
           value={search}
           onChange={(event) => setSearch(event.currentTarget.value)}
@@ -74,7 +127,7 @@ export function DashboardsPage() {
           error={dashboards.error}
           retry={() => dashboards.refetch()}
         />
-      ) : !dashboards.data.length ? (
+      ) : !dashboards.data.totalCount ? (
         <EmptyState
           icon="dashboard"
           title="A blank canvas. A clearer picture."
@@ -91,8 +144,8 @@ export function DashboardsPage() {
       ) : !filtered.length ? (
         <EmptyState
           icon="search"
-          title="No dashboards found"
-          description="Try a different name or clear your search."
+          title="No matching dashboards on this page"
+          description="Clear the filter or browse another page."
           action={
             <Button variant="default" onClick={() => setSearch("")}>
               Clear search
@@ -179,6 +232,39 @@ export function DashboardsPage() {
             <small>Make room for a new perspective</small>
           </button>
         </div>
+      )}
+      {result && result.totalCount > 0 && (
+        <Group justify="space-between" mt="xl" gap="md">
+          <span className="muted">
+            Page {result.page} of {result.totalPages} · {result.totalCount}{" "}
+            dashboards
+          </span>
+          <Group gap="sm">
+            {result.totalPages > 1 && (
+              <Pagination
+                aria-label="Dashboard pages"
+                value={result.page}
+                total={result.totalPages}
+                onChange={(page) => changePage(page)}
+                size="sm"
+              />
+            )}
+            <Select
+              aria-label="Dashboards per page"
+              size="xs"
+              w={145}
+              value={String(result.pageSize)}
+              data={[...new Set([24, 48, 96, result.pageSize])]
+                .sort((a, b) => a - b)
+                .map((size) => ({
+                  value: String(size),
+                  label: `${size} per page`,
+                }))}
+              allowDeselect={false}
+              onChange={(value) => value && changePage(1, Number(value))}
+            />
+          </Group>
+        </Group>
       )}
       <Modal
         opened={createOpen}
@@ -267,7 +353,9 @@ export function DashboardsPage() {
                         editorScope(mode, session?.user.id || "", projectId),
                         dashboard.id,
                       );
-                    } catch {}
+                    } catch {
+                      // The dashboard was deleted; unavailable local storage must not undo that result.
+                    }
 
                     setDeleting(null);
                   },

@@ -3,6 +3,8 @@ type Id = string | number | undefined;
 export const queryKeys = {
   projects: {
     all: ["projects"] as const,
+    page: (page: number, pageSize: number) =>
+      ["projects", page, pageSize] as const,
     detail: (projectId: Id) => ["project", projectId] as const,
   },
 
@@ -40,6 +42,9 @@ export const queryKeys = {
 
   dashboards: {
     list: (projectId: Id) => ["dashboards", projectId] as const,
+
+    page: (projectId: Id, page: number, pageSize: number) =>
+      ["dashboards", projectId, page, pageSize] as const,
 
     detail: (projectId: Id, dashboardId: Id) =>
       ["dashboard", projectId, dashboardId] as const,

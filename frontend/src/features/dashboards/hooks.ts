@@ -1,27 +1,43 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
+import { normalizePagination } from "../../data/pagination";
 import type {
   CreateWidgetInput,
   DashboardWidgetUpdate,
+  PaginationParams,
 } from "../../data/types";
 
-export function useDashboards(projectId: string, enabled = true) {
+export function useDashboards(
+  projectId: string,
+  params: PaginationParams = {},
+  enabled = true,
+) {
   const { adapter } = useSession();
+  const pagination = normalizePagination(params);
 
   return useQuery({
-    queryKey: queryKeys.dashboards.list(projectId),
-    queryFn: () => adapter.listDashboards(projectId),
-    enabled,
+    queryKey: queryKeys.dashboards.page(
+      projectId,
+      pagination.page,
+      pagination.pageSize,
+    ),
+    queryFn: () => adapter.listDashboards(projectId, pagination),
+    enabled: enabled && Boolean(projectId),
   });
 }
 
-export function useDashboard(projectId: string, dashboardId: string) {
+export function useDashboard(
+  projectId: string,
+  dashboardId: string,
+  enabled = true,
+) {
   const { adapter } = useSession();
 
   return useQuery({
     queryKey: queryKeys.dashboards.detail(projectId, dashboardId),
     queryFn: () => adapter.getDashboard(projectId, dashboardId),
+    enabled: enabled && Boolean(projectId && dashboardId),
   });
 }
 
@@ -63,7 +79,11 @@ export function useCreateDashboard(projectId: string) {
   return useMutation({
     mutationFn: (name: string) => adapter.createDashboard(projectId, name),
 
-    onSuccess: async () => {
+    onSuccess: async (dashboard) => {
+      queryClient.setQueryData(
+        queryKeys.dashboards.detail(projectId, dashboard.id),
+        dashboard,
+      );
       await queryClient.invalidateQueries({
         queryKey: queryKeys.dashboards.list(projectId),
       });
@@ -100,7 +120,16 @@ export function useDeleteDashboard(projectId: string) {
     mutationFn: (dashboardId: string) =>
       adapter.deleteDashboard(projectId, dashboardId),
 
-    onSuccess: async () => {
+    onSuccess: async (_, dashboardId) => {
+      queryClient.removeQueries({
+        queryKey: queryKeys.dashboards.detail(projectId, dashboardId),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.dashboards.widgets(projectId, dashboardId),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.dashboards.editorState(projectId, dashboardId),
+      });
       await queryClient.invalidateQueries({
         queryKey: queryKeys.dashboards.list(projectId),
       });

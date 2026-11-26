@@ -1,8 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { normalizePagination } from "../../../data/pagination";
 
 import { useProjects } from "../hooks";
 
-import { ActionIcon, Button, Select, TextInput, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Pagination,
+  Select,
+  TextInput,
+  Tooltip,
+} from "@mantine/core";
 
 import type { Project } from "../../../data/types";
 
@@ -23,20 +33,57 @@ import { DeleteProjectDialog } from "../components/DeleteProjectDialog";
 import "../styles/projects.css";
 
 export default function ProjectsPage() {
-  const projects = useProjects();
+  const [params, setParams] = useSearchParams();
+  const pagination = normalizePagination({
+    page: Number(params.get("page") ?? 1),
+    pageSize: Number(params.get("pageSize") ?? 24),
+  });
+  const projects = useProjects(pagination);
+  const result = projects.data;
+
+  useEffect(() => {
+    if (!result || projects.isFetching) return;
+    if (
+      params.get("page") === String(result.page) &&
+      params.get("pageSize") === String(result.pageSize)
+    )
+      return;
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("page", String(result.page));
+        next.set("pageSize", String(result.pageSize));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [result, projects.isFetching, params, setParams]);
   const [createOpen, setCreateOpen] = useState(false);
   const [renaming, setRenaming] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<string | null>("newest");
   const [view, setView] = useState("grid");
-  const filtered = projects.data
-    ?.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+  const filtered = projects.data?.items
+    .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) =>
       sort === "name"
         ? a.name.localeCompare(b.name)
         : b.createdAtUtc.localeCompare(a.createdAtUtc),
     );
+  function changePage(
+    page: number,
+    pageSize = result?.pageSize ?? pagination.pageSize,
+  ) {
+    setSearch("");
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("page", String(page));
+      next.set("pageSize", String(pageSize));
+      return next;
+    });
+  }
+
   return (
     <div className="page-content projects-center">
       <PageHeading
@@ -54,7 +101,7 @@ export default function ProjectsPage() {
       />
       {!projects.isPending &&
         !projects.error &&
-        projects.data?.length === 0 && (
+        projects.data?.totalCount === 0 && (
           <section className="welcome-banner">
             <div className="welcome-copy">
               <span className="editorial-label">
@@ -129,24 +176,25 @@ export default function ProjectsPage() {
             </div>
           </section>
         )}
-      {!!projects.data?.length && (
+      {!!projects.data?.totalCount && (
         <div className="projects-toolbar">
           <div className="section-heading">
             <h2>Your projects</h2>
-            <span className="count-badge">{projects.data.length}</span>
+            <span className="count-badge">{projects.data.totalCount}</span>
           </div>
 
           <div className="project-controls">
             <TextInput
-              aria-label="Search projects"
-              placeholder="Search projects…"
+              aria-label="Filter projects on this page"
+              placeholder="Filter this page…"
+              description="Filter and sort apply to this page only."
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}
               leftSection={<Icon name="search" size={15} />}
             />
 
             <Select
-              aria-label="Sort projects"
+              aria-label="Sort projects on this page"
               value={sort}
               onChange={setSort}
               data={[
@@ -191,10 +239,10 @@ export default function ProjectsPage() {
           error={projects.error}
           retry={() => void projects.refetch()}
         />
-      ) : projects.data?.length === 0 ? null : !filtered?.length ? (
+      ) : projects.data?.totalCount === 0 ? null : !filtered?.length ? (
         <EmptyState
-          title="No matching projects"
-          description="Try a different name or clear your search."
+          title="No matching projects on this page"
+          description="Clear the filter or browse another page."
           action={
             <Button variant="default" onClick={() => setSearch("")}>
               Clear search
@@ -215,6 +263,39 @@ export default function ProjectsPage() {
             />
           ))}
         </div>
+      )}
+      {result && result.totalCount > 0 && (
+        <Group justify="space-between" mt="xl" gap="md">
+          <span className="muted">
+            Page {result.page} of {result.totalPages} · {result.totalCount}{" "}
+            projects
+          </span>
+          <Group gap="sm">
+            {result.totalPages > 1 && (
+              <Pagination
+                aria-label="Project pages"
+                value={result.page}
+                total={result.totalPages}
+                onChange={(page) => changePage(page)}
+                size="sm"
+              />
+            )}
+            <Select
+              aria-label="Projects per page"
+              size="xs"
+              w={145}
+              value={String(result.pageSize)}
+              data={[...new Set([24, 48, 96, result.pageSize])]
+                .sort((a, b) => a - b)
+                .map((size) => ({
+                  value: String(size),
+                  label: `${size} per page`,
+                }))}
+              allowDeselect={false}
+              onChange={(value) => value && changePage(1, Number(value))}
+            />
+          </Group>
+        </Group>
       )}
       <div className="project-hint">
         <Icon name="lock" size={14} />

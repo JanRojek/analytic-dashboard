@@ -34,7 +34,11 @@ test("editor restores a draft without exposing it in the saved presentation", ()
     overrides: { "chart-a": { title: "New title", type: "LineChart" } },
   };
   persistEditorDraft(scope, "dashboard", draft);
-  assert.deepEqual(readEditor(scope, "dashboard").document, draft);
+  assert.deepEqual(readEditor(scope, "dashboard").document, {
+    ...draft,
+    gridLayout: {},
+    gridColumns: 24,
+  });
   assert.equal(readEditor(scope, "dashboard").dirty, true);
   assert.deepEqual(
     readEditor(scope, "dashboard", false).document.order,

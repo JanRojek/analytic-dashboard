@@ -1,5 +1,6 @@
 import type {
   Dashboard,
+  DashboardListItem,
   DashboardEditorState,
   DataAdapter,
   Dataset,
@@ -15,7 +16,10 @@ import type {
   UpdateDashboardWidgetsResponse,
 } from "./types";
 
-import { normalizeDatasetListParams } from "./pagination.ts";
+import {
+  normalizeDatasetListParams,
+  normalizePagination,
+} from "./pagination.ts";
 
 const sessionExpiryListeners = new Set<() => void>();
 
@@ -175,16 +179,11 @@ type GetDashboardEditorStateResponse = {
 };
 
 export const apiAdapter: DataAdapter = {
-  async listProjects() {
-    type Page = { items: Project[]; totalPages: number };
-    const first = await request<Page>("/projects?page=1&pageSize=100");
-    const items = [...first.items];
-    for (let page = 2; page <= first.totalPages; page++) {
-      items.push(
-        ...(await request<Page>(`/projects?page=${page}&pageSize=100`)).items,
-      );
-    }
-    return items;
+  listProjects(params) {
+    const { page, pageSize } = normalizePagination(params);
+    return request<PagedResult<Project>>(
+      `/projects?page=${page}&pageSize=${pageSize}`,
+    );
   },
   getProject: (p) => request<Project>(projectPath(p)),
   createProject: (name) => request<Project>("/projects", json({ name })),
@@ -238,7 +237,12 @@ export const apiAdapter: DataAdapter = {
       )
     ).items;
   },
-  listDashboards: (p) => request<Dashboard[]>(dashboardPath(p)),
+  listDashboards(p, params) {
+    const { page, pageSize } = normalizePagination(params);
+    return request<PagedResult<DashboardListItem>>(
+      `${dashboardPath(p)}?page=${page}&pageSize=${pageSize}`,
+    );
+  },
   getDashboard: (p, d) => request<Dashboard>(dashboardPath(p, d)),
   async getDashboardEditorState(p, d) {
     const response = await request<GetDashboardEditorStateResponse>(

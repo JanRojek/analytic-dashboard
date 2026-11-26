@@ -92,15 +92,17 @@ export interface DatasetProfile {
   columns: ColumnProfile[];
   previewRows: DataRow[];
 }
-export interface Dashboard {
+export interface DashboardListItem {
   id: string;
   projectId: string;
   name: string;
-  revision: number;
   createdAtUtc: string;
 }
-// GET /editor-state omits Dashboard.createdAtUtc and each Widget.dashboardId.
-// The API adapter normalizes the wire contract into these editor-facing models.
+
+export interface Dashboard extends DashboardListItem {
+  revision: number;
+}
+
 export type EditorDashboard = Pick<
   Dashboard,
   "id" | "projectId" | "name" | "revision"
@@ -162,7 +164,7 @@ export interface TransformStep {
 }
 
 export interface DataAdapter {
-  listProjects(): Promise<Project[]>;
+  listProjects(params?: PaginationParams): Promise<PagedResult<Project>>;
   getProject(projectId: string): Promise<Project>;
   createProject(name: string, description?: string): Promise<Project>;
   renameProject(projectId: string, name: string): Promise<Project>;
@@ -191,7 +193,10 @@ export interface DataAdapter {
     datasetId: string,
     config: QueryConfig,
   ): Promise<QueryItem[]>;
-  listDashboards(projectId: string): Promise<Dashboard[]>;
+  listDashboards(
+    projectId: string,
+    params?: PaginationParams,
+  ): Promise<PagedResult<DashboardListItem>>;
   getDashboard(projectId: string, dashboardId: string): Promise<Dashboard>;
   getDashboardEditorState(
     projectId: string,

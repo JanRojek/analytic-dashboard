@@ -76,10 +76,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (readStoredMode() === "demo") {
-      setLoading(false);
-      return;
-    }
+    if (readStoredMode() === "demo") return;
 
     let active = true;
 

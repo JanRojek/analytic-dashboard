@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Button, Modal, Select, TextInput } from "@mantine/core";
+import {
+  Button,
+  Group,
+  Modal,
+  Pagination,
+  Select,
+  TextInput,
+} from "@mantine/core";
 import { useNavigate } from "react-router-dom";
 
 import { ErrorState } from "../../../components/Feedback";
@@ -10,6 +17,7 @@ import {
   useCreateDashboard,
   useCreateWidget,
   useDashboards,
+  useDashboard,
 } from "../../dashboards/hooks";
 
 import { nextWidgetLayout } from "../widgetPlacement";
@@ -32,10 +40,23 @@ export function SaveChartDialog({
 
   const createDashboard = useCreateDashboard(projectId);
   const createWidget = useCreateWidget(projectId);
-  const dashboards = useDashboards(projectId, opened);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
+  const dashboards = useDashboards(projectId, { page, pageSize }, opened);
 
   const [target, setTarget] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const selected = useDashboard(
+    projectId,
+    target ?? "",
+    opened && Boolean(target && target !== "__new__"),
+  );
+  const items = dashboards.data?.items ?? [];
+  const options =
+    selected.data &&
+    !items.some((dashboard) => dashboard.id === selected.data.id)
+      ? [selected.data, ...items]
+      : items;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -96,7 +117,7 @@ export function SaveChartDialog({
                 : "Choose a dashboard"
             }
             data={[
-              ...(dashboards.data ?? []).map((dashboard) => ({
+              ...options.map((dashboard) => ({
                 value: dashboard.id,
                 label: dashboard.name,
               })),
@@ -104,7 +125,50 @@ export function SaveChartDialog({
             ]}
             value={target}
             onChange={setTarget}
-            disabled={dashboards.isPending || save.isPending}
+            disabled={save.isPending}
+          />
+        )}
+
+        {dashboards.data && (
+          <Group justify="space-between" gap="xs">
+            <span className="analytics-note">
+              {dashboards.data.totalCount} dashboards
+            </span>
+            {dashboards.data.totalPages > 1 && (
+              <Pagination
+                aria-label="Dashboard selection pages"
+                value={dashboards.data.page}
+                total={dashboards.data.totalPages}
+                onChange={setPage}
+                disabled={save.isPending || dashboards.isFetching}
+                size="xs"
+                siblings={0}
+              />
+            )}
+            <Select
+              aria-label="Dashboard options per page"
+              size="xs"
+              w={145}
+              value={String(dashboards.data.pageSize)}
+              data={[24, 48, 96].map((size) => ({
+                value: String(size),
+                label: `${size} per page`,
+              }))}
+              allowDeselect={false}
+              disabled={save.isPending}
+              onChange={(value) => {
+                if (value) {
+                  setPageSize(Number(value));
+                  setPage(1);
+                }
+              }}
+            />
+          </Group>
+        )}
+        {target && target !== "__new__" && selected.isError && (
+          <ErrorState
+            error={selected.error}
+            retry={() => void selected.refetch()}
           />
         )}
 
@@ -127,7 +191,12 @@ export function SaveChartDialog({
 
           <Button
             loading={save.isPending}
-            disabled={!target || (target === "__new__" && !name.trim())}
+            disabled={
+              !target ||
+              (target === "__new__"
+                ? !name.trim()
+                : !selected.data || selected.isError)
+            }
             onClick={() => save.mutate()}
           >
             Add chart

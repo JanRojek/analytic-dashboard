@@ -1,7 +1,11 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
-import type { DataAdapter, DatasetListParams } from "../../data/types";
+import type {
+  DashboardListItem,
+  DataAdapter,
+  DatasetListParams,
+} from "../../data/types";
 import { normalizeDatasetListParams } from "../../data/pagination";
 
 async function findDatasetUsage(
@@ -9,21 +13,38 @@ async function findDatasetUsage(
   projectId: string,
   datasetId: string,
 ) {
-  const dashboards = await adapter.listDashboards(projectId);
+  const usages: { dashboard: DashboardListItem; count: number }[] = [];
+  let page = 1;
+  let totalPages: number;
+  let totalCount: number | undefined;
 
-  const usages = await Promise.all(
-    dashboards.map(async (dashboard) => {
-      const widgets = await adapter.listWidgets(projectId, dashboard.id);
+  do {
+    const dashboards = await adapter.listDashboards(projectId, { page });
+    if (
+      dashboards.page !== page ||
+      (totalCount !== undefined && dashboards.totalCount !== totalCount)
+    ) {
+      throw new Error(
+        "The dashboard list changed while checking dataset usage. Please try again.",
+      );
+    }
+    totalCount = dashboards.totalCount;
+    totalPages = dashboards.totalPages;
+    const pageUsages = await Promise.all(
+      dashboards.items.map(async (dashboard) => {
+        const widgets = await adapter.listWidgets(projectId, dashboard.id);
+        return {
+          dashboard,
+          count: widgets.filter((widget) => widget.datasetId === datasetId)
+            .length,
+        };
+      }),
+    );
+    usages.push(...pageUsages.filter((usage) => usage.count > 0));
+    page++;
+  } while (page <= totalPages);
 
-      return {
-        dashboard,
-        count: widgets.filter((widget) => widget.datasetId === datasetId)
-          .length,
-      };
-    }),
-  );
-
-  return usages.filter((usage) => usage.count > 0);
+  return usages;
 }
 
 export function useDatasets(

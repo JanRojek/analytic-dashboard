@@ -25,7 +25,7 @@ export function ProjectTile({
   onDelete: () => void;
 }) {
   const datasets = useDatasetsSummary(project.id);
-  const dashboards = useDashboards(project.id);
+  const dashboards = useDashboards(project.id, { pageSize: 1 });
   return (
     <article className={`project-card project-tone-${index % 3}`}>
       <Link to={`/projects/${project.id}`} className="project-card-link">
@@ -77,8 +77,8 @@ export function ProjectTile({
             </span>
             <span>
               <Icon name="dashboard" size={14} />
-              {dashboards.data?.length ?? "—"}{" "}
-              {dashboards.data?.length === 1 ? "dashboard" : "dashboards"}
+              {dashboards.data?.totalCount ?? "—"}{" "}
+              {dashboards.data?.totalCount === 1 ? "dashboard" : "dashboards"}
             </span>
           </div>
         </div>

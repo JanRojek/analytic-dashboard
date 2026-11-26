@@ -198,7 +198,9 @@ export function useDashboardAutosave({
             latestSnapshotRef.current,
             result.revision,
           );
-        } catch {}
+        } catch {
+          // Local recovery failure must not replace the confirmed server save outcome.
+        }
         if (mountedRef.current) {
           setStatus("conflict");
           setError(CONFLICT_MESSAGE);
@@ -228,7 +230,9 @@ export function useDashboardAutosave({
               clearEditorSnapshotDraft(draftKey);
             }
           }
-        } catch {}
+        } catch {
+          // Local recovery failure must not replace the confirmed server save outcome.
+        }
 
         return;
       }

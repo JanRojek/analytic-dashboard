@@ -1,4 +1,4 @@
-﻿import type { Dashboard, Dataset } from "../../../data/types.ts";
+﻿import type { DashboardListItem, Dataset } from "../../../data/types.ts";
 import {
   useDatasetProfile,
   useDatasets,
@@ -136,13 +136,12 @@ export default function ProjectOverviewPage() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [deletingDataset, setDeletingDataset] = useState<Dataset | null>(null);
-  const [deletingDashboard, setDeletingDashboard] = useState<Dashboard | null>(
-    null,
-  );
+  const [deletingDashboard, setDeletingDashboard] =
+    useState<DashboardListItem | null>(null);
 
   const datasets = useDatasets(projectId);
   const summary = useDatasetsSummary(projectId);
-  const dashboards = useDashboards(projectId);
+  const dashboards = useDashboards(projectId, { pageSize: 4 });
   const datasetUsage = useDatasetUsage(projectId, deletingDataset?.id);
   const removeDataset = useDeleteDataset(projectId);
   const removeDashboard = useDeleteDashboard(projectId);
@@ -153,7 +152,7 @@ export default function ProjectOverviewPage() {
     !datasets.isPending &&
     !dashboards.isPending &&
     (datasets.data?.totalCount ?? 0) === 0 &&
-    (dashboards.data?.length ?? 0) === 0;
+    (dashboards.data?.totalCount ?? 0) === 0;
 
   return (
     <div className="page-content overview-page">
@@ -191,7 +190,7 @@ export default function ProjectOverviewPage() {
           <span>
             <Icon name="dashboard" size={17} /> Dashboards
           </span>
-          <strong>{dashboards.data?.length ?? "—"}</strong>
+          <strong>{dashboards.data?.totalCount ?? "—"}</strong>
           <small>Created in this project</small>
         </div>
       </div>
@@ -406,7 +405,7 @@ export default function ProjectOverviewPage() {
                 error={dashboards.error}
                 retry={() => void dashboards.refetch()}
               />
-            ) : !dashboards.data?.length ? (
+            ) : !dashboards.data?.totalCount ? (
               <EmptyState
                 icon="dashboard"
                 title="No dashboards yet"
@@ -422,7 +421,7 @@ export default function ProjectOverviewPage() {
                 }
               />
             ) : (
-              dashboards.data.slice(0, 4).map((dashboard) => (
+              dashboards.data.items.map((dashboard) => (
                 <div className="resource-row" key={dashboard.id}>
                   <Link
                     to={`/projects/${projectId}/dashboards/${dashboard.id}/edit`}

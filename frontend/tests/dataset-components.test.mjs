@@ -16,6 +16,15 @@ let ProjectOverviewPage;
 let SessionContext;
 let useImportDataset;
 let useDeleteDataset;
+let useDatasetUsage;
+let useCreateProject;
+let useRenameProject;
+let useDeleteProject;
+let useCreateDashboard;
+let useDeleteDashboard;
+let ProjectsPage;
+let DashboardsPage;
+let AppLayout;
 
 before(async () => {
   vite = await createServer({
@@ -37,9 +46,22 @@ before(async () => {
   ({ SessionContext } = await vite.ssrLoadModule(
     "/src/session/SessionContext.ts",
   ));
-  ({ useImportDataset, useDeleteDataset } = await vite.ssrLoadModule(
-    "/src/features/data/hooks.ts",
+  ({ useCreateProject, useRenameProject, useDeleteProject } =
+    await vite.ssrLoadModule("/src/features/projects/hooks.ts"));
+  ({ useCreateDashboard, useDeleteDashboard } = await vite.ssrLoadModule(
+    "/src/features/dashboards/hooks.ts",
   ));
+  ({ default: ProjectsPage } = await vite.ssrLoadModule(
+    "/src/features/projects/pages/ProjectsPage.tsx",
+  ));
+  ({ DashboardsPage } = await vite.ssrLoadModule(
+    "/src/features/analytics/pages/DashboardsPage.tsx",
+  ));
+  ({ default: AppLayout } = await vite.ssrLoadModule(
+    "/src/layout/AppLayout.tsx",
+  ));
+  ({ useImportDataset, useDeleteDataset, useDatasetUsage } =
+    await vite.ssrLoadModule("/src/features/data/hooks.ts"));
 });
 
 after(async () => {
@@ -267,7 +289,13 @@ test("project overview metrics come from summary even when only one dataset is l
     totalPages: 6,
   });
   client.setQueryData(queryKeys.datasets.summary("project"), summary);
-  client.setQueryData(queryKeys.dashboards.list("project"), []);
+  client.setQueryData(queryKeys.dashboards.page("project", 1, 4), {
+    items: [],
+    page: 1,
+    pageSize: 4,
+    totalCount: 0,
+    totalPages: 1,
+  });
   try {
     const html = render(h(ProjectOverviewPage), client, {
       path: "/projects/:projectId",
@@ -309,7 +337,13 @@ test("import and delete hooks invalidate every filtered page and project summary
           calls.push(["import", projectId, file.name]);
           return { datasetId: "new-dataset" };
         },
-        listDashboards: async () => [],
+        listDashboards: async () => ({
+          items: [],
+          page: 1,
+          pageSize: 24,
+          totalCount: 0,
+          totalPages: 1,
+        }),
         deleteDataset: async (projectId, datasetId) => {
           calls.push(["delete", projectId, datasetId]);
         },
@@ -332,6 +366,283 @@ test("import and delete hooks invalidate every filtered page and project summary
       ["import", "project", "sales.csv"],
       ["delete", "project", "new-dataset"],
     ]);
+  } finally {
+    client.clear();
+  }
+});
+
+test("project and dashboard browsers use URL pages and server totals", async () => {
+  const client = queryClient();
+  const project = {
+    id: "off-page",
+    name: "Second page project",
+    createdAtUtc: "2026-11-26T00:00:00Z",
+  };
+  const dashboard = {
+    id: "board",
+    projectId: project.id,
+    name: "Second page dashboard",
+    createdAtUtc: project.createdAtUtc,
+  };
+  const metadata = { page: 2, pageSize: 24, totalCount: 25, totalPages: 2 };
+  client.setQueryData(queryKeys.projects.page(2, 24), {
+    ...metadata,
+    items: [project],
+  });
+  client.setQueryData(queryKeys.datasets.summary(project.id), summary);
+  client.setQueryData(queryKeys.dashboards.page(project.id, 1, 1), {
+    ...metadata,
+    page: 1,
+    pageSize: 1,
+    totalPages: 25,
+    items: [dashboard],
+  });
+  client.setQueryData(queryKeys.dashboards.page(project.id, 2, 24), {
+    ...metadata,
+    items: [dashboard],
+  });
+  try {
+    const projects = render(h(ProjectsPage), client, {
+      path: "/projects",
+      url: "/projects?page=2&pageSize=24",
+    });
+    assert.match(projects, /Second page project/);
+    assert.match(projects, /25 projects/);
+    assert.match(projects, /Project pages/);
+    assert.match(projects, /Projects per page/);
+    assert.match(projects, /Filter and sort apply to this page only/);
+    assert.match(projects, /25 dashboards/);
+    const dashboards = render(h(DashboardsPage), client, {
+      path: "/projects/:projectId/dashboards",
+      url: "/projects/off-page/dashboards?page=2&pageSize=24",
+    });
+    assert.match(dashboards, /Second page dashboard/);
+    assert.match(dashboards, /25 dashboards/);
+    assert.match(dashboards, /Dashboard pages/);
+    assert.match(dashboards, /Dashboards per page/);
+    assert.match(dashboards, /Filters dashboards on the current page only/);
+  } finally {
+    client.clear();
+  }
+});
+
+test("navigation preserves the current project outside the recent page and displays the total", () => {
+  const client = queryClient();
+  const recent = {
+    id: "recent",
+    name: "Recent project",
+    createdAtUtc: "2026-11-26T00:00:00Z",
+  };
+  const current = { ...recent, id: "current", name: "Older selected project" };
+  client.setQueryData(queryKeys.projects.page(1, 5), {
+    items: [recent],
+    page: 1,
+    pageSize: 5,
+    totalCount: 125,
+    totalPages: 25,
+  });
+  client.setQueryData(queryKeys.projects.detail(current.id), current);
+  try {
+    const html = render(h(AppLayout), client, {
+      path: "/projects/:projectId",
+      url: "/projects/current",
+    });
+    assert.match(html, /Older selected project/);
+    assert.match(html, /Recent project/);
+    assert.match(html, /nav-count">125</);
+    assert.match(html, /Recent and current projects only/);
+    assert.equal(
+      client.getQueryState(queryKeys.projects.page(1, 24)),
+      undefined,
+    );
+  } finally {
+    client.clear();
+  }
+});
+
+test("project and dashboard mutations invalidate every page without mixing collections", async () => {
+  const client = queryClient();
+  const project = {
+    id: "project",
+    name: "Project",
+    createdAtUtc: "2026-11-26T00:00:00Z",
+  };
+  const dashboard = {
+    id: "dashboard",
+    projectId: project.id,
+    name: "Dashboard",
+    createdAtUtc: project.createdAtUtc,
+    revision: 7,
+  };
+  const projectKeys = [
+    queryKeys.projects.page(1, 24),
+    queryKeys.projects.page(2, 48),
+    queryKeys.projects.page(1, 5),
+  ];
+  const dashboardKeys = [
+    queryKeys.dashboards.page(project.id, 1, 24),
+    queryKeys.dashboards.page(project.id, 2, 48),
+    queryKeys.dashboards.page(project.id, 1, 1),
+  ];
+  const otherKey = queryKeys.dashboards.page("other-project", 1, 24);
+  client.setQueryData(otherKey, {});
+  let operations;
+  function Mutations() {
+    operations = {
+      createProject: useCreateProject(),
+      renameProject: useRenameProject(),
+      deleteProject: useDeleteProject(),
+      createDashboard: useCreateDashboard(project.id),
+      deleteDashboard: useDeleteDashboard(project.id),
+    };
+    return null;
+  }
+  function seed(keys) {
+    for (const key of keys) client.setQueryData(key, {});
+  }
+  function invalidated(keys) {
+    for (const key of keys)
+      assert.equal(client.getQueryState(key).isInvalidated, true);
+  }
+  try {
+    render(h(Mutations), client, {
+      adapter: {
+        createProject: async () => project,
+        renameProject: async (_, name) => ({ ...project, name }),
+        deleteProject: async () => {},
+        createDashboard: async () => dashboard,
+        deleteDashboard: async () => {},
+      },
+    });
+    seed(projectKeys);
+    await operations.createProject.mutateAsync({
+      name: "Project",
+      description: "",
+    });
+    invalidated(projectKeys);
+    seed(projectKeys);
+    client.setQueryData(queryKeys.projects.detail(project.id), project);
+    await operations.renameProject.mutateAsync({
+      projectId: project.id,
+      name: "Renamed",
+    });
+    invalidated(projectKeys);
+    assert.equal(
+      client.getQueryState(queryKeys.projects.detail(project.id)).isInvalidated,
+      true,
+    );
+
+    seed(dashboardKeys);
+    await operations.createDashboard.mutateAsync("Dashboard");
+    invalidated(dashboardKeys);
+    assert.deepEqual(
+      client.getQueryData(
+        queryKeys.dashboards.detail(project.id, dashboard.id),
+      ),
+      dashboard,
+    );
+    seed(dashboardKeys);
+    client.setQueryData(
+      queryKeys.dashboards.widgets(project.id, dashboard.id),
+      [],
+    );
+    client.setQueryData(
+      queryKeys.dashboards.editorState(project.id, dashboard.id),
+      { dashboard },
+    );
+    await operations.deleteDashboard.mutateAsync(dashboard.id);
+    invalidated(dashboardKeys);
+    assert.equal(
+      client.getQueryData(
+        queryKeys.dashboards.detail(project.id, dashboard.id),
+      ),
+      undefined,
+    );
+    assert.equal(
+      client.getQueryData(
+        queryKeys.dashboards.widgets(project.id, dashboard.id),
+      ),
+      undefined,
+    );
+    assert.equal(
+      client.getQueryData(
+        queryKeys.dashboards.editorState(project.id, dashboard.id),
+      ),
+      undefined,
+    );
+    assert.equal(client.getQueryState(otherKey).isInvalidated, false);
+
+    seed(projectKeys);
+    await operations.deleteProject.mutateAsync(project.id);
+    invalidated(projectKeys);
+    assert.equal(
+      client.getQueryData(queryKeys.projects.detail(project.id)),
+      undefined,
+    );
+    assert.equal(client.getQueryData(dashboardKeys[0]), undefined);
+    assert.ok(client.getQueryState(otherKey));
+  } finally {
+    client.clear();
+  }
+});
+
+test("dataset usage and delete preflight include a dashboard on the second page", async () => {
+  const client = queryClient();
+  const first = Array.from({ length: 24 }, (_, index) => ({
+    id: `board-${index}`,
+    name: `Board ${index}`,
+    projectId: "project",
+    createdAtUtc: "2026-11-26T00:00:00Z",
+  }));
+  const last = { ...first[0], id: "off-page", name: "Off-page dashboard" };
+  const pages = [];
+  let deleted = false;
+  let collectionChanged = false;
+  let operations;
+  function Usage() {
+    useDatasetUsage("project", "dataset");
+    operations = useDeleteDataset("project");
+    return null;
+  }
+  try {
+    render(h(Usage), client, {
+      adapter: {
+        listDashboards: async (_, { page }) => {
+          pages.push(page);
+          return {
+            items: page === 1 ? first : [last],
+            page,
+            pageSize: 24,
+            totalCount: collectionChanged && page === 2 ? 26 : 25,
+            totalPages: 2,
+          };
+        },
+        listWidgets: async (_, id) =>
+          id === "off-page" ? [{ datasetId: "dataset" }] : [],
+        deleteDataset: async () => {
+          deleted = true;
+        },
+      },
+    });
+    const query = client.getQueryCache().find({
+      queryKey: queryKeys.datasets.usage("project", "dataset"),
+      exact: true,
+    });
+    const usage = await query.options.queryFn();
+    assert.deepEqual(usage, [{ dashboard: last, count: 1 }]);
+    assert.deepEqual(pages, [1, 2]);
+    await assert.rejects(
+      operations.mutateAsync("dataset"),
+      /used by a dashboard/,
+    );
+    assert.deepEqual(pages, [1, 2, 1, 2]);
+    assert.equal(deleted, false);
+    collectionChanged = true;
+    await assert.rejects(
+      operations.mutateAsync("dataset"),
+      /list changed while checking/,
+    );
+    assert.equal(deleted, false);
   } finally {
     client.clear();
   }

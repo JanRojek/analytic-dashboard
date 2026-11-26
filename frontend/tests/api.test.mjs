@@ -276,19 +276,17 @@ test("CSV import preserves multipart boundaries and accepted job identifiers", a
 
 test("project pagination and query results are mapped from actual API responses", async () => {
   const requested = [];
+  const page = {
+    items: [{ id: "one", name: "First", createdAtUtc: "2026-11-26T00:00:00Z" }],
+    page: 1,
+    pageSize: 24,
+    totalCount: 25,
+    totalPages: 2,
+  };
   await withFetch(
     async (url, options) => {
       requested.push(url);
-      if (url.includes("page=1"))
-        return jsonResponse({
-          items: [{ id: "one", name: "First" }],
-          totalPages: 2,
-        });
-      if (url.includes("page=2"))
-        return jsonResponse({
-          items: [{ id: "two", name: "Second" }],
-          totalPages: 2,
-        });
+      if (url.includes("page=1")) return jsonResponse(page);
       assert.deepEqual(JSON.parse(options.body), {
         groupByColumn: "region",
         measureColumn: "revenue",
@@ -297,10 +295,7 @@ test("project pagination and query results are mapped from actual API responses"
       return jsonResponse({ items: [{ label: "Europe", value: 42 }] });
     },
     async () => {
-      assert.deepEqual(
-        (await apiAdapter.listProjects()).map((project) => project.id),
-        ["one", "two"],
-      );
+      assert.deepEqual(await apiAdapter.listProjects(), page);
       assert.deepEqual(
         await apiAdapter.query("project-id", "dataset-id", {
           groupByColumn: "region",
@@ -312,8 +307,7 @@ test("project pagination and query results are mapped from actual API responses"
     },
   );
   assert.deepEqual(requested, [
-    "/api/projects?page=1&pageSize=100",
-    "/api/projects?page=2&pageSize=100",
+    "/api/projects?page=1&pageSize=24",
     "/api/projects/project-id/datasets/dataset-id/query",
   ]);
 });

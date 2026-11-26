@@ -1,5 +1,8 @@
 import type { DataAdapter, Dataset, Project, Widget } from "../data/types.ts";
-import { normalizeDatasetListParams } from "../data/pagination.ts";
+import {
+  normalizeDatasetListParams,
+  normalizePagination,
+} from "../data/pagination.ts";
 import { parseCsv } from "./csv.ts";
 import { profileRows, queryRows } from "./analytics.ts";
 import {
@@ -15,8 +18,24 @@ const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
 
 export const demoAdapter: DataAdapter = {
-  async listProjects() {
-    return readDemoState().projects;
+  async listProjects(params) {
+    const projects = readDemoState().projects.sort(
+      (a, b) =>
+        b.createdAtUtc.localeCompare(a.createdAtUtc) ||
+        a.id.localeCompare(b.id),
+    );
+    const normalized = normalizePagination(params);
+    const totalCount = projects.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / normalized.pageSize));
+    const page = normalized.page <= totalPages ? normalized.page : 1;
+    const offset = (page - 1) * normalized.pageSize;
+    return {
+      items: projects.slice(offset, offset + normalized.pageSize),
+      page,
+      pageSize: normalized.pageSize,
+      totalCount,
+      totalPages,
+    };
   },
   async getProject(p) {
     return requireProject(readDemoState(), p);
@@ -197,10 +216,36 @@ export const demoAdapter: DataAdapter = {
     const item = requireDataset(readDemoState(), p, d);
     return queryRows(item.columns, item.rows, config);
   },
-  async listDashboards(p) {
+  async listDashboards(p, params) {
     const state = readDemoState();
     requireProject(state, p);
-    return state.dashboards.filter((item) => item.projectId === p);
+    const dashboards = state.dashboards
+      .filter((item) => item.projectId === p)
+      .sort(
+        (a, b) =>
+          b.createdAtUtc.localeCompare(a.createdAtUtc) ||
+          a.id.localeCompare(b.id),
+      );
+    const normalized = normalizePagination(params);
+    const totalCount = dashboards.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / normalized.pageSize));
+    const page = normalized.page <= totalPages ? normalized.page : 1;
+    const offset = (page - 1) * normalized.pageSize;
+    const items = dashboards
+      .slice(offset, offset + normalized.pageSize)
+      .map(({ id, projectId, name, createdAtUtc }) => ({
+        id,
+        projectId,
+        name,
+        createdAtUtc,
+      }));
+    return {
+      items,
+      page,
+      pageSize: normalized.pageSize,
+      totalCount,
+      totalPages,
+    };
   },
   async getDashboard(p, d) {
     return requireDashboard(readDemoState(), p, d);

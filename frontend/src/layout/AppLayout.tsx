@@ -22,7 +22,9 @@ import "../layout/styles/app-shell.css";
 export default function AppLayout() {
   const { mode, session, signOut } = useSession();
   const navigate = useNavigate();
-  const projects = useProjects();
+  const projects = useProjects({ pageSize: 5 });
+  const { projectId = "" } = useParams();
+  const currentProject = useProject(projectId);
 
   const [guideOpen, setGuideOpen] = useState(false);
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -49,11 +51,15 @@ export default function AppLayout() {
 
   const normalizedSearch = search.trim().toLowerCase();
 
-  const visibleProjects = normalizedSearch
-    ? (projects.data ?? []).filter((project) =>
-        project.name.toLowerCase().includes(normalizedSearch),
-      )
-    : (projects.data ?? []).slice(0, 5);
+  const recentProjects = projects.data?.items ?? [];
+  const shortcuts =
+    currentProject.data &&
+    !recentProjects.some((project) => project.id === currentProject.data.id)
+      ? [currentProject.data, ...recentProjects]
+      : recentProjects;
+  const visibleProjects = shortcuts.filter((project) =>
+    project.name.toLowerCase().includes(normalizedSearch),
+  );
 
   const navigation = (
     <>
@@ -88,8 +94,9 @@ export default function AppLayout() {
       <TextInput
         ref={searchInputRef}
         className="sidebar-search"
-        aria-label="Find a project"
-        placeholder="Find a project"
+        aria-label="Filter recent and current projects"
+        placeholder="Filter recent projects"
+        description="Recent and current projects only."
         value={search}
         onChange={(event) => setSearch(event.currentTarget.value)}
         leftSection={<Icon name="search" size={16} />}
@@ -109,11 +116,11 @@ export default function AppLayout() {
         >
           <Icon name="folder" />
           <span>All projects</span>
-          <span className="nav-count">{projects.data?.length ?? "—"}</span>
+          <span className="nav-count">{projects.data?.totalCount ?? "—"}</span>
         </NavLink>
       </nav>
 
-      <div className="nav-label recent-label">YOUR PROJECTS</div>
+      <div className="nav-label recent-label">RECENT PROJECTS</div>
 
       <nav aria-label="Project shortcuts">
         {visibleProjects.map((project, index) => (
@@ -130,16 +137,17 @@ export default function AppLayout() {
           </NavLink>
         ))}
 
-        {projects.data?.length === 0 && (
+        {projects.data?.totalCount === 0 && (
           <p className="sidebar-empty">Your first project will appear here.</p>
         )}
 
         {projects.data &&
-          projects.data.length > 0 &&
+          projects.data.totalCount > 0 &&
           normalizedSearch &&
           visibleProjects.length === 0 && (
             <p className="sidebar-empty">
-              No projects match “{search.trim()}”.
+              No recent projects match “{search.trim()}”. Browse All projects
+              for more.
             </p>
           )}
       </nav>
