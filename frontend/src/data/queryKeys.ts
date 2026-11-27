@@ -4,7 +4,7 @@ export const queryKeys = {
   projects: {
     all: ["projects"] as const,
     page: (page: number, pageSize: number) =>
-      ["projects", page, pageSize] as const,
+        ["projects", page, pageSize] as const,
     detail: (projectId: Id) => ["project", projectId] as const,
   },
 
@@ -12,62 +12,59 @@ export const queryKeys = {
     list: (projectId: Id) => ["datasets", projectId] as const,
 
     page: (
-      projectId: Id,
-      page: number,
-      pageSize: number,
-      search = "",
-      readyOnly = false,
+        projectId: Id,
+        page: number,
+        pageSize: number,
+        search = "",
+        readyOnly = false,
     ) => ["datasets", projectId, page, pageSize, search, readyOnly] as const,
 
     summary: (projectId: Id) => ["datasets", projectId, "summary"] as const,
 
     detail: (projectId: Id, datasetId: Id) =>
-      ["dataset", projectId, datasetId] as const,
+        ["dataset", projectId, datasetId] as const,
 
     importStatus: (projectId: Id, datasetId: Id) =>
-      ["import-status", projectId, datasetId] as const,
-
-    usage: (projectId: Id, datasetId: Id) =>
-      ["dataset-usage", projectId, datasetId] as const,
+        ["import-status", projectId, datasetId] as const,
 
     profile: (projectId: Id, datasetId: Id) =>
-      ["profile", projectId, datasetId] as const,
+        ["profile", projectId, datasetId] as const,
 
     rows: (projectId: Id, datasetId: Id, page: number, pageSize: number) =>
-      ["dataset-rows", projectId, datasetId, page, pageSize] as const,
+        ["dataset-rows", projectId, datasetId, page, pageSize] as const,
 
     preparedPreview: (projectId: Id, datasetId: Id, steps: unknown) =>
-      ["prepared-preview", projectId, datasetId, steps] as const,
+        ["prepared-preview", projectId, datasetId, steps] as const,
   },
 
   dashboards: {
     list: (projectId: Id) => ["dashboards", projectId] as const,
 
     page: (projectId: Id, page: number, pageSize: number) =>
-      ["dashboards", projectId, page, pageSize] as const,
+        ["dashboards", projectId, page, pageSize] as const,
 
     detail: (projectId: Id, dashboardId: Id) =>
-      ["dashboard", projectId, dashboardId] as const,
+        ["dashboard", projectId, dashboardId] as const,
 
     widgets: (projectId: Id, dashboardId: Id) =>
-      ["widgets", projectId, dashboardId] as const,
+        ["widgets", projectId, dashboardId] as const,
 
     editorState: (projectId: Id, dashboardId: Id) =>
-      ["dashboard-editor-state", projectId, dashboardId] as const,
+        ["dashboard-editor-state", projectId, dashboardId] as const,
 
     widgetData: (projectId: Id, dashboardId: Id, widgetId: Id) =>
-      ["widget-data", projectId, dashboardId, widgetId] as const,
+        ["widget-data", projectId, dashboardId, widgetId] as const,
   },
 
   analytics: {
     chartData: (projectId: Id, datasetId: Id, config: unknown) =>
-      ["chart-data", projectId, datasetId, config] as const,
+        ["chart-data", projectId, datasetId, config] as const,
 
     exploration: (
-      projectId: Id,
-      datasetId: Id,
-      versionId: Id,
-      config: unknown,
+        projectId: Id,
+        datasetId: Id,
+        versionId: Id,
+        config: unknown,
     ) => ["exploration", projectId, datasetId, versionId, config] as const,
   },
 } as const;

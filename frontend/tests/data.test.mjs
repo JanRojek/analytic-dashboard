@@ -257,13 +257,61 @@ test("a complete local journey persists imports, prepared datasets, dashboards a
       demoAdapter.getDataset("p-retail", prepared.id),
       /not found/,
     );
-    await assert.rejects(
-      demoAdapter.deleteDataset(project.id, prepared.id),
-      /used by a dashboard/,
+    const dashboardBefore = await demoAdapter.getDashboard(
+        project.id,
+        dashboard.id,
     );
-    await demoAdapter.deleteWidget(project.id, dashboard.id, widget.id);
+
+    const widgetBefore = (
+        await demoAdapter.listWidgets(project.id, dashboard.id)
+    ).find((item) => item.id === widget.id);
+
+    assert.ok(widgetBefore);
+
     await demoAdapter.deleteDataset(project.id, prepared.id);
+
+    await assert.rejects(
+        demoAdapter.getDataset(project.id, prepared.id),
+        /not found/,
+    );
+
     assert.equal((await demoAdapter.listDatasets(project.id)).totalCount, 1);
+
+    const dashboardAfter = await demoAdapter.getDashboard(
+        project.id,
+        dashboard.id,
+    );
+
+    assert.equal(dashboardAfter.revision, dashboardBefore.revision + 1);
+
+    const widgetsAfter = await demoAdapter.listWidgets(project.id, dashboard.id);
+
+    assert.equal(widgetsAfter.length, 1);
+
+    const detachedWidget = widgetsAfter[0];
+
+    assert.equal(detachedWidget.id, widget.id);
+    assert.equal(detachedWidget.dashboardId, dashboard.id);
+    assert.equal(detachedWidget.datasetId, null);
+
+    assert.equal(detachedWidget.title, widgetBefore.title);
+    assert.equal(detachedWidget.type, widgetBefore.type);
+    assert.equal(detachedWidget.groupByColumn, widgetBefore.groupByColumn);
+    assert.equal(detachedWidget.measureColumn, widgetBefore.measureColumn);
+    assert.equal(detachedWidget.aggregation, widgetBefore.aggregation);
+    assert.deepEqual(detachedWidget.layout, widgetBefore.layout);
+
+    await assert.rejects(
+        demoAdapter.widgetData(project.id, dashboard.id, widget.id),
+        /source dataset is unavailable/,
+    );
+
+    await demoAdapter.deleteWidget(project.id, dashboard.id, widget.id);
+
+    assert.equal(
+        (await demoAdapter.listWidgets(project.id, dashboard.id)).length,
+        0,
+    );
     await demoAdapter.deleteProject(project.id);
     await assert.rejects(demoAdapter.getProject(project.id), /not found/);
   } finally {

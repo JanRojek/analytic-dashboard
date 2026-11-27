@@ -8,6 +8,9 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
 import { queryKeys } from "../src/data/queryKeys.ts";
+import { demoAdapter } from "../src/mocks/adapter.ts";
+import { createSeed } from "../src/mocks/seed.ts";
+import { DEMO_STORAGE_KEY } from "../src/mocks/store.ts";
 
 let vite;
 let DataPage;
@@ -16,7 +19,6 @@ let ProjectOverviewPage;
 let SessionContext;
 let useImportDataset;
 let useDeleteDataset;
-let useDatasetUsage;
 let useCreateProject;
 let useRenameProject;
 let useDeleteProject;
@@ -35,33 +37,33 @@ before(async () => {
     appType: "custom",
   });
   ({ DataPage } = await vite.ssrLoadModule(
-    "/src/features/data/pages/DataPage.tsx",
+      "/src/features/data/pages/DataPage.tsx",
   ));
   ({ DatasetSelect } = await vite.ssrLoadModule(
-    "/src/features/data/components/DatasetSelect.tsx",
+      "/src/features/data/components/DatasetSelect.tsx",
   ));
   ({ default: ProjectOverviewPage } = await vite.ssrLoadModule(
-    "/src/features/projects/pages/ProjectOverviewPage.tsx",
+      "/src/features/projects/pages/ProjectOverviewPage.tsx",
   ));
   ({ SessionContext } = await vite.ssrLoadModule(
-    "/src/session/SessionContext.ts",
+      "/src/session/SessionContext.ts",
   ));
   ({ useCreateProject, useRenameProject, useDeleteProject } =
-    await vite.ssrLoadModule("/src/features/projects/hooks.ts"));
+      await vite.ssrLoadModule("/src/features/projects/hooks.ts"));
   ({ useCreateDashboard, useDeleteDashboard } = await vite.ssrLoadModule(
-    "/src/features/dashboards/hooks.ts",
+      "/src/features/dashboards/hooks.ts",
   ));
   ({ default: ProjectsPage } = await vite.ssrLoadModule(
-    "/src/features/projects/pages/ProjectsPage.tsx",
+      "/src/features/projects/pages/ProjectsPage.tsx",
   ));
   ({ DashboardsPage } = await vite.ssrLoadModule(
-    "/src/features/analytics/pages/DashboardsPage.tsx",
+      "/src/features/analytics/pages/DashboardsPage.tsx",
   ));
   ({ default: AppLayout } = await vite.ssrLoadModule(
-    "/src/layout/AppLayout.tsx",
+      "/src/layout/AppLayout.tsx",
   ));
-  ({ useImportDataset, useDeleteDataset, useDatasetUsage } =
-    await vite.ssrLoadModule("/src/features/data/hooks.ts"));
+  ({ useImportDataset, useDeleteDataset } =
+      await vite.ssrLoadModule("/src/features/data/hooks.ts"));
 });
 
 after(async () => {
@@ -76,23 +78,23 @@ function queryClient() {
 
 function render(element, client, { url = "/", path = "/", adapter = {} } = {}) {
   return renderToStaticMarkup(
-    h(
-      MantineProvider,
-      null,
       h(
-        QueryClientProvider,
-        { client },
-        h(
-          SessionContext.Provider,
-          { value: { mode: "api", adapter } },
+          MantineProvider,
+          null,
           h(
-            MemoryRouter,
-            { initialEntries: [url] },
-            h(Routes, null, h(Route, { path, element })),
+              QueryClientProvider,
+              { client },
+              h(
+                  SessionContext.Provider,
+                  { value: { mode: "api", adapter } },
+                  h(
+                      MemoryRouter,
+                      { initialEntries: [url] },
+                      h(Routes, null, h(Route, { path, element })),
+                  ),
+              ),
           ),
-        ),
       ),
-    ),
   );
 }
 
@@ -153,14 +155,14 @@ test("DataPage reads search, readiness and pagination from URL and displays glob
 test("empty search results keep search and clear-filter controls available", () => {
   const client = queryClient();
   client.setQueryData(
-    queryKeys.datasets.page("project", 1, 24, "missing", true),
-    {
-      items: [],
-      page: 1,
-      pageSize: 24,
-      totalCount: 0,
-      totalPages: 1,
-    },
+      queryKeys.datasets.page("project", 1, 24, "missing", true),
+      {
+        items: [],
+        page: 1,
+        pageSize: 24,
+        totalCount: 0,
+        totalPages: 1,
+      },
   );
   client.setQueryData(queryKeys.datasets.summary("project"), summary);
   try {
@@ -199,37 +201,37 @@ test("source selector uses ready-only pages and loads an off-page selection by I
   client.setQueryData(detailKey, selected);
   try {
     const html = render(
-      h(DatasetSelect, {
-        projectId: "project",
-        value: selected.id,
-        onChange() {},
-      }),
-      client,
-      {
-        adapter: {
-          listDatasets: async (...args) => {
-            calls.push(["list", ...args]);
-            return page;
-          },
-          getDataset: async (...args) => {
-            calls.push(["detail", ...args]);
-            return selected;
+        h(DatasetSelect, {
+          projectId: "project",
+          value: selected.id,
+          onChange() {},
+        }),
+        client,
+        {
+          adapter: {
+            listDatasets: async (...args) => {
+              calls.push(["list", ...args]);
+              return page;
+            },
+            getDataset: async (...args) => {
+              calls.push(["detail", ...args]);
+              return selected;
+            },
           },
         },
-      },
     );
     assert.match(html, /value="Previously chosen source"/);
     assert.match(html, /value="off-page"/);
     assert.match(html, /Dataset source pages/);
     assert.doesNotMatch(html, /displayed options only/);
     await client
-      .getQueryCache()
-      .find({ queryKey: key, exact: true })
-      .options.queryFn();
+        .getQueryCache()
+        .find({ queryKey: key, exact: true })
+        .options.queryFn();
     await client
-      .getQueryCache()
-      .find({ queryKey: detailKey, exact: true })
-      .options.queryFn();
+        .getQueryCache()
+        .find({ queryKey: detailKey, exact: true })
+        .options.queryFn();
     assert.deepEqual(calls, [
       [
         "list",
@@ -259,17 +261,17 @@ test("source selector preserves a previously selected source that is not ready",
     totalPages: 1,
   });
   client.setQueryData(
-    queryKeys.datasets.detail("project", selected.id),
-    selected,
+      queryKeys.datasets.detail("project", selected.id),
+      selected,
   );
   try {
     const html = render(
-      h(DatasetSelect, {
-        projectId: "project",
-        value: selected.id,
-        onChange() {},
-      }),
-      client,
+        h(DatasetSelect, {
+          projectId: "project",
+          value: selected.id,
+          onChange() {},
+        }),
+        client,
     );
     assert.match(html, /value="Pending source \(not ready\)"/);
     assert.match(html, /value="pending-source"/);
@@ -452,8 +454,8 @@ test("navigation preserves the current project outside the recent page and displ
     assert.match(html, /nav-count">125</);
     assert.match(html, /Recent and current projects only/);
     assert.equal(
-      client.getQueryState(queryKeys.projects.page(1, 24)),
-      undefined,
+        client.getQueryState(queryKeys.projects.page(1, 24)),
+        undefined,
     );
   } finally {
     client.clear();
@@ -528,47 +530,47 @@ test("project and dashboard mutations invalidate every page without mixing colle
     });
     invalidated(projectKeys);
     assert.equal(
-      client.getQueryState(queryKeys.projects.detail(project.id)).isInvalidated,
-      true,
+        client.getQueryState(queryKeys.projects.detail(project.id)).isInvalidated,
+        true,
     );
 
     seed(dashboardKeys);
     await operations.createDashboard.mutateAsync("Dashboard");
     invalidated(dashboardKeys);
     assert.deepEqual(
-      client.getQueryData(
-        queryKeys.dashboards.detail(project.id, dashboard.id),
-      ),
-      dashboard,
+        client.getQueryData(
+            queryKeys.dashboards.detail(project.id, dashboard.id),
+        ),
+        dashboard,
     );
     seed(dashboardKeys);
     client.setQueryData(
-      queryKeys.dashboards.widgets(project.id, dashboard.id),
-      [],
+        queryKeys.dashboards.widgets(project.id, dashboard.id),
+        [],
     );
     client.setQueryData(
-      queryKeys.dashboards.editorState(project.id, dashboard.id),
-      { dashboard },
+        queryKeys.dashboards.editorState(project.id, dashboard.id),
+        { dashboard },
     );
     await operations.deleteDashboard.mutateAsync(dashboard.id);
     invalidated(dashboardKeys);
     assert.equal(
-      client.getQueryData(
-        queryKeys.dashboards.detail(project.id, dashboard.id),
-      ),
-      undefined,
+        client.getQueryData(
+            queryKeys.dashboards.detail(project.id, dashboard.id),
+        ),
+        undefined,
     );
     assert.equal(
-      client.getQueryData(
-        queryKeys.dashboards.widgets(project.id, dashboard.id),
-      ),
-      undefined,
+        client.getQueryData(
+            queryKeys.dashboards.widgets(project.id, dashboard.id),
+        ),
+        undefined,
     );
     assert.equal(
-      client.getQueryData(
-        queryKeys.dashboards.editorState(project.id, dashboard.id),
-      ),
-      undefined,
+        client.getQueryData(
+            queryKeys.dashboards.editorState(project.id, dashboard.id),
+        ),
+        undefined,
     );
     assert.equal(client.getQueryState(otherKey).isInvalidated, false);
 
@@ -576,8 +578,8 @@ test("project and dashboard mutations invalidate every page without mixing colle
     await operations.deleteProject.mutateAsync(project.id);
     invalidated(projectKeys);
     assert.equal(
-      client.getQueryData(queryKeys.projects.detail(project.id)),
-      undefined,
+        client.getQueryData(queryKeys.projects.detail(project.id)),
+        undefined,
     );
     assert.equal(client.getQueryData(dashboardKeys[0]), undefined);
     assert.ok(client.getQueryState(otherKey));
@@ -586,64 +588,190 @@ test("project and dashboard mutations invalidate every page without mixing colle
   }
 });
 
-test("dataset usage and delete preflight include a dashboard on the second page", async () => {
+test("delete dataset skips usage scans and invalidates dependent caches", async () => {
   const client = queryClient();
-  const first = Array.from({ length: 24 }, (_, index) => ({
-    id: `board-${index}`,
-    name: `Board ${index}`,
-    projectId: "project",
-    createdAtUtc: "2026-11-26T00:00:00Z",
-  }));
-  const last = { ...first[0], id: "off-page", name: "Off-page dashboard" };
-  const pages = [];
-  let deleted = false;
-  let collectionChanged = false;
-  let operations;
-  function Usage() {
-    useDatasetUsage("project", "dataset");
-    operations = useDeleteDataset("project");
+  const calls = [];
+  let remove;
+  function Mutations() {
+    remove = useDeleteDataset("project");
     return null;
   }
+  const otherKey = queryKeys.dashboards.editorState(
+      "other-project",
+      "other-board",
+  );
+  const staleKeys = [
+    queryKeys.datasets.page("project", 1, 24),
+    queryKeys.datasets.page("project", 2, 48, "sales", true),
+    queryKeys.datasets.summary("project"),
+    queryKeys.dashboards.detail("project", "board"),
+    queryKeys.dashboards.editorState("project", "board"),
+    queryKeys.dashboards.widgets("project", "board"),
+    queryKeys.dashboards.widgetData("project", "board", "widget"),
+  ];
+  const removedKeys = [
+    queryKeys.datasets.detail("project", "source"),
+    queryKeys.datasets.profile("project", "source"),
+    queryKeys.datasets.importStatus("project", "source"),
+    queryKeys.datasets.rows("project", "source", 1, 24),
+    queryKeys.datasets.preparedPreview("project", "source", []),
+    queryKeys.analytics.chartData("project", "source", {}),
+    queryKeys.analytics.exploration("project", "source", "version", {}),
+  ];
   try {
-    render(h(Usage), client, {
+    render(h(Mutations), client, {
       adapter: {
-        listDashboards: async (_, { page }) => {
-          pages.push(page);
-          return {
-            items: page === 1 ? first : [last],
-            page,
-            pageSize: 24,
-            totalCount: collectionChanged && page === 2 ? 26 : 25,
-            totalPages: 2,
-          };
+        listDashboards: async () => {
+          throw new Error("Unexpected dashboard scan");
         },
-        listWidgets: async (_, id) =>
-          id === "off-page" ? [{ datasetId: "dataset" }] : [],
-        deleteDataset: async () => {
-          deleted = true;
+        listWidgets: async () => {
+          throw new Error("Unexpected widget scan");
+        },
+        deleteDataset: async (...args) => {
+          calls.push(args);
         },
       },
     });
-    const query = client.getQueryCache().find({
-      queryKey: queryKeys.datasets.usage("project", "dataset"),
-      exact: true,
-    });
-    const usage = await query.options.queryFn();
-    assert.deepEqual(usage, [{ dashboard: last, count: 1 }]);
-    assert.deepEqual(pages, [1, 2]);
-    await assert.rejects(
-      operations.mutateAsync("dataset"),
-      /used by a dashboard/,
-    );
-    assert.deepEqual(pages, [1, 2, 1, 2]);
-    assert.equal(deleted, false);
-    collectionChanged = true;
-    await assert.rejects(
-      operations.mutateAsync("dataset"),
-      /list changed while checking/,
-    );
-    assert.equal(deleted, false);
+    for (const key of [...staleKeys, ...removedKeys, otherKey]) {
+      client.setQueryData(key, {});
+    }
+
+    await remove.mutateAsync("source");
+
+    assert.deepEqual(calls, [["project", "source"]]);
+    for (const key of staleKeys) {
+      assert.equal(client.getQueryState(key)?.isInvalidated, true);
+    }
+    for (const key of removedKeys) {
+      assert.equal(client.getQueryData(key), undefined);
+    }
+    assert.equal(client.getQueryState(otherKey)?.isInvalidated, false);
   } finally {
     client.clear();
+  }
+});
+
+test("demo deletion detaches widgets and increments dashboard revisions", async () => {
+  const state = createSeed();
+  const projectId = state.projects[0].id;
+  const dataset = state.datasets.find((item) => item.projectId === projectId);
+  assert.ok(dataset);
+  const datasetId = dataset.dataset.id;
+  const sourceDashboard = state.dashboards.find((d) => d.projectId === projectId);
+  assert.ok(sourceDashboard);
+  const target = {
+    ...sourceDashboard,
+    id: crypto.randomUUID(),
+    name: "Deletion test dashboard",
+    revision: 5,
+  };
+  state.dashboards.push(target);
+  const originalRevision = target.revision;
+  const original = {
+    id: crypto.randomUUID(),
+    dashboardId: target.id,
+    datasetId,
+    type: "Kpi",
+    title: "First chart",
+    groupByColumn: "region",
+    measureColumn: "amount",
+    aggregation: "Count",
+    layout: { x: 0, y: 0, width: 6, height: 14 },
+    createdAtUtc: new Date().toISOString(),
+  };
+  const secondWidget = {
+    ...original,
+    id: crypto.randomUUID(),
+    title: "Second chart",
+    layout: { x: 6, y: 0, width: 6, height: 14 },
+  };
+  state.widgets.push(original, secondWidget);
+  const priorRevisions = new Map(
+      state.dashboards.map((board) => [board.id, board.revision]),
+  );
+  const affected = new Set(
+      state.widgets
+          .filter((w) => w.datasetId === datasetId)
+          .map((w) => w.dashboardId),
+  );
+
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const values = new Map([[DEMO_STORAGE_KEY, JSON.stringify(state)]]);
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+    },
+  });
+  try {
+    await demoAdapter.deleteDataset(projectId, datasetId);
+    const after = await demoAdapter.getDashboardEditorState(
+        projectId,
+        target.id,
+    );
+    assert.equal(after.dashboard.revision, originalRevision + 1);
+    const detached = after.widgets.filter((widget) =>
+        [original.id, secondWidget.id].includes(widget.id),
+    );
+    assert.equal(detached.length, 2);
+    for (const widget of detached) {
+      assert.equal(widget.datasetId, null);
+      const before = widget.id === original.id ? original : secondWidget;
+      assert.equal(widget.title, before.title);
+      assert.deepEqual(widget.layout, before.layout);
+    }
+    for (const board of state.dashboards) {
+      if (board.projectId !== projectId) continue;
+      const actual = await demoAdapter.getDashboard(projectId, board.id);
+      assert.equal(
+          actual.revision,
+          priorRevisions.get(board.id) + (affected.has(board.id) ? 1 : 0),
+      );
+    }
+    assert.equal(
+        (await demoAdapter.getDatasetsSummary(projectId)).totalCount,
+        state.datasets.filter((item) => item.projectId === projectId).length - 1,
+    );
+
+    const updates = after.widgets.map((widget) => ({
+      widgetId: widget.id,
+      datasetId: widget.datasetId,
+      type: widget.type,
+      title: widget.title,
+      groupByColumn: widget.groupByColumn,
+      measureColumn: widget.measureColumn,
+      aggregation: widget.aggregation,
+      layout: widget.layout,
+    }));
+    const saved = await demoAdapter.updateDashboardWidgets(
+        projectId,
+        target.id,
+        updates,
+        after.dashboard.revision,
+    );
+    assert.equal(saved.revision, originalRevision + 2);
+
+    await assert.rejects(
+        demoAdapter.updateDashboardWidgets(
+            projectId,
+            target.id,
+            [{ ...updates[0], widgetId: crypto.randomUUID(), datasetId: null }],
+            saved.revision,
+        ),
+        /needs a dataset/,
+    );
+    await assert.rejects(
+        demoAdapter.updateDashboardWidgets(
+            projectId,
+            target.id,
+            [{ ...updates[0], datasetId }],
+            saved.revision,
+        ),
+        /Reconnecting/,
+    );
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else delete globalThis.localStorage;
   }
 });

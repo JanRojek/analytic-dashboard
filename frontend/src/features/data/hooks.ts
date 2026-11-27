@@ -1,56 +1,13 @@
 ﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "../../session/SessionContext";
 import { queryKeys } from "../../data/queryKeys";
-import type {
-  DashboardListItem,
-  DataAdapter,
-  DatasetListParams,
-} from "../../data/types";
+import type { DatasetListParams } from "../../data/types";
 import { normalizeDatasetListParams } from "../../data/pagination";
 
-async function findDatasetUsage(
-  adapter: DataAdapter,
-  projectId: string,
-  datasetId: string,
-) {
-  const usages: { dashboard: DashboardListItem; count: number }[] = [];
-  let page = 1;
-  let totalPages: number;
-  let totalCount: number | undefined;
-
-  do {
-    const dashboards = await adapter.listDashboards(projectId, { page });
-    if (
-      dashboards.page !== page ||
-      (totalCount !== undefined && dashboards.totalCount !== totalCount)
-    ) {
-      throw new Error(
-        "The dashboard list changed while checking dataset usage. Please try again.",
-      );
-    }
-    totalCount = dashboards.totalCount;
-    totalPages = dashboards.totalPages;
-    const pageUsages = await Promise.all(
-      dashboards.items.map(async (dashboard) => {
-        const widgets = await adapter.listWidgets(projectId, dashboard.id);
-        return {
-          dashboard,
-          count: widgets.filter((widget) => widget.datasetId === datasetId)
-            .length,
-        };
-      }),
-    );
-    usages.push(...pageUsages.filter((usage) => usage.count > 0));
-    page++;
-  } while (page <= totalPages);
-
-  return usages;
-}
-
 export function useDatasets(
-  projectId: string,
-  params: DatasetListParams = {},
-  enabled = true,
+    projectId: string,
+    params: DatasetListParams = {},
+    enabled = true,
 ) {
   const { adapter } = useSession();
   const filters = normalizeDatasetListParams(params);
@@ -58,11 +15,11 @@ export function useDatasets(
 
   return useQuery({
     queryKey: queryKeys.datasets.page(
-      projectId,
-      page,
-      pageSize,
-      search,
-      readyOnly,
+        projectId,
+        page,
+        pageSize,
+        search,
+        readyOnly,
     ),
     queryFn: () => adapter.listDatasets(projectId, filters),
     enabled: enabled && Boolean(projectId),
@@ -79,26 +36,12 @@ export function useDatasetsSummary(projectId: string) {
   });
 }
 
-export function useDatasetUsage(
-  projectId: string,
-  datasetId: string | undefined,
-) {
-  const { adapter } = useSession();
-
-  return useQuery({
-    queryKey: queryKeys.datasets.usage(projectId, datasetId),
-    queryFn: () => findDatasetUsage(adapter, projectId, datasetId!),
-    enabled: Boolean(datasetId),
-    staleTime: 0,
-  });
-}
-
 const IMPORT_STATUS_POLL_INTERVAL_MS = 750;
 
 export function useImportStatus(
-  projectId: string,
-  datasetId: string,
-  enabled = true,
+    projectId: string,
+    datasetId: string,
+    enabled = true,
 ) {
   const { adapter, mode } = useSession();
 
@@ -127,38 +70,56 @@ export function useDeleteDataset(projectId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (datasetId: string) => {
-      const references = await findDatasetUsage(adapter, projectId, datasetId);
-
-      if (references.length) {
-        throw new Error(
-          "This dataset is used by a dashboard. Remove its charts before deleting it.",
-        );
-      }
-
-      return adapter.deleteDataset(projectId, datasetId);
-    },
+    mutationFn: (datasetId: string) => adapter.deleteDataset(projectId, datasetId),
 
     onSuccess: async (_, datasetId) => {
+      // All filtered pages and the project-wide summary share this prefix.
       await queryClient.invalidateQueries({
         queryKey: queryKeys.datasets.list(projectId),
       });
 
-      queryClient.removeQueries({
-        queryKey: queryKeys.datasets.detail(projectId, datasetId),
-      });
+      // Discard cached information derived from the deleted source.
+      const removedDatasetKeys = [
+        queryKeys.datasets.detail(projectId, datasetId),
+        queryKeys.datasets.profile(projectId, datasetId),
+        queryKeys.datasets.importStatus(projectId, datasetId),
+        ["dataset-rows", projectId, datasetId],
+        ["prepared-preview", projectId, datasetId],
+        ["chart-data", projectId, datasetId],
+        ["exploration", projectId, datasetId],
+      ];
 
-      queryClient.removeQueries({
-        queryKey: queryKeys.datasets.profile(projectId, datasetId),
-      });
+      for (const queryKey of removedDatasetKeys) {
+        queryClient.removeQueries({ queryKey });
+      }
+
+      // Deletion detaches dependent widgets and advances dashboard revisions.
+      // Mark editor snapshots/details stale, but do not refetch an active editor:
+      // its local unsaved state must not be replaced by a server snapshot.
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard", projectId],
+          refetchType: "inactive",
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-editor-state", projectId],
+          refetchType: "inactive",
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["widgets", projectId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["widget-data", projectId],
+        }),
+      ]);
     },
   });
 }
 
 export function useDataset(
-  projectId: string,
-  datasetId: string,
-  enabled = true,
+    projectId: string,
+    datasetId: string,
+    enabled = true,
 ) {
   const { adapter } = useSession();
 
@@ -170,9 +131,9 @@ export function useDataset(
 }
 
 export function useDatasetProfile(
-  projectId: string,
-  datasetId: string,
-  enabled = true,
+    projectId: string,
+    datasetId: string,
+    enabled = true,
 ) {
   const { adapter } = useSession();
 
@@ -184,11 +145,11 @@ export function useDatasetProfile(
 }
 
 export function useDatasetRows(
-  projectId: string,
-  datasetId: string,
-  page: number,
-  pageSize: number,
-  enabled = true,
+    projectId: string,
+    datasetId: string,
+    page: number,
+    pageSize: number,
+    enabled = true,
 ) {
   const { adapter } = useSession();
 

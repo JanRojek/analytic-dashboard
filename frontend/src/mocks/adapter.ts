@@ -20,9 +20,9 @@ const id = () => crypto.randomUUID();
 export const demoAdapter: DataAdapter = {
   async listProjects(params) {
     const projects = readDemoState().projects.sort(
-      (a, b) =>
-        b.createdAtUtc.localeCompare(a.createdAtUtc) ||
-        a.id.localeCompare(b.id),
+        (a, b) =>
+            b.createdAtUtc.localeCompare(a.createdAtUtc) ||
+            a.id.localeCompare(b.id),
     );
     const normalized = normalizePagination(params);
     const totalCount = projects.length;
@@ -44,7 +44,7 @@ export const demoAdapter: DataAdapter = {
     return mutateDemoState((state) => {
       const clean = normalizedName(name);
       if (
-        state.projects.some((p) => p.name.toLowerCase() === clean.toLowerCase())
+          state.projects.some((p) => p.name.toLowerCase() === clean.toLowerCase())
       )
         throw new Error("A project with this name already exists.");
       const project: Project = {
@@ -63,10 +63,10 @@ export const demoAdapter: DataAdapter = {
       const project = requireProject(state, p);
       const clean = normalizedName(name);
       if (
-        state.projects.some(
-          (other) =>
-            other.id !== p && other.name.toLowerCase() === clean.toLowerCase(),
-        )
+          state.projects.some(
+              (other) =>
+                  other.id !== p && other.name.toLowerCase() === clean.toLowerCase(),
+          )
       )
         throw new Error("A project with this name already exists.");
       project.name = clean;
@@ -77,20 +77,20 @@ export const demoAdapter: DataAdapter = {
     mutateDemoState((state) => {
       requireProject(state, p);
       const datasetIds = new Set(
-        state.datasets
-          .filter((d) => d.projectId === p)
-          .map((d) => d.dataset.id),
+          state.datasets
+              .filter((d) => d.projectId === p)
+              .map((d) => d.dataset.id),
       );
       const dashboardIds = new Set(
-        state.dashboards.filter((d) => d.projectId === p).map((d) => d.id),
+          state.dashboards.filter((d) => d.projectId === p).map((d) => d.id),
       );
       state.projects = state.projects.filter((item) => item.id !== p);
       state.datasets = state.datasets.filter((item) => item.projectId !== p);
       state.dashboards = state.dashboards.filter(
-        (item) => item.projectId !== p,
+          (item) => item.projectId !== p,
       );
       state.widgets = state.widgets.filter(
-        (item) => !dashboardIds.has(item.dashboardId),
+          (item) => !dashboardIds.has(item.dashboardId),
       );
       for (const datasetId of datasetIds) delete state.recipes[datasetId];
     });
@@ -101,18 +101,18 @@ export const demoAdapter: DataAdapter = {
     const normalized = normalizeDatasetListParams(params);
     const term = normalized.search.toLowerCase();
     const datasets = state.datasets
-      .filter((item) => item.projectId === p)
-      .map((item) => item.dataset)
-      .filter(
-        (dataset) =>
-          (!normalized.readyOnly || dataset.currentVersion !== null) &&
-          dataset.name.toLowerCase().includes(term),
-      )
-      .sort(
-        (a, b) =>
-          b.createdAtUtc.localeCompare(a.createdAtUtc) ||
-          a.id.localeCompare(b.id),
-      );
+        .filter((item) => item.projectId === p)
+        .map((item) => item.dataset)
+        .filter(
+            (dataset) =>
+                (!normalized.readyOnly || dataset.currentVersion !== null) &&
+                dataset.name.toLowerCase().includes(term),
+        )
+        .sort(
+            (a, b) =>
+                b.createdAtUtc.localeCompare(a.createdAtUtc) ||
+                a.id.localeCompare(b.id),
+        );
     const totalCount = datasets.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / normalized.pageSize));
     const page = normalized.page <= totalPages ? normalized.page : 1;
@@ -131,14 +131,14 @@ export const demoAdapter: DataAdapter = {
     requireProject(state, p);
     const datasets = state.datasets.filter((item) => item.projectId === p);
     const ready = datasets.filter(
-      (item) => item.dataset.currentVersion !== null,
+        (item) => item.dataset.currentVersion !== null,
     );
     return {
       totalCount: datasets.length,
       readyCount: ready.length,
       totalRows: ready.reduce(
-        (sum, item) => sum + item.dataset.currentVersion!.rowCount,
-        0,
+          (sum, item) => sum + item.dataset.currentVersion!.rowCount,
+          0,
       ),
     };
   },
@@ -204,10 +204,18 @@ export const demoAdapter: DataAdapter = {
   async deleteDataset(p, d) {
     mutateDemoState((state) => {
       requireDataset(state, p, d);
-      if (state.widgets.some((widget) => widget.datasetId === d))
-        throw new Error(
-          "This dataset is used by a dashboard. Remove its charts before deleting it.",
-        );
+      const affectedDashboards = new Set<string>();
+
+      for (const widget of state.widgets) {
+        if (widget.datasetId !== d) continue;
+        widget.datasetId = null;
+        affectedDashboards.add(widget.dashboardId);
+      }
+
+      for (const dashboard of state.dashboards) {
+        if (affectedDashboards.has(dashboard.id)) dashboard.revision += 1;
+      }
+
       state.datasets = state.datasets.filter((item) => item.dataset.id !== d);
       delete state.recipes[d];
     });
@@ -220,25 +228,25 @@ export const demoAdapter: DataAdapter = {
     const state = readDemoState();
     requireProject(state, p);
     const dashboards = state.dashboards
-      .filter((item) => item.projectId === p)
-      .sort(
-        (a, b) =>
-          b.createdAtUtc.localeCompare(a.createdAtUtc) ||
-          a.id.localeCompare(b.id),
-      );
+        .filter((item) => item.projectId === p)
+        .sort(
+            (a, b) =>
+                b.createdAtUtc.localeCompare(a.createdAtUtc) ||
+                a.id.localeCompare(b.id),
+        );
     const normalized = normalizePagination(params);
     const totalCount = dashboards.length;
     const totalPages = Math.max(1, Math.ceil(totalCount / normalized.pageSize));
     const page = normalized.page <= totalPages ? normalized.page : 1;
     const offset = (page - 1) * normalized.pageSize;
     const items = dashboards
-      .slice(offset, offset + normalized.pageSize)
-      .map(({ id, projectId, name, createdAtUtc }) => ({
-        id,
-        projectId,
-        name,
-        createdAtUtc,
-      }));
+        .slice(offset, offset + normalized.pageSize)
+        .map(({ id, projectId, name, createdAtUtc }) => ({
+          id,
+          projectId,
+          name,
+          createdAtUtc,
+        }));
     return {
       items,
       page,
@@ -262,11 +270,11 @@ export const demoAdapter: DataAdapter = {
         revision: dashboard.revision,
       },
       widgets: state.widgets
-        .filter((widget) => widget.dashboardId === d)
-        .map((widget) => ({
-          ...widget,
-          layout: { ...widget.layout },
-        })),
+          .filter((widget) => widget.dashboardId === d)
+          .map((widget) => ({
+            ...widget,
+            layout: { ...widget.layout },
+          })),
     };
   },
   async createDashboard(p, name) {
@@ -317,9 +325,9 @@ export const demoAdapter: DataAdapter = {
     mutateDemoState((state) => {
       requireDashboard(state, p, d);
       if (
-        !state.widgets.some(
-          (widget) => widget.dashboardId === d && widget.id === w,
-        )
+          !state.widgets.some(
+              (widget) => widget.dashboardId === d && widget.id === w,
+          )
       )
         throw new Error("This chart was not found.");
       state.widgets = state.widgets.filter((item) => item.id !== w);
@@ -329,7 +337,7 @@ export const demoAdapter: DataAdapter = {
     const state = readDemoState();
     requireDashboard(state, p, d);
     const widget = state.widgets.find(
-      (item) => item.dashboardId === d && item.id === w,
+        (item) => item.dashboardId === d && item.id === w,
     );
     if (!widget) throw new Error("This chart was not found.");
     if (widget.datasetId === null) {
@@ -348,22 +356,22 @@ export const demoAdapter: DataAdapter = {
       }
 
       const widgets = state.widgets.filter(
-        (widget) => widget.dashboardId === d,
+          (widget) => widget.dashboardId === d,
       );
 
       const existingWidgetsById = new Map(
-        widgets.map((widget) => [widget.id, widget]),
+          widgets.map((widget) => [widget.id, widget]),
       );
 
       const submittedIds = new Set(updates.map((update) => update.widgetId));
 
       if (
-        submittedIds.size !== updates.length ||
-        updates.some(
-          (update) =>
-            !update.widgetId ||
-            update.widgetId === "00000000-0000-0000-0000-000000000000",
-        )
+          submittedIds.size !== updates.length ||
+          updates.some(
+              (update) =>
+                  !update.widgetId ||
+                  update.widgetId === "00000000-0000-0000-0000-000000000000",
+          )
       ) {
         throw new Error("Widget IDs must be non-empty and unique.");
       }
@@ -374,16 +382,16 @@ export const demoAdapter: DataAdapter = {
         const measureColumn = update.measureColumn.trim();
 
         if (
-          !groupByColumn ||
-          !measureColumn ||
-          [...groupByColumn].length > 255 ||
-          [...measureColumn].length > 255
+            !groupByColumn ||
+            !measureColumn ||
+            [...groupByColumn].length > 255 ||
+            [...measureColumn].length > 255
         ) {
           throw new Error("Invalid widget column configuration.");
         }
 
         if (
-          !["Kpi", "BarChart", "LineChart", "PieChart"].includes(update.type)
+            !["Kpi", "BarChart", "LineChart", "PieChart"].includes(update.type)
         ) {
           throw new Error("Unsupported widget type.");
         }
@@ -391,26 +399,35 @@ export const demoAdapter: DataAdapter = {
         const { x, y, width, height } = update.layout;
 
         if (
-          ![x, y, width, height].every(Number.isInteger) ||
-          x < 0 ||
-          y < 0 ||
-          width < 6 ||
-          height < 14 ||
-          x + width > 24
+            ![x, y, width, height].every(Number.isInteger) ||
+            x < 0 ||
+            y < 0 ||
+            width < 6 ||
+            height < 14 ||
+            x + width > 24
         ) {
           throw new Error("Invalid widget layout.");
         }
 
-        if (update.datasetId === null) {
-          throw new Error("Demo mode cannot save detached charts.");
-        }
-        const dataset = requireDataset(state, p, update.datasetId);
+        const existing = existingWidgetsById.get(update.widgetId);
 
-        queryRows(dataset.columns, dataset.rows, {
-          groupByColumn,
-          measureColumn,
-          aggregation: update.aggregation,
-        });
+        if (update.datasetId === null) {
+          // Only an already detached widget may be saved without a source.
+          if (!existing || existing.datasetId !== null) {
+            throw new Error("A new or connected widget needs a dataset.");
+          }
+        } else {
+          if (existing?.datasetId === null) {
+            throw new Error("Reconnecting a detached widget is not supported.");
+          }
+          const dataset = requireDataset(state, p, update.datasetId);
+
+          queryRows(dataset.columns, dataset.rows, {
+            groupByColumn,
+            measureColumn,
+            aggregation: update.aggregation,
+          });
+        }
 
         return {
           ...update,
@@ -426,10 +443,10 @@ export const demoAdapter: DataAdapter = {
           const b = validated[j].layout;
 
           const intersects =
-            a.x < b.x + b.width &&
-            b.x < a.x + a.width &&
-            a.y < b.y + b.height &&
-            b.y < a.y + a.height;
+              a.x < b.x + b.width &&
+              b.x < a.x + a.width &&
+              a.y < b.y + b.height &&
+              b.y < a.y + a.height;
 
           if (intersects) {
             throw new Error("Widget layouts must not overlap.");
